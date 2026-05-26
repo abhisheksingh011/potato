@@ -861,6 +861,49 @@ body {
 }
 #kbd-hint.show { opacity: 1; }
 
+/* ===== PLAY FLOW ===== */
+#play-indicator {
+  position: fixed;
+  bottom: 36px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(18,21,42,0.97);
+  border: 1px solid var(--teal);
+  border-radius: 10px;
+  padding: 10px 20px;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--teal);
+  z-index: 9000;
+  display: none;
+  backdrop-filter: blur(10px);
+  max-width: 90vw;
+  text-align: center;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.5), 0 0 24px rgba(26,188,156,0.3);
+  pointer-events: none;
+}
+#play-indicator.show { display: block; }
+
+.node.playing-flow {
+  border-color: var(--teal) !important;
+  box-shadow: 0 0 24px rgba(26,188,156,0.7), 0 0 0 2px rgba(26,188,156,0.5) !important;
+  z-index: 50 !important;
+  animation: play-pulse 0.9s ease-in-out;
+}
+@keyframes play-pulse {
+  0%, 100% { transform: scale(1); }
+  50%      { transform: scale(1.04); }
+}
+
+.arrow-path.playing-flow {
+  stroke-width: 3 !important;
+  stroke-opacity: 1 !important;
+  stroke-dasharray: 8, 6 !important;
+  animation: dash-flow 0.6s linear infinite !important;
+}
+
+#btn-play-flow.playing { background: linear-gradient(135deg, #1abc9c, #2e86c1); border-color: transparent; }
+
 kbd {
   display: inline-block;
   padding: 1px 5px;
@@ -1001,6 +1044,7 @@ kbd {
     <button class="tb-btn" onclick="autoLayout('lr')" title="Auto Layout Left→Right" aria-label="Auto-layout left to right"><span class="tb-icon" aria-hidden="true">→</span><span class="tb-label">Layout LR</span></button>
     <button class="tb-btn" onclick="autoLayout('tb')" title="Auto Layout Top→Bottom" aria-label="Auto-layout top to bottom"><span class="tb-icon" aria-hidden="true">↓</span><span class="tb-label">Layout TB</span></button>
     <button id="btn-grid-snap" class="tb-btn" onclick="toggleGridSnap()" title="Toggle snap to 20px grid" aria-label="Toggle grid snap" aria-pressed="false"><span class="tb-icon" aria-hidden="true">⌗</span><span class="tb-label">Snap</span></button>
+    <button id="btn-play-flow" class="tb-btn" onclick="togglePlayFlow()" title="Animate the data flow through the diagram" aria-label="Play flow animation"><span class="tb-icon" aria-hidden="true">▶</span><span class="tb-label">Play</span></button>
   </div>
 
   <div style="flex:1;"></div>
@@ -1132,6 +1176,9 @@ kbd {
 
 <!-- KBD HINT -->
 <div id="kbd-hint"></div>
+
+<!-- PLAY FLOW INDICATOR -->
+<div id="play-indicator" aria-live="polite"></div>
 
 <!-- NOTIFICATIONS -->
 <div id="notifications" role="status" aria-live="polite" aria-atomic="false"></div>
@@ -3908,7 +3955,8 @@ function setupEventListeners() {
     if (e.key === '-') zoomOut();
     if (e.key === '0') zoomReset();
     if (e.key === 'f') fitToContent();
-    if (e.key === 'Escape') { clearSelection(); setTool('select'); cancelConnecting(); }
+    if (e.key === 'Escape') { clearSelection(); setTool('select'); cancelConnecting(); if (_playFlowTimer) stopPlayFlow(); }
+    if (e.key === ' ' || e.key === 'Spacebar') { e.preventDefault(); togglePlayFlow(); }
 
     // Arrow key nudge
     const NUDGE = e.shiftKey ? 10 : 1;
@@ -4614,6 +4662,129 @@ function autoLayout(dir) {
   fitToContent();
   markDirty();
   notify(`Auto-layout (${isLR ? 'LR' : 'TB'}) applied — ${layerKeys.length} layers`);
+}
+
+// ===== PLAY FLOW =====
+// Animates the data flow through the diagram, one arrow at a time.
+// Steps are derived by BFS from source nodes (no incoming arrows), so a
+// well-formed left-to-right architecture diagram plays in the order the
+// user reads it. Cycles fall back to creation order.
+const PLAY_STEP_MS = 1400;
+let _playFlowTimer = null;
+let _playFlowSteps = [];
+let _playFlowIdx = 0;
+
+function buildPlaySteps() {
+  if (!arrows.length) return [];
+  const inDeg = {}, outArrows = {};
+  nodes.forEach(n => { inDeg[n.id] = 0; outArrows[n.id] = []; });
+  arrows.forEach(a => {
+    if (inDeg[a.to] !== undefined) inDeg[a.to]++;
+    if (outArrows[a.from]) outArrows[a.from].push(a);
+  });
+
+  // Sources first (no incoming), then by leftmost x for predictable order.
+  let queue = nodes.filter(n => inDeg[n.id] === 0).sort((a,b) => (a.x - b.x) || (a.y - b.y)).map(n => n.id);
+  if (!queue.length && nodes.length) {
+    // Pure cycle — start from leftmost node.
+    queue = [[...nodes].sort((a,b) => a.x - b.x)[0].id];
+  }
+
+  const visited = new Set();
+  const emitted = new Set();
+  const steps = [];
+
+  while (queue.length) {
+    const id = queue.shift();
+    if (visited.has(id)) continue;
+    visited.add(id);
+    // Sort outgoing edges by target position (left-to-right then top-to-bottom).
+    const outs = (outArrows[id] || []).slice().sort((a,b) => {
+      const tA = getNode(a.to), tB = getNode(b.to);
+      if (!tA || !tB) return 0;
+      return (tA.x - tB.x) || (tA.y - tB.y);
+    });
+    outs.forEach(arrow => {
+      if (emitted.has(arrow.id)) return;
+      emitted.add(arrow.id);
+      steps.push(arrow);
+      if (!visited.has(arrow.to)) queue.push(arrow.to);
+    });
+  }
+
+  // Catch any arrows missed by traversal (cycles or orphans) so the play
+  // shows the full diagram, not just the reachable part.
+  arrows.forEach(a => { if (!emitted.has(a.id)) steps.push(a); });
+  return steps;
+}
+
+function togglePlayFlow() {
+  if (_playFlowTimer) { stopPlayFlow(); return; }
+  startPlayFlow();
+}
+
+function startPlayFlow() {
+  _playFlowSteps = buildPlaySteps();
+  if (!_playFlowSteps.length) {
+    notify(arrows.length ? 'Nothing to play' : 'Add connections, then press Play', 'warning');
+    return;
+  }
+  _playFlowIdx = 0;
+  const btn = document.getElementById('btn-play-flow');
+  if (btn) {
+    btn.classList.add('playing');
+    btn.querySelector('.tb-icon').textContent = '⏹';
+    btn.querySelector('.tb-label').textContent = 'Stop';
+  }
+  document.getElementById('play-indicator').classList.add('show');
+  runPlayStep();
+  _playFlowTimer = setInterval(runPlayStep, PLAY_STEP_MS);
+}
+
+function stopPlayFlow() {
+  if (_playFlowTimer) clearInterval(_playFlowTimer);
+  _playFlowTimer = null;
+  clearPlayHighlights();
+  document.getElementById('play-indicator').classList.remove('show');
+  const btn = document.getElementById('btn-play-flow');
+  if (btn) {
+    btn.classList.remove('playing');
+    btn.querySelector('.tb-icon').textContent = '▶';
+    btn.querySelector('.tb-label').textContent = 'Play';
+  }
+}
+
+function runPlayStep() {
+  clearPlayHighlights();
+  if (_playFlowIdx >= _playFlowSteps.length) { stopPlayFlow(); return; }
+  const arrow = _playFlowSteps[_playFlowIdx];
+  const total = _playFlowSteps.length;
+
+  // Highlight source + destination nodes
+  ['from', 'to'].forEach(end => {
+    const el = document.getElementById('node-' + arrow[end]);
+    if (el) el.classList.add('playing-flow');
+  });
+
+  // Animate the arrow
+  const g = document.getElementById('arrow-' + arrow.id);
+  if (g) {
+    const path = g.querySelector('.arrow-path');
+    if (path) path.classList.add('playing-flow');
+  }
+
+  // Step indicator label
+  const fromName = (getNode(arrow.from) || {}).label || arrow.from;
+  const toName = (getNode(arrow.to) || {}).label || arrow.to;
+  const tail = arrow.label ? ` — ${arrow.label}` : '';
+  document.getElementById('play-indicator').textContent = `Step ${_playFlowIdx + 1} / ${total} · ${fromName} → ${toName}${tail}`;
+
+  _playFlowIdx++;
+}
+
+function clearPlayHighlights() {
+  document.querySelectorAll('.node.playing-flow').forEach(n => n.classList.remove('playing-flow'));
+  document.querySelectorAll('.arrow-path.playing-flow').forEach(p => p.classList.remove('playing-flow'));
 }
 
 // ===== SAVE / LOAD =====
@@ -5503,6 +5674,7 @@ function showHelp() {
       <tr style="border-bottom:1px solid var(--border)"><td style="padding:6px 0;color:var(--text-muted)">Arrow keys</td><td>Nudge (Shift = 10px)</td></tr>
       <tr style="border-bottom:1px solid var(--border)"><td style="padding:6px 0;color:var(--text-muted)">S / H / T</td><td>Select / Pan / Text tool</td></tr>
       <tr style="border-bottom:1px solid var(--border)"><td style="padding:6px 0;color:var(--text-muted)">+ / - / 0 / F</td><td>Zoom in/out/reset/fit</td></tr>
+      <tr style="border-bottom:1px solid var(--border)"><td style="padding:6px 0;color:var(--text-muted)">Space</td><td>Play / stop the flow animation</td></tr>
     </table>
     <br>
     <p style="font-size:11px;color:var(--text-muted)">
