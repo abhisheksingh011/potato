@@ -2658,7 +2658,7 @@ function renderSidebar(tab, filter = '') {
       el.draggable = true;
       el.dataset.compId = item.id;
       const iconBody = item.iconUrl
-        ? `<img src="${escHtml(item.iconUrl)}" alt="" loading="lazy" style="width:22px;height:22px;object-fit:contain" onerror="this.replaceWith(Object.assign(document.createElement('span'),{textContent:${JSON.stringify(item.icon || '⬜')}}))">`
+        ? `<img src="${escHtml(item.iconUrl)}" alt="" loading="lazy" draggable="false" style="width:22px;height:22px;object-fit:contain;pointer-events:none;-webkit-user-drag:none" onerror="this.replaceWith(Object.assign(document.createElement('span'),{textContent:${JSON.stringify(item.icon || '⬜')}}))">`
         : escHtml(item.icon || '');
       el.innerHTML = `
         <div class="comp-icon" style="background:${themeToColor(item.theme)}22; color:${themeToColor(item.theme)}">
@@ -3048,7 +3048,7 @@ function renderNode(node) {
 
   const iconMarkup = isText ? ''
     : node.iconUrl
-      ? `<span class="node-icon" aria-hidden="true"><img src="${escHtml(node.iconUrl)}" alt="" style="width:28px;height:28px;object-fit:contain;display:block" onerror="this.replaceWith(Object.assign(document.createElement('span'),{textContent:${JSON.stringify(node.icon || '⬜')},style:'font-size:24px'}))"></span>`
+      ? `<span class="node-icon" aria-hidden="true"><img src="${escHtml(node.iconUrl)}" alt="" draggable="false" style="width:28px;height:28px;object-fit:contain;display:block;pointer-events:none;-webkit-user-drag:none" onerror="this.replaceWith(Object.assign(document.createElement('span'),{textContent:${JSON.stringify(node.icon || '⬜')},style:'font-size:24px'}))"></span>`
       : `<span class="node-icon" aria-hidden="true">${escHtml(node.icon || '')}</span>`;
   el.innerHTML = `
     ${iconMarkup}
@@ -3714,8 +3714,17 @@ function nudgeSelected(dx, dy) {
 }
 
 function selectAll() {
-  nodes.forEach(n => { selectedIds.add(n.id); const el = document.getElementById('node-'+n.id); if (el) el.classList.add('selected'); });
+  if (!nodes.length) { notify('Nothing on the canvas yet', 'info'); return; }
+  selectedArrow = null;
+  arrowsSvg.querySelectorAll('.arrow-path').forEach(a => a.classList.remove('selected'));
+  nodes.forEach(n => {
+    selectedIds.add(n.id);
+    let el = document.getElementById('node-' + n.id);
+    if (!el) { renderNode(n); el = document.getElementById('node-' + n.id); }
+    if (el) el.classList.add('selected');
+  });
   updatePropsPanel();
+  notify(`Selected ${nodes.length} node${nodes.length !== 1 ? 's' : ''}`);
 }
 
 // ===== TOOLS =====
