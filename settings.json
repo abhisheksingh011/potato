@@ -1,0 +1,29 @@
+{
+  "github.copilot.chat.codeGeneration.instructions": [
+    {
+      "file": ".github/copilot-instructions.md"
+    },
+    {
+      "file": "COPILOT_CONTEXT.md"
+    }
+  ],
+  "github.copilot.chat.testGeneration.instructions": [
+    {
+      "file": ".github/copilot-instructions.md"
+    }
+  ],
+  "editor.formatOnSave": false,
+  "editor.tabSize": 2,
+  "files.associations": {
+    "*.potato.html": "html"
+  },
+  "emmet.includeLanguages": {
+    "html": "html"
+  },
+  "[html]": {
+    "editor.defaultFormatter": "vscode.html-language-features"
+  },
+  "search.exclude": {
+    "*.potato.html": false
+  }
+}

@@ -1,0 +1,31 @@
+{
+  "folders": [
+    {
+      "name": "🥔 Potato — Main Editor",
+      "path": "."
+    },
+    {
+      "name": "🧩 Potato — VS Code Extension",
+      "path": "../potato-vscode"
+    }
+  ],
+  "settings": {
+    "github.copilot.chat.codeGeneration.instructions": [
+      { "file": ".github/copilot-instructions.md" },
+      { "file": "COPILOT_CONTEXT.md" }
+    ],
+    "editor.tabSize": 2,
+    "files.associations": {
+      "*.potato.html": "html"
+    }
+  },
+  "extensions": {
+    "recommendations": [
+      "github.copilot",
+      "github.copilot-chat",
+      "ecmel.vscode-html-css",
+      "formulahendry.auto-rename-tag",
+      "ritwickdey.liveserver"
+    ]
+  }
+}

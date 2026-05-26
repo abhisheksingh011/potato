@@ -1,0 +1,25 @@
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Editors
+.vscode/*
+!.vscode/launch.json
+!.vscode/extensions.json
+.idea/
+*.swp
+*.swo
+
+# VS Code extension build artifacts
+*.vsix
+node_modules/
+
+# Local autosaves / scratch files
+*.potato.html.bak
+scratch/
+local/
+
+# Logs
+*.log
+npm-debug.log*

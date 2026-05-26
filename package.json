@@ -1,0 +1,90 @@
+{
+  "name": "potato-diagram",
+  "displayName": "🥔 Potato Diagram",
+  "description": "Open and edit Potato architecture diagrams directly inside VS Code",
+  "version": "1.0.0",
+  "publisher": "potato-diagram",
+  "icon": "icon.png",
+  "engines": { "vscode": "^1.85.0" },
+  "categories": ["Visualization", "Other"],
+  "keywords": ["diagram", "architecture", "aws", "flowchart", "potato"],
+  "repository": { "type": "git", "url": "https://github.com/potato-diagram/potato" },
+  "activationEvents": [],
+  "main": "./src/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "potato.openEditor",
+        "title": "🥔 Open Potato Diagram Editor",
+        "category": "Potato"
+      },
+      {
+        "command": "potato.newDiagram",
+        "title": "🥔 New Potato Diagram",
+        "category": "Potato"
+      },
+      {
+        "command": "potato.openFile",
+        "title": "🥔 Open in Potato Editor",
+        "category": "Potato"
+      }
+    ],
+    "menus": {
+      "explorer/context": [
+        {
+          "command": "potato.openFile",
+          "when": "resourceExtname == .html",
+          "group": "navigation"
+        }
+      ],
+      "editor/title": [
+        {
+          "command": "potato.openFile",
+          "when": "resourceExtname == .html",
+          "group": "navigation"
+        }
+      ]
+    },
+    "customEditors": [
+      {
+        "viewType": "potato.diagramEditor",
+        "displayName": "Potato Diagram",
+        "selector": [{ "filenamePattern": "*.potato.html" }],
+        "priority": "default"
+      }
+    ],
+    "keybindings": [
+      {
+        "command": "potato.openEditor",
+        "key": "ctrl+alt+d",
+        "mac": "cmd+alt+d",
+        "when": "!inQuickOpen"
+      }
+    ],
+    "configuration": {
+      "title": "Potato Diagram",
+      "properties": {
+        "potato.autoSave": {
+          "type": "boolean",
+          "default": true,
+          "description": "Auto-save diagram when closing the editor"
+        },
+        "potato.defaultLayout": {
+          "type": "string",
+          "enum": ["lr", "tb"],
+          "default": "lr",
+          "description": "Default auto-layout direction (lr = left-right, tb = top-bottom)"
+        }
+      }
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "echo 'Ready'",
+    "package": "vsce package",
+    "publish": "vsce publish"
+  },
+  "devDependencies": {
+    "@types/vscode": "^1.85.0",
+    "@vscode/vsce": "^2.22.0"
+  }
+}
