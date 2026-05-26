@@ -1263,7 +1263,7 @@ flowchart LR
     <div style="margin-top:10px;padding:12px 14px;background:var(--bg3);border:1px solid var(--border);border-radius:10px;display:flex;flex-direction:column;gap:8px">
       <div style="display:flex;align-items:center;gap:8px">
         <span style="display:inline-flex;align-items:center;justify-content:center;width:20px;height:20px;border-radius:50%;background:var(--purple);color:#fff;font-size:11px;font-weight:700">3</span>
-        <strong style="font-size:13px">Paste the LLM's full HTML output here, then Import</strong>
+        <strong style="font-size:13px">Paste the LLM's full Potato-format HTML output here, then Import</strong>
       </div>
       <p style="font-size:11px;color:var(--text-muted);font-family:ui-monospace,Menlo,Consolas,monospace;line-height:1.5;margin:0">The whole reply — from <code style="color:var(--text)">&lt;!DOCTYPE html&gt;</code> through <code style="color:var(--text)">&lt;/html&gt;</code>. Raw JSON works too if the LLM skipped the wrapper.</p>
       <textarea id="ai-paste-input" placeholder="Paste the LLM HTML output here...
@@ -5310,33 +5310,36 @@ function getNode(id) { return nodes.find(n => n.id === id); }
 function escHtml(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 
 // ===== LLM PROMPT (inlined so users don't need to leave the app) =====
-const POTATO_LLM_PROMPT_TEXT = `You are a diagram generator for the Potato diagramming tool.
+const POTATO_LLM_PROMPT_TEXT = `You are a diagram generator for Potato (https://github.com/potato-diagram/potato).
 
-Output ONLY a complete HTML file with this exact structure — no intro text, no markdown fences:
+Your only output is a complete HTML file in Potato's .potato.html format. No prose, no markdown fences.
 
+OUTPUT TEMPLATE:
 <!DOCTYPE html>
 <html lang="en"><head><meta charset="UTF-8"><title>NAME — Potato</title></head><body>
 <!-- Potato Saved Diagram -->
 <script type="application/json" id="potato-data">
 {
-  "meta": { "version": "1.0", "name": "NAME", "created": "ISO_DATE" },
-  "nodes": [ ...node objects... ],
+  "meta":   { "version": "1.0", "name": "NAME", "created": "ISO_DATE" },
+  "nodes":  [ ...node objects...  ],
   "arrows": [ ...arrow objects... ],
   "groups": [ ...group objects... ]
 }
 <\/script></body></html>
 
-NODE schema (all fields required):
+NODE SCHEMA (all fields required, iconUrl is OPTIONAL):
 { "id":"n_1", "x":60, "y":60, "w":160, "h":null, "type":"AWS Lambda",
   "label":"Auth Fn", "sublabel":"auth-fn", "category":"Compute",
-  "icon":"⚡", "theme":"orange", "description":"...", "zIndex":10 }
+  "icon":"⚡",
+  "iconUrl":"icons/aws/Compute/AWS-Lambda.svg",   // optional, real SVG
+  "theme":"orange", "description":"...", "zIndex":10 }
 
-ARROW schema:
+ARROW SCHEMA:
 { "id":"a_1", "from":"n_1", "to":"n_2",
   "fromPort":"right", "toPort":"left",
   "color":"blue", "style":"solid", "label":"HTTPS", "animated":false }
 
-GROUP schema:
+GROUP SCHEMA:
 { "id":"g_1", "x":40, "y":40, "w":700, "h":300, "label":"VPC", "color":"purple" }
 
 ALLOWED VALUES:
@@ -5344,6 +5347,45 @@ ALLOWED VALUES:
 - fromPort/toPort: top, bottom, left, right
 - arrow color: default, green, blue, purple, red, teal, orange, pink, yellow
 - arrow style: solid (sync), dashed (async/event), dotted (monitoring)
+
+ICON LIBRARY (iconUrl, optional — real provider SVG; emoji icon is the fallback):
+Path format: icons/<provider>/<Category>/<Service>.svg  where provider ∈ {aws, azure, gcp}.
+
+Common AWS paths:
+  icons/aws/Compute/AWS-Lambda.svg
+  icons/aws/Compute/Amazon-EC2.svg
+  icons/aws/Compute/Amazon-Elastic-Container-Service.svg
+  icons/aws/Storage/Amazon-Simple-Storage-Service.svg
+  icons/aws/Databases/Amazon-RDS.svg
+  icons/aws/Databases/Amazon-DynamoDB.svg
+  icons/aws/Networking-Content-Delivery/Amazon-API-Gateway.svg
+  icons/aws/Networking-Content-Delivery/Amazon-CloudFront.svg
+  icons/aws/Networking-Content-Delivery/Elastic-Load-Balancing.svg
+  icons/aws/Security-Identity/AWS-Identity-and-Access-Management.svg
+  icons/aws/Security-Identity/Amazon-Cognito.svg
+  icons/aws/Application-Integration/Amazon-Simple-Queue-Service.svg
+  icons/aws/Application-Integration/Amazon-EventBridge.svg
+  icons/aws/Artificial-Intelligence/Amazon-Bedrock.svg
+  icons/aws/Management-Tools/Amazon-CloudWatch.svg
+
+Common Azure paths:
+  icons/azure/Compute/Virtual-Machine.svg
+  icons/azure/Compute/Function-Apps.svg
+  icons/azure/Storage/Storage-Accounts.svg
+  icons/azure/Databases/Azure-Cosmos-DB.svg
+  icons/azure/Identity/Azure-Active-Directory.svg
+  icons/azure/Integration/API-Management-Services.svg
+
+Common GCP paths:
+  icons/gcp/Featured/Compute-Engine.svg
+  icons/gcp/Featured/Cloud-Run.svg
+  icons/gcp/Featured/GKE.svg
+  icons/gcp/Featured/BigQuery.svg
+  icons/gcp/Featured/Vertex-AI.svg
+  icons/gcp/Featured/Cloud-Storage.svg
+  icons/gcp/Featured/Cloud-SQL.svg
+
+If unsure of the exact path, OMIT iconUrl. Potato falls back to the emoji on missing files.
 
 LAYOUT RULES:
 - Left-to-right flow: user/client on left (x=60), backend/storage on right (x=1000+).
@@ -5353,9 +5395,15 @@ LAYOUT RULES:
 - Use groups to wrap related services (VPCs, subnets, service boundaries).
 - icon: use the most fitting emoji (⚡ Lambda, 🪣 S3, 🗄️ DB, 🚪 Gateway, 🤖 agent, 👤 user, etc.)
 
-THEME GUIDANCE: AWS storage → green, AWS compute → orange, AWS DB → blue,
-AWS networking → purple, AWS security → red, integration/queues → orange,
-AI agents/orchestrators → gradient, generic frontend → teal, users → gray.
+THEME GUIDANCE:
+  AWS compute/containers → orange | AWS storage → green | AWS DB → blue
+  AWS networking → purple | AWS security → red | integration/queues → orange
+  AWS AI/agents → gradient | DevOps/monitoring → teal
+  Azure → blue (all) | GCP → red (all)
+  Generic frontend → teal | Users → gray | Caches → red
+
+USAGE: the user can save your reply as my-diagram.potato.html and open it via File → Open
+in Potato, or paste it into the 🤖 AI Import modal.
 
 Now describe the architecture you want me to diagram:`;
 
