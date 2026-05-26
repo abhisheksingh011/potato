@@ -2773,248 +2773,452 @@ function findComp(id, tab) {
 
 // ===== SERVICE KNOWLEDGE BASE =====
 // Auto-fills description with limits + justification when a node is dropped
+// Service Knowledge Base — generated from service_kb.json by _generate_kb.js.
+// To update, edit service_kb.json then run `node _generate_kb.js`.
+// Data as of 2026-Q2.
+const SERVICE_KB_AS_OF = "2026-Q2";
 const SERVICE_KB = {
-  // AWS COMPUTE
   'lambda': {
+    name: "AWS Lambda",
+    matches: ["AWS Lambda","Lambda","Amazon Lambda"],
     limits: "Max execution: 15 min timeout | Memory: 128 MB–10 GB | Payload: 6 MB sync / 256 KB async | Cold start: 100ms–1s | Concurrency: 1,000 default (soft limit) | Deployment pkg: 50 MB zipped / 250 MB unzipped | /tmp storage: 512 MB–10 GB",
-    justification: "Best for short-lived, event-driven tasks. Scales to zero — no idle cost. Ideal for API handlers, S3 triggers, scheduled jobs under 15 min."
+    whenToUse: "Best for short-lived, event-driven tasks. Scales to zero — no idle cost. Ideal for API handlers, S3 triggers, scheduled jobs under 15 min.",
+    cost: "$0.20 per 1M requests + $0.0000166 per GB-second. Free tier: 1M requests + 400k GB-s/mo forever. ARM (Graviton) is ~20% cheaper than x86. (as of Q2 2026)",
+    pitfalls: ["VPC cold starts add 1-5s — keep Lambda outside VPC unless you need private resources","Concurrency soft-cap of 1,000 — request limit increase early for production workloads","/tmp is 512 MB by default, ephemeral — provision more if processing large files","Pay for the full GB-s allocation, not actual usage — over-provisioning memory is expensive"],
   },
   'ec2': {
+    name: "Amazon EC2",
+    matches: ["Amazon EC2","AWS EC2","EC2"],
     limits: "No execution timeout (runs indefinitely) | Requires manual scaling or ASG | EBS I/O depends on instance type | Instance startup: 30–90s | No built-in HA without ALB + ASG",
-    justification: "Best for long-running workloads, stateful apps, or when you need full OS control. Use when Lambda timeout or memory limits are a constraint."
+    whenToUse: "Best for long-running workloads, stateful apps, or when you need full OS control. Use when Lambda timeout or memory limits are a constraint.",
+    cost: "On-demand t3.medium ~$30/mo. Reserved 1yr saves ~40%, 3yr saves ~62%. Spot saves 70-90% but can be interrupted. Data egress: $0.09/GB to internet. (as of Q2 2026)",
+    pitfalls: ["Stopped instances still charge for attached EBS — terminate to fully stop billing","NAT Gateway for private subnet egress costs ~$32/mo + $0.045/GB — often the surprise bill","Cross-AZ data transfer is $0.01/GB each way — pin chatty services to one AZ","Default instance limits per region are low — request limit increases before launching at scale"],
   },
   'ecs': {
+    name: "Amazon ECS",
+    matches: ["AWS ECS","Amazon ECS","Amazon Elastic Container Service","ECS"],
     limits: "Task CPU: 0.25–16 vCPU | Task memory: 512 MB–120 GB | Max containers per task: 10 | Service startup: ~30–60s | No automatic rollback without CodeDeploy",
-    justification: "Best for containerised microservices needing persistent processes. Easier ops than raw EC2, more flexible than Lambda for long-running workloads."
+    whenToUse: "Best for containerised microservices needing persistent processes. Easier ops than raw EC2, more flexible than Lambda for long-running workloads.",
+    cost: "EC2 launch type: pay for EC2 instances + EBS (no ECS premium). Fargate launch type: $0.04048/vCPU-hour + $0.004445/GB-hour. ARM Fargate ~20% cheaper. (as of Q2 2026)",
+    pitfalls: ["Fargate has no Spot option for older platform versions — check before assuming Spot savings","Task definitions are immutable — every change creates a new revision (old revisions accrue)","Service Auto Scaling default cooldowns are slow — tune for traffic patterns","Container insights metrics are NOT free — opt-in adds CloudWatch costs"],
   },
   'eks': {
+    name: "Amazon EKS",
+    matches: ["AWS EKS","Amazon EKS","Amazon Elastic Kubernetes Service","EKS"],
     limits: "Max pods per node: 110 (t3.medium) to 750 (large) | Max nodes per cluster: 5,000 | Control plane SLA: 99.95% | Add-on updates require manual intervention | Higher ops overhead than ECS",
-    justification: "Best when you need full Kubernetes compatibility, multi-cloud portability, or advanced scheduling. Higher complexity than ECS — justify with scale or K8s-specific tooling."
+    whenToUse: "Best when you need full Kubernetes compatibility, multi-cloud portability, or advanced scheduling. Higher complexity than ECS — justify with scale or K8s-specific tooling.",
+    cost: "Control plane: $0.10/hour per cluster (~$73/mo). Plus EC2/Fargate for nodes. EKS Auto Mode adds $0.0029/vCPU-hr for AWS-managed nodes. (as of Q2 2026)",
+    pitfalls: ["Control plane charge is per-cluster — running dev/staging/prod = 3x the base cost","AWS Load Balancer Controller pods cost extra and must be in place before ingress works","Cluster Autoscaler vs Karpenter — Karpenter is faster and cheaper for most workloads now","Kubernetes version upgrades every ~3 months, AWS supports each version for ~14 months"],
   },
   'fargate': {
+    name: "AWS Fargate",
+    matches: ["AWS Fargate","Fargate"],
     limits: "Max CPU: 16 vCPU | Max memory: 120 GB | No persistent local storage (use EFS) | Cold start: 30–60s | Cannot access EC2 instance metadata",
-    justification: "Serverless containers — no EC2 management. Pay per task second. Best for unpredictable or bursty container workloads."
+    whenToUse: "Serverless containers — no EC2 management. Pay per task second. Best for unpredictable or bursty container workloads.",
+    cost: "$0.04048/vCPU-hour + $0.004445/GB-hour (x86). ARM ~20% cheaper. Spot ~70% off. Billed per second, 1-min minimum. (as of Q2 2026)",
+    pitfalls: ["Cold starts are 30-60s — not suitable for latency-sensitive scale-up","No daemonset equivalent — each task gets its own networking","Ephemeral storage is 20 GB default; charged extra above that","Cheaper than EC2 only for low-utilization workloads — high-utilization EC2 Reserved wins"],
   },
   'batch': {
+    name: "AWS Batch",
+    matches: ["AWS Batch","Batch"],
     limits: "Job timeout: configurable, no hard limit | Max job queues: 50 | Max compute environments: 50 | Spot interruption risk if using Spot fleet | Job arrays: max 10,000 jobs",
-    justification: "Best for large-scale batch processing (ML training, ETL, rendering). Automatically manages EC2/Spot fleet. Cost-efficient for non-time-sensitive workloads."
+    whenToUse: "Best for large-scale batch processing (ML training, ETL, rendering). Automatically manages EC2/Spot fleet. Cost-efficient for non-time-sensitive workloads.",
+    cost: "No charge for the Batch service itself. Pay for underlying EC2 / Fargate / Spot. Spot fleet typically 70-90% off on-demand. (as of Q2 2026)",
+    pitfalls: ["Spot interruption can kill long jobs — use checkpointing or non-Spot for critical workloads","Job array indices are limited to 10,000 — partition very large workloads","Compute environment scaling has lag — provision generously for time-sensitive batches"],
   },
-
-  // AWS STORAGE
   's3': {
+    name: "Amazon S3",
+    matches: ["AWS S3","Amazon S3","Amazon Simple Storage Service","S3"],
     limits: "Max object size: 5 TB | Single PUT: 5 GB (use multipart above 100 MB) | Max bucket count: 100 per account (soft) | No native query — use Athena/S3 Select | S3 Select: 128 MB max | Lifecycle rules: 1,000 per bucket | Eventual consistency: READ-after-DELETE may return old data",
-    justification: "Industry-standard object store. 11 nines durability. Best for files, backups, static assets, data lake landing zone. Not suitable for transactional or low-latency random access."
+    whenToUse: "Industry-standard object store. 11 nines durability. Best for files, backups, static assets, data lake landing zone. Not suitable for transactional or low-latency random access.",
+    cost: "Standard: $0.023/GB/mo for first 50 TB. PUT: $0.005/1k requests. GET: $0.0004/1k. Data egress: $0.09/GB to internet. Intelligent-Tiering auto-saves 70%+ on cold data. (as of Q2 2026)",
+    pitfalls: ["Data egress is the single biggest S3 surprise bill — pair with CloudFront for served content","Lifecycle policies don't apply retroactively to existing objects without a transition rule","Versioning + lifecycle requires careful policy design or versioned objects multiply storage","Cross-region replication doubles storage cost AND adds egress charges"],
   },
   'ebs': {
+    name: "Amazon EBS",
+    matches: ["AWS EBS","Amazon EBS","Amazon Elastic Block Store","EBS"],
     limits: "Max volume size: 64 TB (io2) | Max IOPS: 256,000 (io2 Block Express) | Single-AZ only — not HA across AZs | Attach to one EC2 at a time (except io1/io2 Multi-Attach, max 16) | Snapshots are eventually consistent",
-    justification: "Block storage for EC2. Best for databases, OS volumes, high-IOPS workloads needing persistence. Tied to one AZ — design failover accordingly."
+    whenToUse: "Block storage for EC2. Best for databases, OS volumes, high-IOPS workloads needing persistence. Tied to one AZ — design failover accordingly.",
+    cost: "gp3: $0.08/GB/mo (3,000 IOPS + 125 MB/s included). io2 Block Express: $0.125/GB + $0.065/IOPS. Snapshots: $0.05/GB/mo. (as of Q2 2026)",
+    pitfalls: ["Detached volumes still bill — track them with AWS Config or Trusted Advisor","Snapshots are incremental but billing is for blocks held — old snapshots stack up","gp3 is almost always cheaper than gp2 — actively migrate","Cross-AZ failover requires snapshot + restore — not instant"],
   },
   'efs': {
+    name: "Amazon EFS",
+    matches: ["AWS EFS","Amazon EFS","Amazon Elastic File System","EFS"],
     limits: "Throughput: Bursting (baseline 1 MB/s per GB) or Provisioned | Latency: ~1–3ms (higher than EBS) | Max file size: 52 TB | Max files per filesystem: unlimited | Costs ~3x EBS for same storage",
-    justification: "Shared NFS file system — multiple EC2/ECS/Lambda can mount simultaneously. Best for shared config, media processing pipelines, CMS workloads."
+    whenToUse: "Shared NFS file system — multiple EC2/ECS/Lambda can mount simultaneously. Best for shared config, media processing pipelines, CMS workloads.",
+    cost: "Standard storage: $0.30/GB/mo. Infrequent Access: $0.025/GB + $0.01/GB per read. One Zone tier: 47% cheaper but single-AZ. (as of Q2 2026)",
+    pitfalls: ["~3x more expensive than EBS for same GB — only use when sharing is actually needed","Bursting throughput depletes credits with sustained I/O — switch to Provisioned for steady workloads","Lifecycle to IA can cause unexpected read charges if access pattern is wrong"],
   },
   'glacier': {
+    name: "Amazon S3 Glacier",
+    matches: ["AWS Glacier","Amazon Glacier","S3 Glacier","Glacier"],
     limits: "Retrieval time: Expedited 1–5 min ($$$), Standard 3–5 hrs, Bulk 5–12 hrs | Min storage duration: 90 days (Glacier), 180 days (Deep Archive) | Max archive size: 40 TB | Not suitable for real-time access",
-    justification: "Lowest-cost AWS storage. Best for compliance archiving, long-term backups, regulatory data retention. Plan retrieval times into your recovery objectives."
+    whenToUse: "Lowest-cost AWS storage. Best for compliance archiving, long-term backups, regulatory data retention. Plan retrieval times into your recovery objectives.",
+    cost: "Glacier Flexible: $0.0036/GB/mo. Glacier Deep Archive: $0.00099/GB/mo (cheapest cloud storage). Retrieval fees: $0.01-$0.10/GB depending on speed. (as of Q2 2026)",
+    pitfalls: ["Early deletion charges if removed before minimum duration (90/180 days)","Expedited retrieval is expensive — budget for retrieval, not just storage","Glacier Instant Retrieval is different — same retrieval speed as S3 Standard, higher storage cost"],
   },
-
-  // AWS DATABASE
   'rds': {
+    name: "Amazon RDS",
+    matches: ["AWS RDS","Amazon RDS","Amazon Relational Database Service","RDS"],
     limits: "Max DB size: 64 TB (Aurora) / 16–32 TB (others) | Max connections: depends on instance RAM (e.g. db.t3.medium ≈ 60 connections) | Read replicas: max 15 (Aurora) / 5 (MySQL/Postgres) | Failover time: 60–120s | No horizontal write scaling — single primary writer",
-    justification: "Best for relational, ACID-compliant workloads. Managed patching, backups, Multi-AZ HA. Use Aurora for better performance and auto-scaling storage."
+    whenToUse: "Best for relational, ACID-compliant workloads. Managed patching, backups, Multi-AZ HA. Use Aurora for better performance and auto-scaling storage.",
+    cost: "On-demand db.t3.medium MySQL: ~$60/mo + storage. Multi-AZ doubles compute cost. Reserved 1yr saves ~40%. Backups: free up to allocated storage size. (as of Q2 2026)",
+    pitfalls: ["Storage can only grow, never shrink — overprovisioning is permanent","Multi-AZ standby is NOT a read replica — it's idle until failover","Engine version upgrades require downtime — schedule maintenance windows carefully","Reserved instances are tied to instance type — wrong size = wasted commitment"],
   },
   'dynamo': {
+    name: "Amazon DynamoDB",
+    matches: ["AWS DynamoDB","Amazon DynamoDB","DynamoDB"],
     limits: "Max item size: 400 KB | Max partition key throughput: 3,000 RCU / 1,000 WCU per partition | Query must use partition key — cannot do full table scans efficiently | GSI propagation: eventual consistency | Max GSIs: 20 per table | BatchWriteItem: max 25 items | Transactions: max 100 items / 4 MB",
-    justification: "Best for high-throughput key-value or document access at any scale. Sub-millisecond latency. Avoid for complex queries, joins, or aggregations — use Athena or Aurora instead."
+    whenToUse: "Best for high-throughput key-value or document access at any scale. Sub-millisecond latency. Avoid for complex queries, joins, or aggregations — use Athena or Aurora instead.",
+    cost: "On-demand: $1.25/M write requests + $0.25/M read requests + $0.25/GB/mo storage. Provisioned: $0.00065/WCU-hr + $0.00013/RCU-hr. Standard-IA tier saves ~60% on rarely-read data. (as of Q2 2026)",
+    pitfalls: ["Scans cost the same as full reads — design access patterns around partition key from day one","Hot partitions cap at 3,000 RCU / 1,000 WCU regardless of table provisioning","GSI propagation lag (~100ms) makes them unsuitable for read-after-write consistency","Backup costs (PITR + on-demand) often exceed table storage costs","Item size limit of 400 KB — large items overflow into S3 pointer pattern"],
   },
   'elasticache': {
+    name: "Amazon ElastiCache",
+    matches: ["AWS ElastiCache","Amazon ElastiCache","ElastiCache"],
     limits: "Redis max memory: node-type dependent (e.g. r6g.large = 13 GB) | Redis Cluster max nodes: 500 | Memcached max nodes: 300 | No persistence in Memcached | Redis AOF persistence adds latency | Max key size: 512 MB | Max value: 512 MB",
-    justification: "In-memory cache for sub-millisecond reads. Best for session storage, leaderboards, rate limiting, DB query caching. Use Redis for persistence/pub-sub, Memcached for pure caching."
+    whenToUse: "In-memory cache for sub-millisecond reads. Best for session storage, leaderboards, rate limiting, DB query caching. Use Redis for persistence/pub-sub, Memcached for pure caching.",
+    cost: "cache.t4g.micro Redis: ~$12/mo. cache.r6g.large: ~$185/mo. Reserved 1yr saves ~40%. Serverless: $0.125/GB-hr storage + $0.0034/ECU. (as of Q2 2026)",
+    pitfalls: ["Multi-AZ replication doubles cost — confirm RPO/RTO needs justify it","Cluster mode enabled requires app-side awareness (CRC16 slot routing)","Backups (snapshots) charge separately — set sensible retention","Reserved nodes are tied to specific node type — wrong choice = stuck"],
   },
   'aurora': {
+    name: "Amazon Aurora",
+    matches: ["AWS Aurora","Amazon Aurora","Aurora"],
     limits: "Max storage: 128 TB (auto-scales) | Max read replicas: 15 | Failover: ~30s | Aurora Serverless v2 min: 0.5 ACU | Max connections: instance-dependent | Writer endpoint is single — no multi-writer by default (except Aurora Global)",
-    justification: "MySQL/Postgres compatible with up to 5x performance. Auto-scaling storage, 6-way replication, fast failover. Best when RDS limits are hit or high availability is critical."
+    whenToUse: "MySQL/Postgres compatible with up to 5x performance. Auto-scaling storage, 6-way replication, fast failover. Best when RDS limits are hit or high availability is critical.",
+    cost: "db.r6g.large: ~$210/mo. Storage: $0.10/GB/mo. I/O: $0.20/M requests. Aurora Serverless v2: $0.12/ACU-hr (~$87/mo for 1 ACU 24/7). (as of Q2 2026)",
+    pitfalls: ["I/O charges can dominate cost for write-heavy workloads — consider I/O-Optimized cluster ($0.225/GB but no I/O charge)","Serverless v2 minimum 0.5 ACU bills 24/7 — not truly serverless for idle workloads","Aurora Global is expensive (~2x storage) — worth it only for cross-region DR","Cluster volume can't be downsized once grown"],
   },
   'redshift': {
+    name: "Amazon Redshift",
+    matches: ["AWS Redshift","Amazon Redshift","Redshift"],
     limits: "Max table size: no hard limit but query perf degrades past billions of rows without tuning | Sort keys required for range queries | Max columns per table: 1,600 | COPY is fastest load method — INSERT row-by-row is very slow | Concurrency: max 50 WLM queries | VACUUM needed after large deletes",
-    justification: "Columnar analytical database for petabyte-scale OLAP queries. Best for BI dashboards, data warehousing. Not for OLTP — use RDS/Aurora for transactional workloads."
+    whenToUse: "Columnar analytical database for petabyte-scale OLAP queries. Best for BI dashboards, data warehousing. Not for OLTP — use RDS/Aurora for transactional workloads.",
+    cost: "ra3.xlplus: ~$1.09/hr (~$795/mo). Storage (RMS): $0.024/GB/mo. Reserved 1yr saves ~25%, 3yr saves ~75%. Serverless: $0.36/RPU-hour, 60s minimum. (as of Q2 2026)",
+    pitfalls: ["Concurrency Scaling clusters charge separately if peak exceeds main cluster","Sort key + dist key design is critical and hard to change later","Spectrum (S3 query) charges $5/TB scanned — partition + Parquet to control cost","Pause/resume saves compute cost but storage still bills"],
   },
-
-  // AWS NETWORKING
   'vpc': {
+    name: "Amazon VPC",
+    matches: ["AWS VPC","Amazon VPC","Amazon Virtual Private Cloud","VPC"],
     limits: "Max VPCs per region: 5 (soft) | Max subnets per VPC: 200 | Max security groups per ENI: 5 | Max rules per SG: 60 inbound + 60 outbound | VPC peering: non-transitive — A↔B, B↔C does not mean A↔C | Max route table entries: 1,000",
-    justification: "Isolated network boundary for your AWS resources. Use private subnets for databases/Lambda, public subnets for ALB/NAT. Design CIDR ranges for future peering needs."
+    whenToUse: "Isolated network boundary for your AWS resources. Use private subnets for databases/Lambda, public subnets for ALB/NAT. Design CIDR ranges for future peering needs.",
+    cost: "VPC itself: free. NAT Gateway: ~$32/mo + $0.045/GB processed. VPC Endpoints (Interface): $0.01/hr + $0.01/GB. PrivateLink: $0.01/hr + data. (as of Q2 2026)",
+    pitfalls: ["NAT Gateway is the #1 surprise bill — one per AZ + data processing adds up fast","CIDR ranges can't be expanded, only added — plan for 5-10x growth on day one","Default VPCs in every region cost nothing but waste IP space — delete unused","Cross-AZ data transfer is $0.01/GB each way even inside a VPC"],
   },
   'alb': {
+    name: "Application Load Balancer",
+    matches: ["AWS ALB","Amazon ALB","ALB","Application Load Balancer","Elastic Load Balancing"],
     limits: "Max target groups: 100 | Max rules per listener: 100 | Max targets per group: 1,000 | SSL cert limit: 25 per ALB | WebSocket support: yes | gRPC: yes | Sticky sessions: yes (cookie-based) | Not suitable for TCP/UDP — use NLB",
-    justification: "Layer 7 HTTP/HTTPS load balancer. Routes by path, host, headers. Best for web apps, microservices, API routing. Pair with ECS/EKS/EC2 target groups."
+    whenToUse: "Layer 7 HTTP/HTTPS load balancer. Routes by path, host, headers. Best for web apps, microservices, API routing. Pair with ECS/EKS/EC2 target groups.",
+    cost: "$0.0225/hr (~$16/mo) + $0.008/LCU-hr. Free SSL via ACM. NLB is similar pricing structure for L4. (as of Q2 2026)",
+    pitfalls: ["LCU charges scale with new connections, active connections, processed bytes, and rule evaluations","Idle ALBs still bill the hourly base — delete unused dev/staging LBs","Cross-zone load balancing is enabled by default but adds inter-AZ data transfer cost"],
   },
   'cloudfront': {
+    name: "Amazon CloudFront",
+    matches: ["AWS CloudFront","Amazon CloudFront","CloudFront"],
     limits: "Max distributions: 200 per account | Cache TTL: 0–31,536,000s | Max object size: 20 GB | Custom origin timeout: max 60s | Functions max execution: 2ms (CloudFront Functions) / 30s (Lambda@Edge) | Lambda@Edge cold start adds 100–500ms",
-    justification: "Global CDN with 400+ edge locations. Reduces latency for static/dynamic content. Best for S3 static sites, API caching, WAF integration. Configure cache policies carefully to avoid stale data."
+    whenToUse: "Global CDN with 400+ edge locations. Reduces latency for static/dynamic content. Best for S3 static sites, API caching, WAF integration. Configure cache policies carefully to avoid stale data.",
+    cost: "Data out to internet: $0.085/GB (US/EU), tiered down to $0.02/GB at PB scale. HTTPS requests: $0.0075-$0.0120/10k. Free tier: 1 TB out + 10M requests/mo forever. (as of Q2 2026)",
+    pitfalls: ["Origin requests still cost S3 GET fees — high cache miss rate doubles your bill","Lambda@Edge runs at every edge region — debugging is hard, costs add up","Invalidations: first 1000/mo free, then $0.005 each — use versioned filenames instead","WAF on CloudFront is in us-east-1 only — region-specific quirk"],
   },
   'route53': {
+    name: "Amazon Route 53",
+    matches: ["AWS Route 53","Amazon Route 53","Route 53","Route53"],
     limits: "Max hosted zones: 500 per account | Max records per zone: 10,000 | Health check interval: min 10s (standard) / 30s (basic) | DNS TTL affects failover speed — low TTL = faster failover but more queries | Max routing policies: Latency, Weighted, Geolocation, Failover, Multi-value",
-    justification: "AWS-native DNS with health checks, routing policies, and domain management. Best for multi-region failover, blue/green deployments, and latency-based routing."
+    whenToUse: "AWS-native DNS with health checks, routing policies, and domain management. Best for multi-region failover, blue/green deployments, and latency-based routing.",
+    cost: "$0.50/mo per hosted zone (first 25) + $0.40 per 1M queries. Health checks: $0.50/mo per check. Domain registration varies. (as of Q2 2026)",
+    pitfalls: ["Health check costs surprise people — $0.50/mo × dozens of endpoints = real money","TTL changes don't propagate until existing TTL expires — plan migrations days ahead","Alias records to AWS resources are free queries — use them over CNAME where possible"],
   },
   'apigateway': {
+    name: "Amazon API Gateway",
+    matches: ["AWS API Gateway","Amazon API Gateway","API Gateway"],
     limits: "Max timeout: 29s (REST) / 29s (HTTP) / no limit (WebSocket) | Max payload: 10 MB (REST) / 10 MB (HTTP) | Throttling: 10,000 RPS default (account-wide soft limit) | Max stages: 10 per API | Caching: 0.5 GB–237 GB, adds latency on misses | Max integrations per API: 300",
-    justification: "Managed API front door for Lambda, HTTP backends, AWS services. Best for REST/WebSocket APIs with auth, throttling, caching built-in. Use HTTP API for lower cost/latency, REST API for full features."
+    whenToUse: "Managed API front door for Lambda, HTTP backends, AWS services. Best for REST/WebSocket APIs with auth, throttling, caching built-in. Use HTTP API for lower cost/latency, REST API for full features.",
+    cost: "REST API: $3.50/M calls. HTTP API: $1.00/M calls (much cheaper for simple Lambda proxy). WebSocket: $1.00/M messages + $0.25/M connection-min. Cache: $0.02/hr per GB. (as of Q2 2026)",
+    pitfalls: ["REST API is 3.5x more expensive than HTTP API — only pay for it if you need features like usage plans or full request transforms","Caching has a flat hourly cost regardless of utilization — measure cache hit rate","29s timeout is hard — long requests need WebSocket or async patterns","Authorizers and custom domains are billed extra"],
   },
   'waf': {
+    name: "AWS WAF",
+    matches: ["AWS WAF","WAF","Web Application Firewall"],
     limits: "Max Web ACLs: 100 per account | Max rules per ACL: 100 | Max rule groups: 100 | WCU limit: 1,500 per ACL | Managed rules count toward WCU | Regex patterns: max 10 per set | Logging: must configure separately to Kinesis/S3",
-    justification: "Layer 7 firewall — SQL injection, XSS, bot protection, IP blocking. Best placed in front of CloudFront or ALB. Use AWS Managed Rules for quick baseline protection."
+    whenToUse: "Layer 7 firewall — SQL injection, XSS, bot protection, IP blocking. Best placed in front of CloudFront or ALB. Use AWS Managed Rules for quick baseline protection.",
+    cost: "$5/mo per Web ACL + $1/mo per rule + $0.60/M requests. Managed rule groups: $1-$10/mo each + per-request fees. (as of Q2 2026)",
+    pitfalls: ["Per-request charge applies to ALL inspected traffic, including blocked — bots can drive up cost","Managed rule groups each cost separately — stack them carefully","WAF logs go to Kinesis/S3/CloudWatch but storage is your bill — set retention"],
   },
-
-  // AWS AI/ML
   'bedrock': {
-    limits: "RPM/TPM limits per model vary — Claude Sonnet: ~500 RPM default | Max context: model-dependent (Claude 3.5: 200K tokens) | No training — inference only | Cross-region inference available | On-demand pricing — no reserved capacity | Knowledge base chunking: max 10,000 chars",
-    justification: "Managed foundation model API — no infrastructure to manage. Best for generative AI features, RAG pipelines, agent orchestration. Choose model based on latency vs capability trade-off."
+    name: "Amazon Bedrock",
+    matches: ["AWS Bedrock","Amazon Bedrock","Bedrock"],
+    limits: "RPM/TPM limits per model vary — Claude Sonnet: ~500 RPM default | Max context: model-dependent (Claude Sonnet 4.6: 200K tokens) | No training — inference only | Cross-region inference available | On-demand pricing — no reserved capacity | Knowledge base chunking: max 10,000 chars",
+    whenToUse: "Managed foundation model API — no infrastructure to manage. Best for generative AI features, RAG pipelines, agent orchestration. Choose model based on latency vs capability trade-off.",
+    cost: "Claude Sonnet 4.6: $3/M input tokens + $15/M output tokens. Claude Haiku 4.5: $1/M in + $5/M out. Provisioned Throughput: hourly commitment for guaranteed capacity. Prompt caching saves up to 90% on cached prefix. (as of Q2 2026)",
+    pitfalls: ["Output tokens cost 3-5x input tokens — verbose prompts/responses double the bill fast","RPM/TPM quotas are low by default — request increases early for production","Knowledge Base storage uses OpenSearch Serverless underneath — that's a separate, significant bill","Cross-region inference adds latency and inter-region data transfer cost"],
   },
   'sagemaker': {
+    name: "Amazon SageMaker",
+    matches: ["AWS SageMaker","Amazon SageMaker","SageMaker"],
     limits: "Training job max runtime: 5 days | Max parallel training jobs: 20 (soft) | Endpoint auto-scaling: min 30s scale-out | Real-time inference timeout: 60s | Batch transform: no timeout limit | Max model size for real-time: instance memory dependent | Feature store: eventual consistency for online store",
-    justification: "End-to-end ML platform — training, hosting, pipelines. Best when you need custom model training or fine-tuning. Heavier ops than Bedrock — justify with custom model requirements."
+    whenToUse: "End-to-end ML platform — training, hosting, pipelines. Best when you need custom model training or fine-tuning. Heavier ops than Bedrock — justify with custom model requirements.",
+    cost: "Endpoint instance hours + storage. ml.m5.large: ~$0.115/hr (~$84/mo 24/7). Studio notebooks: same instance pricing. Training: pay per second of training instance. Savings Plans available. (as of Q2 2026)",
+    pitfalls: ["Endpoints run 24/7 once deployed — even with zero traffic — delete or use Serverless Inference","Studio notebooks left running overnight burn money — auto-shutdown extensions are essential","Multi-model endpoints save cost but cold-load latency varies","Feature Store online and offline stores have separate pricing"],
   },
   'rekognition': {
+    name: "Amazon Rekognition",
+    matches: ["AWS Rekognition","Amazon Rekognition","Rekognition"],
     limits: "Max image size: 5 MB (API) / 15 MB (S3) | Max faces per collection: 20 million | DetectLabels: max 100 labels | Video analysis is async — polling required | Not real-time for video (use Kinesis Video Streams) | PPE detection accuracy varies by environment",
-    justification: "Managed computer vision — face detection, object labels, text extraction, content moderation. Best for image/video analysis without ML expertise. Async for video, sync for images."
+    whenToUse: "Managed computer vision — face detection, object labels, text extraction, content moderation. Best for image/video analysis without ML expertise. Async for video, sync for images.",
+    cost: "Image analysis: $1.00 per 1,000 images for first 1M. Face search: $1.00 per 1,000 face vectors. Video: $0.10 per minute analyzed. (as of Q2 2026)",
+    pitfalls: ["Face collections charge for storage + each search — set TTL on collections","Custom Labels models charge by training and inference hours, NOT per call","Video analysis is async — your code must poll or subscribe to SNS for completion"],
   },
   'textract': {
+    name: "Amazon Textract",
+    matches: ["AWS Textract","Amazon Textract","Textract"],
     limits: "Max document size: 500 MB (S3) / 10 MB (API) | Async API for multi-page PDFs | Max pages per async job: 3,000 | Queries per page: max 15 | Forms/tables accuracy: high for structured docs, lower for handwriting | Not suitable for scanned images with <200 DPI",
-    justification: "Managed OCR + document understanding. Extracts text, forms, tables from PDFs/images. Best for document processing pipelines (invoices, contracts, ID verification)."
+    whenToUse: "Managed OCR + document understanding. Extracts text, forms, tables from PDFs/images. Best for document processing pipelines (invoices, contracts, ID verification).",
+    cost: "DetectDocumentText: $1.50 per 1,000 pages. AnalyzeDocument (forms+tables): $50 per 1,000 pages. Queries: $15 per 1,000 pages. (as of Q2 2026)",
+    pitfalls: ["AnalyzeDocument is 33x more expensive than DetectDocumentText — only use when you need structure","Async jobs charge by completion — abandoned jobs still bill if they finish","Low-DPI scans accuracy drops rapidly — pre-process inputs if quality varies"],
   },
   'comprehend': {
+    name: "Amazon Comprehend",
+    matches: ["AWS Comprehend","Amazon Comprehend","Comprehend"],
     limits: "Max document size: 100 KB (sync) / 5 GB (async batch) | Language detection: 100 languages | Entity recognition latency: ~100ms | Custom classifier training: requires 1,000+ examples per label | Async batch jobs: max 5 concurrent",
-    justification: "NLP service — sentiment, entities, key phrases, language detection, topic modelling. Best for analysing large text corpora, customer feedback, support tickets."
+    whenToUse: "NLP service — sentiment, entities, key phrases, language detection, topic modelling. Best for analysing large text corpora, customer feedback, support tickets.",
+    cost: "$0.0001 per 100 characters for built-in features. Custom models: training + inference billed separately. PII detection: $0.0001 per 100 chars. (as of Q2 2026)",
+    pitfalls: ["Billed per 100 characters, so verbose text amplifies cost","Custom classifier needs 1,000+ training examples per label — gather data before committing","Bedrock with Claude is often cheaper AND more accurate for general NLP now"],
   },
-
-  // AWS SECURITY
   'iam': {
+    name: "AWS IAM",
+    matches: ["AWS IAM","IAM","AWS Identity and Access Management"],
     limits: "Max managed policies per account: 1,500 | Max policy size: 6,144 chars (inline) / 6,144 chars (managed) | Max roles per account: 1,000 | Session duration: 1hr (default) to 12hrs | Permission boundaries do not grant permissions — only restrict | Max policy versions: 5",
-    justification: "Foundation of AWS security. Follow least-privilege principle. Use roles for EC2/Lambda (not access keys). Enable MFA for all human users. Audit with IAM Access Analyzer."
+    whenToUse: "Foundation of AWS security. Follow least-privilege principle. Use roles for EC2/Lambda (not access keys). Enable MFA for all human users. Audit with IAM Access Analyzer.",
+    cost: "Free. IAM Access Analyzer: free for external access findings, charged for unused-access findings ($0.20 per IAM role analyzed). (as of Q2 2026)",
+    pitfalls: ["Wildcards in policies (*) are the #1 source of breaches — always scope to resource ARNs","Long-lived access keys are dangerous — rotate or use IAM Identity Center / roles instead","Default session duration is 1hr — assume role expiry can break batch jobs","Permission boundaries restrict, never grant — separate from policies attached"],
   },
   'cognito': {
+    name: "Amazon Cognito",
+    matches: ["AWS Cognito","Amazon Cognito","Cognito"],
     limits: "User pool: max 40 million users | App clients per user pool: 300 | Custom attributes: 25 per user pool | Token validity: Access 5min–1day, ID 5min–1day, Refresh 1hr–10yrs | Email sending limit: 50/day free tier, SES for more | Lambda triggers: max 5s execution",
-    justification: "Managed user auth — sign-up, sign-in, MFA, social federation. Best for web/mobile app auth. Avoid for M2M — use IAM roles or Client Credentials OAuth instead."
+    whenToUse: "Managed user auth — sign-up, sign-in, MFA, social federation. Best for web/mobile app auth. Avoid for M2M — use IAM roles or Client Credentials OAuth instead.",
+    cost: "Free tier: 10,000 MAUs (50,000 for SAML/OIDC). Above: $0.0055/MAU (sliding scale down to $0.0025). SMS MFA charged separately. (as of Q2 2026)",
+    pitfalls: ["SMS MFA is expensive in some countries — TOTP MFA is free","User Pool deletion is permanent — back up users before testing schema migrations","Email sending defaults to 50/day — switch to SES early for any real volume","Migration from another IdP requires Lambda trigger gymnastics"],
   },
   'kms': {
+    name: "AWS KMS",
+    matches: ["AWS KMS","KMS","AWS Key Management Service"],
     limits: "API rate: 5,500–30,000 req/s per region depending on key type | Key rotation: automatic annual rotation for AWS-managed | CMK cost: $1/month per key | Max data encrypted per call: 4 KB (use envelope encryption for larger data) | Cross-account key sharing requires resource policy",
-    justification: "Managed encryption key service. Use envelope encryption — KMS encrypts your data key, data key encrypts data. Enables audit trail via CloudTrail. Required for many compliance frameworks."
+    whenToUse: "Managed encryption key service. Use envelope encryption — KMS encrypts your data key, data key encrypts data. Enables audit trail via CloudTrail. Required for many compliance frameworks.",
+    cost: "$1/mo per customer-managed key. Requests: $0.03 per 10,000 (first 20k free/mo). AWS-managed keys are free. Custom Key Store: $1/hr per cluster + HSM costs. (as of Q2 2026)",
+    pitfalls: ["Cross-region replication and aliases multiply key count — each is $1/mo","High-volume operations (Lambda decrypt-on-cold-start) can hit API rate limits — cache data keys","Deleting a key has a mandatory 7-30 day waiting period — plan deprecation"],
   },
   'secrets': {
+    name: "AWS Secrets Manager",
+    matches: ["AWS Secrets Manager","Secrets Manager","AWS Secrets"],
     limits: "Max secret size: 65,536 bytes | Max secrets per account: 500,000 | Rotation Lambda must complete within 4hrs | API rate: 2,500 req/s (GetSecretValue) per region | Cross-region replication: yes | Cost: $0.40/month per secret + $0.05 per 10,000 API calls",
-    justification: "Managed secrets storage with automatic rotation. Best for DB passwords, API keys, certs. Never hardcode secrets in code or env vars — use Secrets Manager or SSM Parameter Store."
+    whenToUse: "Managed secrets storage with automatic rotation. Best for DB passwords, API keys, certs. Never hardcode secrets in code or env vars — use Secrets Manager or SSM Parameter Store.",
+    cost: "$0.40/mo per secret + $0.05 per 10k API calls. Cross-region replicated secrets bill per region. (as of Q2 2026)",
+    pitfalls: ["Secrets x lots of microservices = thousands of $0.40 charges — SSM Parameter Store free tier is often enough","Rotation Lambda failures leave the secret in an inconsistent state — alert on rotation failures","Each region replica is a full $0.40/mo secret"],
   },
   'shield': {
+    name: "AWS Shield",
+    matches: ["AWS Shield","Shield"],
     limits: "Standard: free, auto for all AWS resources | Advanced: $3,000/month, covers EC2/ELB/CloudFront/Route53 | Advanced DDoS response team: 24/7 | L3/L4 protection: Standard | L7 protection: Advanced + WAF required | SLA for cost credits: must be Advanced",
-    justification: "DDoS protection. Standard is always-on and free. Advanced adds cost protection, attack visibility, and AWS DRT escalation. Required for public-facing critical infrastructure."
+    whenToUse: "DDoS protection. Standard is always-on and free. Advanced adds cost protection, attack visibility, and AWS DRT escalation. Required for public-facing critical infrastructure.",
+    cost: "Standard: free. Advanced: $3,000/mo per organization + data transfer fees during attacks (DDoS Response Team consultation included). (as of Q2 2026)",
+    pitfalls: ["Advanced subscription requires a 1-year commitment — $36k minimum spend","WAF rules included in Advanced — don't double-pay for managed rule groups","Cost protection refunds scale-out costs during attacks, not steady-state"],
   },
-
-  // AWS INTEGRATION
   'sqs': {
+    name: "Amazon SQS",
+    matches: ["AWS SQS","Amazon SQS","Amazon Simple Queue Service","SQS"],
     limits: "Max message size: 256 KB (use S3 Extended Client for larger) | Max retention: 14 days | Visibility timeout: max 12hrs | Standard: at-least-once delivery, out-of-order | FIFO: exactly-once, ordered, max 3,000 msg/s (batching) | Max in-flight messages: 120,000 (Standard) / 20,000 (FIFO) | DLQ redrive: max 1,000 messages/s",
-    justification: "Decouples producers from consumers. Use Standard for high throughput, FIFO for ordered processing. Best for async workloads, retry logic, load levelling. Pair with Lambda or ECS consumers."
+    whenToUse: "Decouples producers from consumers. Use Standard for high throughput, FIFO for ordered processing. Best for async workloads, retry logic, load levelling. Pair with Lambda or ECS consumers.",
+    cost: "Standard: $0.40 per 1M requests (free tier: 1M/mo forever). FIFO: $0.50 per 1M. Long polling reduces empty receives. Each batch of 10 = 1 request. (as of Q2 2026)",
+    pitfalls: ["Empty receives still count as requests — use long polling (WaitTimeSeconds=20)","FIFO message group ID determines parallelism — single group = single consumer","Visibility timeout too short = duplicate processing, too long = stuck messages","Always set up a DLQ — silently dropped messages are the worst failure mode"],
   },
   'sns': {
+    name: "Amazon SNS",
+    matches: ["AWS SNS","Amazon SNS","Amazon Simple Notification Service","SNS"],
     limits: "Max message size: 256 KB | Max subscriptions per topic: 12,500,000 | Max topics: 100,000 | FIFO topic: max 300 msg/s | Email delivery: not guaranteed (spam filters) | No message retention — fire and forget | SMS costs vary by country",
-    justification: "Fan-out pub/sub — one message to many subscribers (SQS, Lambda, HTTP, email, SMS). Best for event broadcasting, alerts, decoupled notification systems."
+    whenToUse: "Fan-out pub/sub — one message to many subscribers (SQS, Lambda, HTTP, email, SMS). Best for event broadcasting, alerts, decoupled notification systems.",
+    cost: "$0.50 per 1M publishes. Delivery: $0.50/M to SQS, $0.60/M to Lambda, $1.00/M to email, SMS varies by country (often $0.01-$0.075 per message). (as of Q2 2026)",
+    pitfalls: ["SMS to international numbers is expensive AND has unpredictable delivery rates","Email throttled to 50/day for sandbox accounts — request production access early","No message retention — failed deliveries lost without DLQ on each subscription"],
   },
   'eventbridge': {
+    name: "Amazon EventBridge",
+    matches: ["AWS EventBridge","Amazon EventBridge","EventBridge"],
     limits: "Max rules per bus: 300 | Max targets per rule: 5 | Event size: max 256 KB | Invocation rate: 18,750/s per region | Event replay: max 24hr retention for replay | Schema registry: max 100 schemas | Cross-account: requires resource policy",
-    justification: "Serverless event bus — routes events from AWS services, SaaS, custom apps. Best for event-driven architectures, replacing cron jobs (Scheduler), and cross-service decoupling."
+    whenToUse: "Serverless event bus — routes events from AWS services, SaaS, custom apps. Best for event-driven architectures, replacing cron jobs (Scheduler), and cross-service decoupling.",
+    cost: "$1.00 per 1M custom events. AWS service events are free. Schema discovery: $0.10 per 1M events processed. EventBridge Scheduler: $1.00 per 1M invocations. (as of Q2 2026)",
+    pitfalls: ["Cross-region replication via rules doubles event cost","Schema discovery on a busy bus is expensive — turn off after schemas stabilize","DLQ on each rule is essential — failed delivery is otherwise silent"],
   },
   'stepfunctions': {
+    name: "AWS Step Functions",
+    matches: ["AWS Step Functions","Step Functions","AWS StepFunctions"],
     limits: "Max state machine definition: 1 MB | Max execution history: 25,000 events | Execution duration: Standard max 1 year / Express max 5 min | Max concurrent executions: 2,000 (Standard, soft) | Map state: max 40 concurrent iterations | API Gateway integration: 29s timeout still applies",
-    justification: "Visual workflow orchestration — retries, parallel branches, human approval steps. Best for complex multi-step processes (order processing, ML pipelines). Use Express for high-volume short workflows."
+    whenToUse: "Visual workflow orchestration — retries, parallel branches, human approval steps. Best for complex multi-step processes (order processing, ML pipelines). Use Express for high-volume short workflows.",
+    cost: "Standard: $25 per 1M state transitions (very expensive for fine-grained workflows). Express: $1.00 per 1M requests + duration. Inline Map saves transitions. (as of Q2 2026)",
+    pitfalls: ["Standard state machines bill per transition — chatty workflows cost a lot","Express is 25x cheaper for short workflows — convert when execution < 5 min","Execution history capped at 25k events — long-running workflows hit this fast","Hidden DescribeExecution polling from your code can rate-limit"],
   },
   'kinesis': {
+    name: "Amazon Kinesis Data Streams",
+    matches: ["AWS Kinesis","Amazon Kinesis","Kinesis","Amazon Kinesis Data Streams"],
     limits: "Shard throughput: 1 MB/s write / 2 MB/s read per shard | Max record size: 1 MB | Retention: 24hrs default, max 365 days (extended) | GetRecords: max 10,000 records / 10 MB per call | Shard splitting takes ~30s | Consumer limit: 5 GetRecords calls/s per shard (use Enhanced Fan-Out for more)",
-    justification: "Real-time data streaming. Best for clickstreams, IoT telemetry, log aggregation, real-time analytics. Scale shards based on throughput. Use Enhanced Fan-Out for multiple low-latency consumers."
+    whenToUse: "Real-time data streaming. Best for clickstreams, IoT telemetry, log aggregation, real-time analytics. Scale shards based on throughput. Use Enhanced Fan-Out for multiple low-latency consumers.",
+    cost: "Provisioned: $0.015/shard-hour (~$11/shard-mo) + $0.014/M PUT units. On-demand: $0.040 per GB ingested + $0.040 per GB retrieved. Enhanced Fan-Out: $0.015/shard-hour-consumer. (as of Q2 2026)",
+    pitfalls: ["On-demand mode has a 5-min scale-up — bursts hit throughput limits before scaling","Extended retention (>24hr) and EFO each add significant cost","Shard count determines fan-in throughput — under-provisioning causes producer throttling"],
   },
-
-  // AWS DEVOPS
   'cloudwatch': {
+    name: "Amazon CloudWatch",
+    matches: ["AWS CloudWatch","Amazon CloudWatch","CloudWatch"],
     limits: "Metric resolution: 1s (high-res, extra cost) / 60s standard | Log retention: 1 day–10 years (set per log group!) | Dashboard widgets: max 500 | Alarms: max 10 dimensions per metric | Logs Insights: max 20 log groups per query / 15 min query timeout | GetMetricData: max 500 metrics per request",
-    justification: "AWS-native monitoring. Set log retention explicitly — default is never expire (costly). Use metric filters to turn logs into metrics. Alarm on p99 latency, error rate, not just average."
+    whenToUse: "AWS-native monitoring. Set log retention explicitly — default is never expire (costly). Use metric filters to turn logs into metrics. Alarm on p99 latency, error rate, not just average.",
+    cost: "Metrics: $0.30/metric/mo (first 10k). Logs ingestion: $0.50/GB. Logs storage: $0.03/GB/mo. Insights queries: $0.005/GB scanned. Alarms: $0.10/mo each. Dashboards: $3/mo each. (as of Q2 2026)",
+    pitfalls: ["Default 'never expire' log retention causes silent bills that compound for years — set retention on every log group","Custom metrics at 1s resolution are 4x the cost of 60s — only use for critical latency tracking","Logs Insights queries against terabytes can cost dollars per query — scope time range","Container Insights enabled per task adds per-task metric cost"],
   },
   'xray': {
+    name: "AWS X-Ray",
+    matches: ["AWS X-Ray","X-Ray","AWS XRay"],
     limits: "Trace retention: 30 days | Sampling: default 5% + 1 req/s per host | Max segment size: 64 KB | Groups: max 25 per account | Sampling rules: max 25 | Insights: auto-detect anomalies but adds cost | Not available in all regions",
-    justification: "Distributed tracing — visualise request flow across services. Best for debugging latency in microservices. Integrate with Lambda, ECS, API Gateway, ALB for end-to-end traces."
+    whenToUse: "Distributed tracing — visualise request flow across services. Best for debugging latency in microservices. Integrate with Lambda, ECS, API Gateway, ALB for end-to-end traces.",
+    cost: "Trace recording: $5 per 1M. Trace retrieval/scan: $0.50 per 1M. Insights: $1.00 per 1M traces analyzed. (as of Q2 2026)",
+    pitfalls: ["Default 5% sampling rate is fine for cost but misses rare bugs — adjust per service","Each AWS SDK call instrumented = a subsegment = $$ at scale","Insights adds ML analysis — useful but doubles trace cost"],
   },
   'agentcore': {
+    name: "AWS AgentCore",
+    matches: ["AgentCore Runtime","AWS AgentCore","AgentCore"],
     limits: "Concurrent agent invocations: quota-based per account | Context window: bounded by underlying model | Tool call depth: configurable max steps | Memory TTL: session or persistent (configurable) | Supports LangGraph, Strands, custom runtimes",
-    justification: "AWS-managed agent runtime — handles orchestration, tool calling, memory, observability. Best for multi-agent architectures on Bedrock. Reduces infrastructure overhead vs self-hosted agent frameworks."
+    whenToUse: "AWS-managed agent runtime — handles orchestration, tool calling, memory, observability. Best for multi-agent architectures on Bedrock. Reduces infrastructure overhead vs self-hosted agent frameworks.",
+    cost: "Pricing is per agent invocation + underlying Bedrock model tokens. Memory and code interpreter charged separately. Check current pricing — service is evolving rapidly. (as of Q2 2026)",
+    pitfalls: ["Tool call loops can compound — set max steps conservatively","Memory storage bills separately — set TTL on session memory","Underlying Bedrock model cost is the dominant line item — pick model deliberately"],
   },
-
-  // AZURE
   'az-func': {
+    name: "Azure Functions",
+    matches: ["Azure Functions","Azure Function"],
     limits: "Max execution: 10 min (Consumption) / unlimited (Premium/Dedicated) | Memory: 1.5 GB (Consumption) | Cold start: 1–3s (Consumption) | Max instances: 200 (Consumption) | HTTP trigger timeout: 230s | Durable Functions orchestrator replay limit: watch for large history",
-    justification: "Serverless compute on Azure. Best for event-driven, short-lived tasks. Use Premium plan to eliminate cold starts for latency-sensitive workloads."
+    whenToUse: "Serverless compute on Azure. Best for event-driven, short-lived tasks. Use Premium plan to eliminate cold starts for latency-sensitive workloads.",
+    cost: "Consumption: $0.20 per 1M executions + $0.000016 per GB-second. Free grant: 1M executions + 400k GB-s/mo. Premium plan: hourly + per-execution. (as of Q2 2026)",
+    pitfalls: ["Consumption cold starts can be 1-3s — use Premium pre-warmed instances for latency SLAs","Durable Functions orchestrator replays the entire history every continuation — keep history small","Premium plan has a base monthly cost even with zero traffic"],
   },
   'az-cosmos': {
+    name: "Azure Cosmos DB",
+    matches: ["Azure CosmosDB","Azure Cosmos DB","Cosmos DB"],
     limits: "Max item size: 2 MB | Max partition key value length: 2 KB | RU/s per partition: 10,000 max | Cross-partition queries are expensive in RUs | Point reads: cheapest (1 RU for 1 KB) | Consistency levels: 5 options — Strong adds 2x RU cost | Max stored procedures size: 256 KB",
-    justification: "Globally distributed multi-model database. Best for globally distributed apps needing low-latency reads/writes. Choose consistency level carefully — Strong consistency doubles cost."
+    whenToUse: "Globally distributed multi-model database. Best for globally distributed apps needing low-latency reads/writes. Choose consistency level carefully — Strong consistency doubles cost.",
+    cost: "Provisioned: $0.008/100 RU/s per hour (~$23/mo for 400 RU/s minimum). Serverless: $0.25 per 1M RU consumed. Storage: $0.25/GB/mo. Multi-region writes 2x. (as of Q2 2026)",
+    pitfalls: ["Strong consistency doubles RU cost — only enable per query when truly required","Cross-partition queries can blow through RU budget — design partition key for query patterns","Provisioned min 400 RU/s per container — many small containers = many minimums","Multi-region writes are 2x the storage and RU cost"],
   },
   'az-blob': {
+    name: "Azure Blob Storage",
+    matches: ["Azure Blob","Azure Blob Storage","Blob Storage"],
     limits: "Max block size: 4 GB | Max blob size: 190.7 TB | Max IOPS: storage account level (20,000 for standard) | Soft delete retention: up to 365 days | Lifecycle management: up to 100 rules | Access tiers: Hot/Cool/Cold/Archive (Archive retrieval: hours)",
-    justification: "Azure object storage. Best for unstructured data, backups, media, data lake. Set lifecycle policies to move cold data to Archive tier for cost savings."
+    whenToUse: "Azure object storage. Best for unstructured data, backups, media, data lake. Set lifecycle policies to move cold data to Archive tier for cost savings.",
+    cost: "Hot tier (LRS): $0.0184/GB/mo. Cool: $0.01/GB/mo. Cold: $0.0036/GB/mo. Archive: $0.00099/GB/mo. Operations + egress billed separately. (as of Q2 2026)",
+    pitfalls: ["Egress to internet is a major cost driver — pair with Azure CDN","Early deletion fees apply to Cool/Cold/Archive — design lifecycle policies carefully","Archive retrieval takes hours and has retrieval fees per GB"],
   },
-
-  // GCP
   'gcf': {
+    name: "Google Cloud Functions",
+    matches: ["GCP Functions","Google Cloud Functions","Cloud Functions"],
     limits: "Max execution: 60 min (2nd gen) / 9 min (1st gen) | Memory: 32 GB (2nd gen) | Max concurrent requests: 1,000 per instance (2nd gen) | Cold start: 100ms–2s | Max file size: 100 MB (source) | Event payload: 10 MB",
-    justification: "Serverless functions on GCP. 2nd gen (Cloud Run based) supports longer timeouts and higher concurrency. Best for event-driven workloads triggered by Pub/Sub, GCS, HTTP."
+    whenToUse: "Serverless functions on GCP. 2nd gen (Cloud Run based) supports longer timeouts and higher concurrency. Best for event-driven workloads triggered by Pub/Sub, GCS, HTTP.",
+    cost: "$0.40 per 1M invocations + $0.0000025 per GB-s + $0.0000100 per GHz-s. Free tier: 2M invocations + 400k GB-s + 200k GHz-s/mo. (as of Q2 2026)",
+    pitfalls: ["2nd gen runs on Cloud Run — same cold start behavior, but more flexible","Network egress charged separately — VPC connector adds cost too","Min instances eliminate cold starts but bill 24/7 per instance"],
   },
   'bq': {
+    name: "Google BigQuery",
+    matches: ["GCP BigQuery","Google BigQuery","BigQuery"],
     limits: "Query timeout: 6hrs | Max results per query: 10 GB (interactive) | Streaming insert: max 1 MB per row / 1 GB per second per project | Max tables per dataset: unlimited (but UI shows 50K) | Slot-based pricing: on-demand = 2,000 slots max | DML (UPDATE/DELETE) counts toward daily limits",
-    justification: "Serverless analytical data warehouse. Best for petabyte-scale SQL analytics, BI dashboards. Partitioning + clustering dramatically reduces query cost. Not for OLTP — use Cloud SQL/Spanner."
+    whenToUse: "Serverless analytical data warehouse. Best for petabyte-scale SQL analytics, BI dashboards. Partitioning + clustering dramatically reduces query cost. Not for OLTP — use Cloud SQL/Spanner.",
+    cost: "On-demand queries: $5 per TB scanned. Flat-rate: $20/slot-hour ($2,000/mo for 100 slots). Storage: $0.02/GB/mo active, $0.01/GB/mo long-term (auto after 90 days). (as of Q2 2026)",
+    pitfalls: ["SELECT * scans the whole table — always project specific columns","Lack of partitioning turns every query into a full scan — partition on date and cluster on filter columns","Streaming inserts cost $0.01/200 MB on top of storage — batch loads are free","Materialized views save cost on repeated aggregations but storage charges apply"],
   },
-
-  // NETWORK
   'router': {
+    name: "Router",
+    matches: ["Router"],
     limits: "Routing table size depends on hardware model | BGP session limits vary | High CPU on complex ACLs | Single point of failure without redundant pair | Config changes require maintenance window",
-    justification: "Core network routing between subnets, VLANs, or WAN links. Deploy in redundant pairs for HA. Document all routing policies and ACLs."
+    whenToUse: "Core network routing between subnets, VLANs, or WAN links. Deploy in redundant pairs for HA. Document all routing policies and ACLs.",
+    cost: "Hardware + maintenance contract varies by vendor. SD-WAN/cloud equivalents (AWS Transit Gateway: $0.05/hr + $0.02/GB) replace hardware in many setups.",
+    pitfalls: ["Single router = single point of failure — always pair for HA","BGP misconfigurations can blackhole traffic — peer review changes","Logging at line-rate often saturates collection — sample or filter"],
   },
   'firewall': {
+    name: "Firewall",
+    matches: ["Firewall"],
     limits: "Throughput: hardware/license dependent | Stateful inspection adds latency (~1–5ms) | SSL inspection significantly impacts performance | Rule count affects processing time | Log volume can be very high — plan storage",
-    justification: "Network perimeter security. Define strict ingress/egress rules. Enable logging for compliance. Regularly audit rules — unused permissive rules are common security gaps."
+    whenToUse: "Network perimeter security. Define strict ingress/egress rules. Enable logging for compliance. Regularly audit rules — unused permissive rules are common security gaps.",
+    cost: "Hardware appliances + license. Cloud equivalents: AWS Network Firewall $0.395/hr + $0.065/GB processed; Azure Firewall ~$1.25/hr.",
+    pitfalls: ["SSL inspection adds significant CPU — size for peak load","Stale 'allow any' rules from migrations are common attack surface — audit quarterly","Logging traffic at scale needs SIEM sizing — costs more than the firewall"],
   },
   'server': {
+    name: "Server",
+    matches: ["Server"],
     limits: "Single point of failure without clustering/HA | Patching requires downtime without rolling update strategy | Local storage lost on hardware failure | Manual scaling — no auto-scale",
-    justification: "Physical or virtual server. Plan for HA with load balancing and redundant instances. Use configuration management (Ansible/Terraform) for consistent provisioning."
+    whenToUse: "Physical or virtual server. Plan for HA with load balancing and redundant instances. Use configuration management (Ansible/Terraform) for consistent provisioning.",
+    cost: "Bare-metal: capex + power + cooling + colocation. Cloud VM equivalents: EC2 t3.medium ~$30/mo, Azure D2 ~$70/mo, GCP e2-medium ~$25/mo.",
+    pitfalls: ["Capacity planning surprises kill bare-metal projects — start with cloud unless you have specific reasons","Patching policies often forgotten — automate via Ansible/Puppet/Salt","Local-only data is your problem — backup discipline is non-negotiable"],
   },
-
-  // GENERIC
   'cylinder': {
+    name: "Generic Database",
+    matches: ["db","Database"],
     limits: "Connection pool size must match application threads | Index design critical for query performance | Backup retention and RPO/RTO must be defined | Disk I/O is often the bottleneck",
-    justification: "Relational database. Design schema carefully — refactoring at scale is expensive. Define indexes on all foreign keys and frequent query columns."
+    whenToUse: "Relational database. Design schema carefully — refactoring at scale is expensive. Define indexes on all foreign keys and frequent query columns.",
+    cost: "Varies wildly by deployment. Self-hosted: VM + storage + ops time. Managed (RDS/Cloud SQL/Azure SQL): instance + storage + I/O + backups.",
+    pitfalls: ["N+1 queries are the #1 performance killer — use eager loading","Missing indexes get expensive as data grows — review slow query log monthly","Backups untested = no backups — practice restore quarterly"],
   },
   'queue': {
+    name: "Generic Queue",
+    matches: ["queue","Message Queue"],
     limits: "Message size limits vary by implementation | At-least-once delivery requires idempotent consumers | FIFO ordering adds throughput constraints | Dead-letter queues needed for failed messages",
-    justification: "Async decoupling between services. Producers and consumers scale independently. Always implement DLQ and alerting on DLQ depth."
+    whenToUse: "Async decoupling between services. Producers and consumers scale independently. Always implement DLQ and alerting on DLQ depth.",
+    cost: "Self-hosted (RabbitMQ/Kafka): VM + storage + ops. Managed (SQS/Service Bus/Pub-Sub): per-message + retention.",
+    pitfalls: ["Idempotency is required for at-least-once delivery — design consumers to deduplicate","DLQ without alerting = silent data loss — alert on DLQ depth > 0","Backpressure handling matters more than queue speed"],
   },
   'lb': {
+    name: "Load Balancer",
+    matches: ["Load Balancer","lb"],
     limits: "Health check interval affects failover speed | SSL termination offloads CPU from backends | Session affinity can cause uneven load | Max connections depends on instance size",
-    justification: "Distributes traffic across multiple backends. Enables zero-downtime deployments. Configure health checks conservatively — too aggressive causes flapping."
+    whenToUse: "Distributes traffic across multiple backends. Enables zero-downtime deployments. Configure health checks conservatively — too aggressive causes flapping.",
+    cost: "AWS ALB ~$16/mo + LCU. Azure Load Balancer ~$22/mo + data. GCP HTTP(S) LB $0.025/hr per forwarding rule + $0.008-$0.012/GB.",
+    pitfalls: ["Health checks too frequent or strict cause unnecessary failovers","Session affinity (sticky sessions) defeats horizontal scaling — avoid unless required","TCP/UDP needs NLB-style, not ALB — pick the right L4/L7 mix"],
   },
   'cache': {
+    name: "Generic Cache",
+    matches: ["Cache","cache"],
     limits: "Memory is finite — eviction policy matters (LRU, LFU) | Cache invalidation is the hardest problem | No persistence by default in most caches | Thundering herd on cache miss at scale",
-    justification: "Reduces database load and improves response time. Cache only data that is read frequently and changes infrequently. Set appropriate TTLs to avoid stale data."
+    whenToUse: "Reduces database load and improves response time. Cache only data that is read frequently and changes infrequently. Set appropriate TTLs to avoid stale data.",
+    cost: "Redis on ElastiCache cache.t4g.micro: ~$12/mo. Azure Cache for Redis Basic C0: ~$16/mo. Memorystore basic 1GB: ~$36/mo.",
+    pitfalls: ["Cache stampedes on miss can take down the DB — use request coalescing or probabilistic early refresh","Stale data bugs are hard to reproduce — TTLs should be a fraction of the data freshness SLA","Cache-aside vs write-through trade-offs matter — pick deliberately"],
   },
   'k8s': {
+    name: "Kubernetes",
+    matches: ["Kubernetes","k8s","K8s"],
     limits: "Max pods per node: ~110 (default) | etcd size limit: 8 GB | API server rate limiting | Rolling updates require readiness probes | Persistent volumes need storage class planning",
-    justification: "Container orchestration at scale. Enables auto-healing, rolling deployments, horizontal scaling. Significant ops overhead — consider managed K8s (EKS/GKE/AKS) over self-hosted."
-  },
+    whenToUse: "Container orchestration at scale. Enables auto-healing, rolling deployments, horizontal scaling. Significant ops overhead — consider managed K8s (EKS/GKE/AKS) over self-hosted.",
+    cost: "Self-hosted: VM cost + ops time (significant). Managed control plane: EKS $73/mo, GKE Standard $73/mo (Autopilot has different model), AKS free control plane.",
+    pitfalls: ["Resource requests/limits set wrong = OOM kills or wasted nodes — measure actual usage","etcd is the chokepoint — high churn in CRDs or events can OOM the cluster","Operators add operational complexity — only adopt if you'll actually maintain them"],
+  }
 };
 
-function getServiceKB(compId) {
-  return SERVICE_KB[compId] || null;
+// Look up a KB entry by matching against a component's type string OR its id.
+// The KB entries have a `matches` array of accepted type strings; we also try
+// the entry key directly (for legacy short keys like 'lambda').
+function getServiceKB(typeOrId) {
+  if (!typeOrId) return null;
+  if (SERVICE_KB[typeOrId]) return SERVICE_KB[typeOrId];
+  for (const [key, entry] of Object.entries(SERVICE_KB)) {
+    if (entry.matches && entry.matches.includes(typeOrId)) return entry;
+  }
+  return null;
 }
 
 function buildAutoDescription(comp) {
-  const kb = getServiceKB(comp.id);
+  const kb = getServiceKB(comp.type) || getServiceKB(comp.id);
   if (!kb) return '';
-  return '📋 LIMITS\n' + kb.limits + '\n\n💡 WHY USE THIS\n' + kb.justification;
+  let out = '';
+  if (kb.limits)    out += '📋 LIMITS\n' + kb.limits + '\n\n';
+  if (kb.whenToUse) out += '💡 WHY USE THIS\n' + kb.whenToUse + '\n\n';
+  if (kb.cost)      out += '💰 COST (' + (SERVICE_KB_AS_OF || 'approx') + ')\n' + kb.cost + '\n\n';
+  if (kb.pitfalls && kb.pitfalls.length) {
+    out += '⚠️ COMMON PITFALLS\n' + kb.pitfalls.map(p => '• ' + p).join('\n');
+  }
+  return out.trim();
 }
 
 function addNodeFromComp(comp, x, y) {
@@ -3953,14 +4157,20 @@ function updatePropsPanel() {
   if (!node) { showPropsEmpty(); return; }
 
   // Look up the original component KB by best-effort matching against the type field.
-  const kbId = inferKbIdForNode(node);
-  const kb = kbId ? SERVICE_KB[kbId] : null;
+  const kb = inferKbForNode(node);
+  const kbSection = (title, body) => body ? `
+      <div class="prop-group-title" style="margin-top:10px">${title}</div>
+      <div style="font-size:11px;line-height:1.6;color:var(--text-muted);font-family:var(--font-mono);white-space:pre-wrap">${escHtml(body)}</div>` : '';
+  const kbList = (title, items) => (items && items.length) ? `
+      <div class="prop-group-title" style="margin-top:10px">${title}</div>
+      <ul style="font-size:11px;line-height:1.6;color:var(--text-muted);font-family:var(--font-mono);margin:4px 0 0;padding-left:18px">${items.map(p => `<li>${escHtml(p)}</li>`).join('')}</ul>` : '';
   const kbHtml = kb ? `
     <div class="prop-group">
-      <div class="prop-group-title">Service Limits</div>
-      <div style="font-size:11px;line-height:1.6;color:var(--text-muted);font-family:var(--font-mono);white-space:pre-wrap">${escHtml(kb.limits)}</div>
-      <div class="prop-group-title" style="margin-top:10px">When to use</div>
-      <div style="font-size:11px;line-height:1.6;color:var(--text-muted);font-family:var(--font-mono);white-space:pre-wrap">${escHtml(kb.justification)}</div>
+      <div class="prop-group-title">📋 Limits</div>
+      <div style="font-size:11px;line-height:1.6;color:var(--text-muted);font-family:var(--font-mono);white-space:pre-wrap">${escHtml(kb.limits || '—')}</div>
+      ${kbSection('💡 When to use', kb.whenToUse)}
+      ${kbSection('💰 Cost' + (SERVICE_KB_AS_OF ? ' (as of ' + SERVICE_KB_AS_OF + ')' : ''), kb.cost)}
+      ${kbList('⚠️ Common pitfalls', kb.pitfalls)}
     </div>` : '';
 
   content.innerHTML = `
@@ -4028,18 +4238,20 @@ function updatePropsPanel() {
 
 // Map a node back to a SERVICE_KB key. Walks COMPONENTS to find an item whose
 // type label matches, then returns its id (which is the KB key).
-function inferKbIdForNode(node) {
-  if (!node || !node.type) return null;
-  for (const tabKey of Object.keys(COMPONENTS)) {
-    for (const cat of COMPONENTS[tabKey] || []) {
-      for (const item of cat.items || []) {
-        if (item.type === node.type && SERVICE_KB[item.id]) return item.id;
-      }
-    }
+// Return the KB entry itself for a node, or null. Caller uses entry.{limits,whenToUse,cost,pitfalls}.
+function inferKbForNode(node) {
+  if (!node) return null;
+  // Direct match on node.type via the matches[] arrays.
+  if (node.type) {
+    const kb = getServiceKB(node.type);
+    if (kb) return kb;
   }
-  // Fallback: try matching against the type lowercased / dehyphenated.
-  const guess = String(node.type).toLowerCase().replace(/^aws\s+/, '').replace(/\s+/g,'');
-  return SERVICE_KB[guess] ? guess : null;
+  // Fallback: lowercased/dehyphenated guess (handles legacy short keys like 'lambda').
+  if (node.type) {
+    const guess = String(node.type).toLowerCase().replace(/^aws\s+/, '').replace(/\s+/g,'');
+    if (SERVICE_KB[guess]) return SERVICE_KB[guess];
+  }
+  return null;
 }
 
 function renderArrowProps(arrow) {
