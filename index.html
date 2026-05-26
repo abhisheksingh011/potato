@@ -1023,8 +1023,8 @@ kbd {
     <div id="sidebar-tabs" role="tablist" aria-label="Component categories">
       <div class="sidebar-tab active" role="tab" tabindex="0" onclick="switchSidebarTab('shapes')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();switchSidebarTab('shapes');}">Shapes</div>
       <div class="sidebar-tab" role="tab" tabindex="0" onclick="switchSidebarTab('aws')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();switchSidebarTab('aws');}">AWS</div>
-      <div class="sidebar-tab" role="tab" tabindex="0" onclick="switchSidebarTab('cloud')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();switchSidebarTab('cloud');}">Azure / GCP</div>
-      <div class="sidebar-tab" role="tab" tabindex="0" onclick="switchSidebarTab('net')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();switchSidebarTab('net');}">Network</div>
+      <div class="sidebar-tab" role="tab" tabindex="0" onclick="switchSidebarTab('azure')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();switchSidebarTab('azure');}">Azure</div>
+      <div class="sidebar-tab" role="tab" tabindex="0" onclick="switchSidebarTab('gcp')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();switchSidebarTab('gcp');}">GCP</div>
     </div>
     <div id="component-list"></div>
   </div>
@@ -1713,7 +1713,7 @@ const COMPONENTS = {
       { id: "aws_storage_amazon_simple_storage_service", name: "Amazon Simple Storage Service", icon: "⬜", iconUrl: "icons/aws/Storage/Amazon-Simple-Storage-Service.svg", theme: "green", type: "Amazon Simple Storage Service", cat: "Storage" }
     ] }
   ],
-  cloud: [
+  azure: [
     { cat: "AI Machine Learning", items: [
       { id: "azure_ai_machine_learning_ai_studio", name: "AI Studio", icon: "⬜", iconUrl: "icons/azure/AI Machine Learning/AI-Studio.svg", theme: "blue", type: "AI Studio", cat: "AI Machine Learning" },
       { id: "azure_ai_machine_learning_anomaly_detector", name: "Anomaly Detector", icon: "⬜", iconUrl: "icons/azure/AI Machine Learning/Anomaly-Detector.svg", theme: "blue", type: "Anomaly Detector", cat: "AI Machine Learning" },
@@ -2475,7 +2475,9 @@ const COMPONENTS = {
       { id: "azure_web_power_platform", name: "Power Platform", icon: "⬜", iconUrl: "icons/azure/WEB/Power-Platform.svg", theme: "blue", type: "Power Platform", cat: "WEB" },
       { id: "azure_web_signalr", name: "Signal R", icon: "⬜", iconUrl: "icons/azure/WEB/SignalR.svg", theme: "blue", type: "Signal R", cat: "WEB" },
       { id: "azure_web_static_apps", name: "Static Apps", icon: "⬜", iconUrl: "icons/azure/WEB/Static-Apps.svg", theme: "blue", type: "Static Apps", cat: "WEB" }
-    ] },
+    ] }
+  ],
+  gcp: [
     { cat: "AI Machine Learning", items: [
       { id: "gcp_ai_machine_learning_aimachinelearning_512_color", name: "AIMachine Learning 512 color", icon: "⬜", iconUrl: "icons/gcp/AI  Machine Learning/AIMachineLearning-512-color.svg", theme: "red", type: "AIMachine Learning 512 color", cat: "AI Machine Learning" }
     ] },
@@ -2576,11 +2578,6 @@ const COMPONENTS = {
       { id: "gcp_web3_web3_512_color", name: "Web3 512 color", icon: "⬜", iconUrl: "icons/gcp/Web3/Web3-512-color.svg", theme: "red", type: "Web3 512 color", cat: "Web3" }
     ] }
   ],
-  net: [
-    { cat: "General", items: [
-      { id: "network_general_kubernetes", name: "kubernetes", icon: "⬜", iconUrl: "icons/network/kubernetes.svg", theme: "gray", type: "kubernetes", cat: "General" }
-    ] }
-  ],
 };
 
 // ===== ARROW COLORS =====
@@ -2629,7 +2626,7 @@ function init() {
 // ===== SIDEBAR =====
 function switchSidebarTab(tab) {
   document.querySelectorAll('.sidebar-tab').forEach((t, i) => {
-    const tabs = ['shapes','aws','cloud','net'];
+    const tabs = ['shapes','aws','azure','gcp'];
     t.classList.toggle('active', tabs[i] === tab);
   });
   renderSidebar(tab);
