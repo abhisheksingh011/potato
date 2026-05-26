@@ -1222,32 +1222,62 @@ flowchart LR
 </div>
 
 <!-- AI IMPORT MODAL -->
-<div id="ai-modal-overlay" style="position:fixed;inset:0;background:rgba(0,0,0,0.75);z-index:8500;display:none;align-items:center;justify-content:center;backdrop-filter:blur(4px)">
-  <div style="background:var(--bg2);border:1px solid var(--border);border-radius:14px;padding:24px;width:640px;max-width:95vw;max-height:85vh;display:flex;flex-direction:column;box-shadow:0 24px 80px rgba(0,0,0,0.8)">
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
+<div id="ai-modal-overlay" role="dialog" aria-modal="true" aria-labelledby="ai-modal-title" style="position:fixed;inset:0;background:rgba(0,0,0,0.75);z-index:8500;display:none;align-items:center;justify-content:center;backdrop-filter:blur(4px)">
+  <div style="background:var(--bg2);border:1px solid var(--border);border-radius:14px;padding:24px;width:680px;max-width:95vw;max-height:90vh;display:flex;flex-direction:column;box-shadow:0 24px 80px rgba(0,0,0,0.8);overflow-y:auto">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
       <div>
-        <h2 style="font-size:17px;font-weight:800">🤖 AI Import</h2>
-        <p style="font-size:11px;color:var(--text-muted);font-family:ui-monospace,Menlo,Consolas,monospace;margin-top:3px">Paste the HTML output from any LLM (ChatGPT, Claude, Gemini, etc)</p>
+        <h2 id="ai-modal-title" style="font-size:17px;font-weight:800">🤖 AI Import — generate a diagram with any LLM</h2>
+        <p style="font-size:11px;color:var(--text-muted);font-family:ui-monospace,Menlo,Consolas,monospace;margin-top:3px">Three steps. Works with ChatGPT, Claude, Gemini, Mistral, Llama — any model that returns HTML.</p>
       </div>
-      <button onclick="closeAiModal()" style="background:none;border:none;color:var(--text-muted);font-size:22px;cursor:pointer;line-height:1">×</button>
+      <button onclick="closeAiModal()" aria-label="Close" style="background:none;border:none;color:var(--text-muted);font-size:22px;cursor:pointer;line-height:1">×</button>
     </div>
 
-    <div style="display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap">
-      <button type="button" class="tb-btn" onclick="copyLlmPrompt(this)" style="font-size:11px">📋 Copy LLM prompt to clipboard</button>
-      <span style="font-size:11px;color:var(--text-dim);align-self:center">→ paste into ChatGPT/Claude/Gemini → describe your architecture → paste output below</span>
+    <!-- STEP 1 -->
+    <div style="margin-top:14px;padding:12px 14px;background:var(--bg3);border:1px solid var(--border);border-radius:10px">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
+        <span style="display:inline-flex;align-items:center;justify-content:center;width:20px;height:20px;border-radius:50%;background:var(--purple);color:#fff;font-size:11px;font-weight:700">1</span>
+        <strong style="font-size:13px">Copy the Potato prompt</strong>
+      </div>
+      <p style="font-size:11px;color:var(--text-muted);font-family:ui-monospace,Menlo,Consolas,monospace;line-height:1.5;margin-bottom:8px">Tells the LLM the exact JSON schema Potato expects (nodes, arrows, groups, themes, ports).</p>
+      <button type="button" class="tb-btn primary" onclick="copyLlmPrompt(this)" style="font-size:11px">📋 Copy LLM prompt to clipboard</button>
     </div>
 
-    <textarea id="ai-paste-input" placeholder="Paste the full HTML output from your LLM here...
+    <!-- STEP 2 -->
+    <div style="margin-top:10px;padding:12px 14px;background:var(--bg3);border:1px solid var(--border);border-radius:10px">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
+        <span style="display:inline-flex;align-items:center;justify-content:center;width:20px;height:20px;border-radius:50%;background:var(--purple);color:#fff;font-size:11px;font-weight:700">2</span>
+        <strong style="font-size:13px">Paste it into your LLM and describe your architecture</strong>
+      </div>
+      <p style="font-size:11px;color:var(--text-muted);font-family:ui-monospace,Menlo,Consolas,monospace;line-height:1.6">Open ChatGPT / Claude / Gemini, paste the prompt, then describe what you want in plain English. The LLM replies with one block — a Potato-format HTML file (a <code style="color:var(--text)">&lt;script type="application/json" id="potato-data"&gt;</code> wrapping the diagram). To keep it for later, save the reply as <code style="color:var(--text)">my-diagram.potato.html</code> — Potato reads that format directly from File → Open.</p>
+      <details style="margin-top:8px">
+        <summary style="font-size:11px;color:var(--text-muted);font-family:ui-monospace,Menlo,Consolas,monospace;cursor:pointer">Example prompts</summary>
+        <ul style="font-size:11px;color:var(--text-dim);font-family:ui-monospace,Menlo,Consolas,monospace;line-height:1.7;margin-top:6px;padding-left:18px">
+          <li>"Draw an AWS serverless API: API Gateway → 3 Lambdas → DynamoDB + SQS"</li>
+          <li>"Show a RAG chatbot: S3 docs → embedding pipeline → vector DB → Bedrock"</li>
+          <li>"Diagram a Kubernetes app with ingress, 2 deployments, Redis + Postgres"</li>
+        </ul>
+      </details>
+    </div>
 
-The LLM should have given you something like:
+    <!-- STEP 3 -->
+    <div style="margin-top:10px;padding:12px 14px;background:var(--bg3);border:1px solid var(--border);border-radius:10px;display:flex;flex-direction:column;gap:8px">
+      <div style="display:flex;align-items:center;gap:8px">
+        <span style="display:inline-flex;align-items:center;justify-content:center;width:20px;height:20px;border-radius:50%;background:var(--purple);color:#fff;font-size:11px;font-weight:700">3</span>
+        <strong style="font-size:13px">Paste the LLM's full HTML output here, then Import</strong>
+      </div>
+      <p style="font-size:11px;color:var(--text-muted);font-family:ui-monospace,Menlo,Consolas,monospace;line-height:1.5;margin:0">The whole reply — from <code style="color:var(--text)">&lt;!DOCTYPE html&gt;</code> through <code style="color:var(--text)">&lt;/html&gt;</code>. Raw JSON works too if the LLM skipped the wrapper.</p>
+      <textarea id="ai-paste-input" placeholder="Paste the LLM HTML output here...
+
 &lt;!DOCTYPE html&gt;
-&lt;html&gt;...
+&lt;html&gt;&lt;head&gt;...&lt;/head&gt;&lt;body&gt;
 &lt;script type=&quot;application/json&quot; id=&quot;potato-data&quot;&gt;
-{ nodes: [...], arrows: [...], groups: [...] }
-&lt;/script&gt;..."
-      style="flex:1;min-height:280px;background:var(--bg3);border:1px solid var(--border);border-radius:8px;color:var(--text);font-family:ui-monospace,Menlo,Consolas,monospace;font-size:11px;padding:12px;resize:none;line-height:1.6;transition:border-color 0.2s"
-      onfocus="this.style.borderColor='var(--purple)'"
-      onblur="this.style.borderColor='var(--border)'"></textarea>
+{ &quot;nodes&quot;: [...], &quot;arrows&quot;: [...], &quot;groups&quot;: [...] }
+&lt;/script&gt;
+&lt;/body&gt;&lt;/html&gt;"
+        style="min-height:200px;background:var(--bg);border:1px solid var(--border);border-radius:8px;color:var(--text);font-family:ui-monospace,Menlo,Consolas,monospace;font-size:11px;padding:12px;resize:vertical;line-height:1.6;transition:border-color 0.2s"
+        onfocus="this.style.borderColor='var(--purple)'"
+        onblur="this.style.borderColor='var(--border)'"></textarea>
+    </div>
 
     <div id="ai-import-error" style="display:none;color:var(--red);font-size:11px;font-family:ui-monospace,Menlo,Consolas,monospace;margin-top:8px;padding:8px 12px;background:rgba(221,52,76,0.1);border-radius:6px;border:1px solid rgba(221,52,76,0.3)"></div>
 
