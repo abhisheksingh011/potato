@@ -6121,9 +6121,23 @@ function importFromAI() {
   let sanitized = 0;
   const sanitizeField = (cond) => { if (cond) sanitized++; };
 
+  let iconRescued = 0;
   data.nodes = data.nodes.map((n, i) => {
     const themeOk = validThemes.includes(n.theme);
     sanitizeField(n.theme && !themeOk);
+    // Carry iconUrl through. If the LLM-provided path doesn't exist in our
+    // catalog, try to match by node.type against COMPONENTS so we still get
+    // a real icon instead of falling all the way back to emoji.
+    let iconUrl = (n.iconUrl || n.icon_url || '').toString().trim();
+    if (iconUrl && !iconUrlExistsInCatalog(iconUrl)) {
+      const guess = guessIconUrlFromType(n.type || n.label || '');
+      if (guess) { iconUrl = guess; iconRescued++; }
+      else { iconUrl = ''; }  // LLM made up a path with no match — drop it
+    } else if (!iconUrl) {
+      // No iconUrl at all — try to infer from type.
+      const guess = guessIconUrlFromType(n.type || n.label || '');
+      if (guess) iconUrl = guess;
+    }
     return {
       id:          n.id || ('n_import_' + i),
       x:           typeof n.x === 'number' ? n.x : 60 + (i % 5) * 220,
@@ -6135,6 +6149,7 @@ function importFromAI() {
       sublabel:    n.sublabel || n.subLabel || n.sub_label || '',
       category:    n.category || '',
       icon:        n.icon || '⬜',
+      iconUrl:     iconUrl,
       theme:       themeOk ? n.theme : 'gray',
       description: n.description || n.desc || n.notes || '',
       zIndex:      n.zIndex || (10 + i),
@@ -6189,12 +6204,60 @@ function importFromAI() {
   notify('✅ Imported ' + data.nodes.length + ' nodes, ' + data.arrows.length + ' connections from AI output!');
   if (sanitized) notify(`⚠️ ${sanitized} invalid value(s) auto-corrected. Check colors/ports/themes.`, 'warning');
   if (droppedArrows.length) notify(`⚠️ Dropped ${droppedArrows.length} connection(s) with missing endpoints.`, 'warning');
+  if (iconRescued) notify(`🔧 ${iconRescued} icon path(s) didn't match our catalog — rescued from node type.`, 'info');
 }
 
 function showAiError(msg) {
   const el = document.getElementById('ai-import-error');
   el.textContent = msg;
   el.style.display = 'block';
+}
+
+// Build a flat catalog of every real icon path once at startup, plus an index
+// keyed by lowercased type string so we can rescue LLM-generated paths that
+// don't exactly match our directory structure.
+let _iconCatalog = null;   // Set<string>
+let _iconByType  = null;   // Map<lower(type), iconUrl>
+function buildIconIndex() {
+  if (_iconCatalog) return;
+  _iconCatalog = new Set();
+  _iconByType  = new Map();
+  for (const tabKey of Object.keys(COMPONENTS)) {
+    for (const cat of COMPONENTS[tabKey] || []) {
+      for (const item of cat.items || []) {
+        if (item.iconUrl) _iconCatalog.add(item.iconUrl);
+        if (item.iconUrl && item.type) {
+          _iconByType.set(String(item.type).toLowerCase(), item.iconUrl);
+          // also store under the bare name (last path segment without extension)
+          _iconByType.set(String(item.name || '').toLowerCase(), item.iconUrl);
+        }
+      }
+    }
+  }
+}
+function iconUrlExistsInCatalog(path) {
+  buildIconIndex();
+  return _iconCatalog.has(path);
+}
+function guessIconUrlFromType(typeStr) {
+  if (!typeStr) return '';
+  buildIconIndex();
+  const key = String(typeStr).toLowerCase().trim();
+  // Direct hit on the type string.
+  if (_iconByType.has(key)) return _iconByType.get(key);
+  // Try a few normalizations: strip "AWS "/"Amazon "/"Azure "/"GCP " prefixes,
+  // strip trailing "(Service)", trailing whitespace etc.
+  const cleaned = key.replace(/^(aws|amazon|azure|gcp|google)\s+/i, '').trim();
+  if (_iconByType.has(cleaned)) return _iconByType.get(cleaned);
+  // Fuzzy contains: pick the first catalog entry whose type contains all the
+  // significant words from the query (>=3 chars). Cheap but works for
+  // "AWS Lambda" → "Lambda Function", "S3 Bucket" → "Amazon S3", etc.
+  const words = cleaned.split(/\s+/).filter(w => w.length >= 3);
+  if (!words.length) return '';
+  for (const [type, url] of _iconByType.entries()) {
+    if (words.every(w => type.includes(w))) return url;
+  }
+  return '';
 }
 
 // Close AI modal on overlay click
