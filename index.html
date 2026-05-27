@@ -3707,8 +3707,14 @@ function drawArrow(arrow) {
   if (!from || !to) return;
 
   const colorConf = ARROW_COLORS[arrow.color] || ARROW_COLORS.default;
-  const cp = getBezierControlPoints(from, to, fp, tp);
-  const dStr = `M${from.x},${from.y} C${cp.c1x},${cp.c1y} ${cp.c2x},${cp.c2y} ${to.x},${to.y}`;
+  // Orthogonal (Manhattan) routing — collect obstacles from the live DOM.
+  const obstacles = collectObstacleRects(arrow.from, arrow.to, (n) => {
+    const el = document.getElementById('node-' + n.id);
+    if (!el) return null;
+    return { x: n.x, y: n.y, w: el.offsetWidth, h: el.offsetHeight };
+  });
+  const routePoints = orthogonalRoute(from, fp, to, tp, obstacles);
+  const dStr = pointsToRoundedPath(routePoints);
 
   let g = document.getElementById('arrow-' + arrow.id);
   let hit, path;
@@ -3743,7 +3749,8 @@ function drawArrow(arrow) {
   else if (arrow.style === 'dotted') path.setAttribute('stroke-dasharray', '2,4');
   else                                path.removeAttribute('stroke-dasharray');
 
-  // Label — create / update / remove in place.
+  // Label — place at the geometric center of the routed polyline (so it sits
+  // on the longest middle segment rather than floating over an obstacle).
   let lbl = g.querySelector('.arrow-label');
   if (arrow.label) {
     if (!lbl) {
@@ -3752,28 +3759,190 @@ function drawArrow(arrow) {
       lbl.setAttribute('text-anchor', 'middle');
       g.appendChild(lbl);
     }
-    const mx = (from.x + to.x) / 2;
-    const my = (from.y + to.y) / 2;
-    lbl.setAttribute('x', mx);
-    lbl.setAttribute('y', my - 5);
+    const mid = midpointOfPolyline(routePoints);
+    lbl.setAttribute('x', mid.x);
+    lbl.setAttribute('y', mid.y - 5);
     lbl.textContent = arrow.label;
   } else if (lbl) {
     lbl.remove();
   }
 }
 
+// Returns the point on a polyline at half the total path length.
+function midpointOfPolyline(points) {
+  if (!points || !points.length) return { x: 0, y: 0 };
+  if (points.length === 1) return points[0];
+  let total = 0;
+  for (let i = 0; i < points.length - 1; i++) total += Math.hypot(points[i+1].x - points[i].x, points[i+1].y - points[i].y);
+  let half = total / 2;
+  for (let i = 0; i < points.length - 1; i++) {
+    const dx = points[i+1].x - points[i].x;
+    const dy = points[i+1].y - points[i].y;
+    const seg = Math.hypot(dx, dy);
+    if (half <= seg) {
+      const t = seg ? half / seg : 0;
+      return { x: points[i].x + dx * t, y: points[i].y + dy * t };
+    }
+    half -= seg;
+  }
+  return points[points.length - 1];
+}
+
 function getBezierControlPoints(from, to, fp, tp) {
   const dist = Math.max(50, Math.hypot(to.x - from.x, to.y - from.y) * 0.4);
-  const portOffset = (pt, port, d) => {
-    if (port === 'right')  return { x: pt.x + d, y: pt.y };
-    if (port === 'left')   return { x: pt.x - d, y: pt.y };
-    if (port === 'bottom') return { x: pt.x, y: pt.y + d };
-    if (port === 'top')    return { x: pt.x, y: pt.y - d };
-    return { x: pt.x + d, y: pt.y };
-  };
-  const c1 = portOffset(from, fp, dist);
-  const c2 = portOffset(to, tp, dist);
+  const c1 = portOffsetPoint(from, fp, dist);
+  const c2 = portOffsetPoint(to, tp, dist);
   return { c1x: c1.x, c1y: c1.y, c2x: c2.x, c2y: c2.y };
+}
+
+// ----------------------------------------------------------------------
+// Orthogonal (Manhattan) routing — used by live drawArrow + all exports.
+// Produces a list of polyline points (with axis-aligned segments) routed
+// between two ports, optionally avoiding rectangular obstacles (other nodes).
+// ----------------------------------------------------------------------
+
+const ORTH_STUB = 20;           // straight stub length at each port
+const ORTH_OBSTACLE_PAD = 12;   // extra clearance around node rects
+const ORTH_CORNER_RADIUS = 8;   // rounded-corner radius for rendering
+
+function portOffsetPoint(pt, port, d) {
+  if (port === 'right')  return { x: pt.x + d, y: pt.y };
+  if (port === 'left')   return { x: pt.x - d, y: pt.y };
+  if (port === 'bottom') return { x: pt.x, y: pt.y + d };
+  if (port === 'top')    return { x: pt.x, y: pt.y - d };
+  return { x: pt.x + d, y: pt.y };
+}
+
+// Cache the bounding rects of every node except the two endpoints. Used as
+// obstacles for the routing algorithm. `getRect` takes a node and returns
+// {x, y, w, h} in diagram coordinates.
+function collectObstacleRects(skipFromId, skipToId, getRect) {
+  const out = [];
+  for (const n of nodes) {
+    if (n.id === skipFromId || n.id === skipToId) continue;
+    const r = getRect(n);
+    if (!r) continue;
+    out.push({
+      x: r.x - ORTH_OBSTACLE_PAD,
+      y: r.y - ORTH_OBSTACLE_PAD,
+      w: r.w + ORTH_OBSTACLE_PAD * 2,
+      h: r.h + ORTH_OBSTACLE_PAD * 2
+    });
+  }
+  return out;
+}
+
+// Does an axis-aligned segment p->q cross any rect? Returns true on first hit.
+function segmentHitsAnyRect(p, q, rects) {
+  if (p.x === q.x) {
+    // vertical
+    const xMin = p.x, yMin = Math.min(p.y, q.y), yMax = Math.max(p.y, q.y);
+    for (const r of rects) {
+      if (xMin > r.x && xMin < r.x + r.w && yMax > r.y && yMin < r.y + r.h) return true;
+    }
+  } else if (p.y === q.y) {
+    // horizontal
+    const yMin = p.y, xMin = Math.min(p.x, q.x), xMax = Math.max(p.x, q.x);
+    for (const r of rects) {
+      if (yMin > r.y && yMin < r.y + r.h && xMax > r.x && xMin < r.x + r.w) return true;
+    }
+  }
+  return false;
+}
+
+function pathHitsAnyRect(points, rects) {
+  for (let i = 0; i < points.length - 1; i++) {
+    if (segmentHitsAnyRect(points[i], points[i + 1], rects)) return true;
+  }
+  return false;
+}
+
+// Compose the routing points from port→exit, exit→entry, entry→port.
+// `bend` parameters let us try alternative jog points if the default hits.
+function buildOrthPath(from, fromPort, to, toPort, opts) {
+  opts = opts || {};
+  const exit  = portOffsetPoint(from, fromPort, ORTH_STUB);
+  const entry = portOffsetPoint(to,   toPort,   ORTH_STUB);
+  const fromH = fromPort === 'left' || fromPort === 'right';
+  const toH   = toPort   === 'left' || toPort   === 'right';
+  const pts = [from, exit];
+
+  if (fromH && toH) {
+    // both horizontal ports — S-bend via a vertical midline
+    const midX = (opts.midOverride !== undefined) ? opts.midOverride : (exit.x + entry.x) / 2;
+    pts.push({ x: midX, y: exit.y });
+    pts.push({ x: midX, y: entry.y });
+  } else if (!fromH && !toH) {
+    // both vertical ports — S-bend via a horizontal midline
+    const midY = (opts.midOverride !== undefined) ? opts.midOverride : (exit.y + entry.y) / 2;
+    pts.push({ x: exit.x, y: midY });
+    pts.push({ x: entry.x, y: midY });
+  } else if (fromH) {
+    // horizontal → vertical: L-bend at (entry.x, exit.y)
+    pts.push({ x: entry.x, y: exit.y });
+  } else {
+    // vertical → horizontal: L-bend at (exit.x, entry.y)
+    pts.push({ x: exit.x, y: entry.y });
+  }
+  pts.push(entry, to);
+  return pts;
+}
+
+// Top-level: try the natural route. If it crosses an obstacle, try several
+// alternative jog midpoints (S-bend) before giving up. The result is always
+// a valid orthogonal path — at worst it crosses the obstacle, which is still
+// no worse than the old straight Bezier.
+function orthogonalRoute(from, fromPort, to, toPort, obstacles) {
+  const def = buildOrthPath(from, fromPort, to, toPort);
+  if (!obstacles || !obstacles.length || !pathHitsAnyRect(def, obstacles)) return def;
+  // Try shifting the midline around the obstacles (S-bend variants only).
+  const fromH = fromPort === 'left' || fromPort === 'right';
+  const toH   = toPort   === 'left' || toPort   === 'right';
+  if (fromH === toH) {
+    // Gather candidate midlines: the outer edges of every obstacle ± pad.
+    const candidates = [];
+    for (const r of obstacles) {
+      if (fromH) {
+        candidates.push(r.x - 6, r.x + r.w + 6);
+      } else {
+        candidates.push(r.y - 6, r.y + r.h + 6);
+      }
+    }
+    // Sort by distance to the default midpoint so we try closer routes first.
+    const defaultMid = fromH ? (from.x + to.x) / 2 : (from.y + to.y) / 2;
+    candidates.sort((a, b) => Math.abs(a - defaultMid) - Math.abs(b - defaultMid));
+    for (const mid of candidates) {
+      const try1 = buildOrthPath(from, fromPort, to, toPort, { midOverride: mid });
+      if (!pathHitsAnyRect(try1, obstacles)) return try1;
+    }
+  }
+  // No clean route found — return the default (mild collision is acceptable).
+  return def;
+}
+
+// Render a polyline as an SVG path string with rounded corners.
+function pointsToRoundedPath(points, radius) {
+  if (!points || points.length < 2) return '';
+  const r = radius != null ? radius : ORTH_CORNER_RADIUS;
+  let d = 'M' + points[0].x + ',' + points[0].y;
+  for (let i = 1; i < points.length - 1; i++) {
+    const prev = points[i - 1], curr = points[i], next = points[i + 1];
+    // Limit the corner radius so it doesn't exceed half the segment lengths.
+    const inLen  = Math.hypot(curr.x - prev.x, curr.y - prev.y);
+    const outLen = Math.hypot(next.x - curr.x, next.y - curr.y);
+    const rr = Math.max(0, Math.min(r, inLen / 2, outLen / 2));
+    if (rr < 0.5) { d += ' L' + curr.x + ',' + curr.y; continue; }
+    const ux1 = (curr.x - prev.x) / (inLen || 1);
+    const uy1 = (curr.y - prev.y) / (inLen || 1);
+    const ux2 = (next.x - curr.x) / (outLen || 1);
+    const uy2 = (next.y - curr.y) / (outLen || 1);
+    const ax = curr.x - ux1 * rr, ay = curr.y - uy1 * rr;
+    const bx = curr.x + ux2 * rr, by = curr.y + uy2 * rr;
+    d += ' L' + ax + ',' + ay + ' Q' + curr.x + ',' + curr.y + ' ' + bx + ',' + by;
+  }
+  const last = points[points.length - 1];
+  d += ' L' + last.x + ',' + last.y;
+  return d;
 }
 
 function redrawArrows() {
@@ -5340,16 +5509,20 @@ function buildDiagramSVG() {
     const tw2=tel?tel.offsetWidth:160, th=tel?tel.offsetHeight:80;
     const fp=a.fromPort||'right', tp=a.toPort||'left';
     const from=portPos(fn,fw,fh,fp,ox,oy), to=portPos(tn,tw2,th,tp,ox,oy);
-    const dist=Math.max(50,Math.hypot(to.x-from.x,to.y-from.y)*0.4);
-    const c1=portOffset(from,fp,dist), c2=portOffset(to,tp,dist);
+    const obstacles = collectObstacleRects(a.from, a.to, (n) => {
+      const ne = document.getElementById('node-' + n.id);
+      return { x: n.x + ox, y: n.y + oy, w: ne ? ne.offsetWidth : 160, h: ne ? ne.offsetHeight : 80 };
+    });
+    const routePts = orthogonalRoute(from, fp, to, tp, obstacles);
+    const dStr = pointsToRoundedPath(routePts);
     const stroke=colorMap[a.color]||colorMap.default;
     const dashArr=a.style==='dashed'?'stroke-dasharray="6 4"':a.style==='dotted'?'stroke-dasharray="2 4"':'';
     const markerId=a.color&&a.color!=='default'?`ah-${a.color}`:'ah';
-    svg += `  <path class="potato-arrow" data-arrow-id="${escHtml(a.id)}" d="M${from.x},${from.y} C${c1.x},${c1.y} ${c2.x},${c2.y} ${to.x},${to.y}" fill="none" stroke="${stroke}" stroke-width="1.5" ${dashArr} marker-end="url(#${markerId})" opacity="0.75"/>
+    svg += `  <path class="potato-arrow" data-arrow-id="${escHtml(a.id)}" d="${dStr}" fill="none" stroke="${stroke}" stroke-width="1.5" ${dashArr} marker-end="url(#${markerId})" opacity="0.75"/>
 `;
     if (a.label) {
-      const mx=(from.x+to.x)/2, my=(from.y+to.y)/2;
-      svg += `  <text x="${mx}" y="${my-4}" text-anchor="middle" font-size="9" fill="#7986cb">${escHtml(a.label)}</text>
+      const mid = midpointOfPolyline(routePts);
+      svg += `  <text x="${mid.x}" y="${mid.y-4}" text-anchor="middle" font-size="9" fill="#7986cb">${escHtml(a.label)}</text>
 `;
     }
   });
@@ -5514,8 +5687,11 @@ function exportPNG() {
         const to   = portPos(tn, tw, th, tp, ox, oy);
         const colorMap = {default:'rgba(255,255,255,0.45)',green:'#4caf50',blue:'#2E86C1',purple:'#9B59B6',red:'#DD344C',teal:'#1ABC9C',orange:'#FF9900',pink:'#E91E63',yellow:'#F1C40F'};
         const stroke = colorMap[a.color] || colorMap.default;
-        const dist = Math.max(50, Math.hypot(to.x-from.x, to.y-from.y)*0.4);
-        const c1 = portOffset(from, fp, dist), c2 = portOffset(to, tp, dist);
+        const obstacles = collectObstacleRects(a.from, a.to, (n) => {
+          const ne = document.getElementById('node-' + n.id);
+          return { x: n.x + ox, y: n.y + oy, w: ne ? ne.offsetWidth : 160, h: ne ? ne.offsetHeight : 80 };
+        });
+        const routePts = orthogonalRoute(from, fp, to, tp, obstacles);
 
         ctx.save();
         ctx.strokeStyle = stroke;
@@ -5524,30 +5700,47 @@ function exportPNG() {
         if (a.style === 'dashed') ctx.setLineDash([6,4]);
         if (a.style === 'dotted') ctx.setLineDash([2,4]);
         ctx.beginPath();
-        ctx.moveTo(from.x, from.y);
-        ctx.bezierCurveTo(c1.x, c1.y, c2.x, c2.y, to.x, to.y);
+        // Walk the polyline. Use rounded corners between non-collinear segments.
+        const r = ORTH_CORNER_RADIUS;
+        ctx.moveTo(routePts[0].x, routePts[0].y);
+        for (let i = 1; i < routePts.length - 1; i++) {
+          const prev = routePts[i-1], curr = routePts[i], next = routePts[i+1];
+          const inLen  = Math.hypot(curr.x - prev.x, curr.y - prev.y);
+          const outLen = Math.hypot(next.x - curr.x, next.y - curr.y);
+          const rr = Math.max(0, Math.min(r, inLen/2, outLen/2));
+          if (rr < 0.5) { ctx.lineTo(curr.x, curr.y); continue; }
+          const ax = curr.x - (curr.x - prev.x) / (inLen || 1) * rr;
+          const ay = curr.y - (curr.y - prev.y) / (inLen || 1) * rr;
+          const bx = curr.x + (next.x - curr.x) / (outLen || 1) * rr;
+          const by = curr.y + (next.y - curr.y) / (outLen || 1) * rr;
+          ctx.lineTo(ax, ay);
+          ctx.quadraticCurveTo(curr.x, curr.y, bx, by);
+        }
+        const last = routePts[routePts.length - 1];
+        ctx.lineTo(last.x, last.y);
         ctx.stroke();
         ctx.setLineDash([]);
-        // Arrow head
-        const angle = Math.atan2(to.y - c2.y, to.x - c2.x);
+        // Arrow head — direction from the last polyline segment, not Bezier control.
+        const tail = routePts[routePts.length - 2] || routePts[0];
+        const angle = Math.atan2(last.y - tail.y, last.x - tail.x);
         ctx.globalAlpha = 0.85;
         ctx.fillStyle = stroke;
         ctx.beginPath();
-        ctx.moveTo(to.x, to.y);
-        ctx.lineTo(to.x - 9*Math.cos(angle-0.4), to.y - 9*Math.sin(angle-0.4));
-        ctx.lineTo(to.x - 9*Math.cos(angle+0.4), to.y - 9*Math.sin(angle+0.4));
+        ctx.moveTo(last.x, last.y);
+        ctx.lineTo(last.x - 9*Math.cos(angle-0.4), last.y - 9*Math.sin(angle-0.4));
+        ctx.lineTo(last.x - 9*Math.cos(angle+0.4), last.y - 9*Math.sin(angle+0.4));
         ctx.closePath(); ctx.fill();
-        // Label
+        // Label at the polyline midpoint
         if (a.label) {
-          const mx = (from.x+to.x)/2, my = (from.y+to.y)/2;
+          const mid = midpointOfPolyline(routePts);
           ctx.globalAlpha = 0.8;
           ctx.fillStyle = 'rgba(13,15,26,0.85)';
           const tw2 = ctx.measureText(a.label).width;
-          ctx.fillRect(mx-tw2/2-3, my-10, tw2+6, 14);
+          ctx.fillRect(mid.x - tw2/2 - 3, mid.y - 10, tw2 + 6, 14);
           ctx.fillStyle = '#7986cb';
           ctx.font = '9px ui-monospace, Menlo, Consolas, monospace';
           ctx.textAlign = 'center';
-          ctx.fillText(a.label, mx, my);
+          ctx.fillText(a.label, mid.x, mid.y);
           ctx.textAlign = 'left';
         }
         ctx.restore();
@@ -5698,16 +5891,20 @@ function exportSVG() {
     const tw2=tel?tel.offsetWidth:160, th=tel?tel.offsetHeight:80;
     const fp=a.fromPort||'right', tp=a.toPort||'left';
     const from=portPos(fn,fw,fh,fp,ox,oy), to=portPos(tn,tw2,th,tp,ox,oy);
-    const dist=Math.max(50,Math.hypot(to.x-from.x,to.y-from.y)*0.4);
-    const c1=portOffset(from,fp,dist), c2=portOffset(to,tp,dist);
+    const obstacles = collectObstacleRects(a.from, a.to, (n) => {
+      const ne = document.getElementById('node-' + n.id);
+      return { x: n.x + ox, y: n.y + oy, w: ne ? ne.offsetWidth : 160, h: ne ? ne.offsetHeight : 80 };
+    });
+    const routePts = orthogonalRoute(from, fp, to, tp, obstacles);
+    const dStr = pointsToRoundedPath(routePts);
     const stroke=colorMap[a.color]||colorMap.default;
     const dashArr=a.style==='dashed'?'stroke-dasharray="6 4"':a.style==='dotted'?'stroke-dasharray="2 4"':'';
     const markerId=a.color&&a.color!=='default'?`ah-${a.color}`:'ah';
-    svg += `  <path d="M${from.x},${from.y} C${c1.x},${c1.y} ${c2.x},${c2.y} ${to.x},${to.y}" fill="none" stroke="${stroke}" stroke-width="1.5" ${dashArr} marker-end="url(#${markerId})" opacity="0.75"/>
+    svg += `  <path d="${dStr}" fill="none" stroke="${stroke}" stroke-width="1.5" ${dashArr} marker-end="url(#${markerId})" opacity="0.75"/>
 `;
     if (a.label) {
-      const mx=(from.x+to.x)/2, my=(from.y+to.y)/2;
-      svg += `  <text x="${mx}" y="${my-4}" text-anchor="middle" font-size="9" fill="#7986cb">${escHtml(a.label)}</text>
+      const mid = midpointOfPolyline(routePts);
+      svg += `  <text x="${mid.x}" y="${mid.y-4}" text-anchor="middle" font-size="9" fill="#7986cb">${escHtml(a.label)}</text>
 `;
     }
   });
