@@ -138,8 +138,7 @@ duplicateNode(id) / copySelected() / pasteNodes()
 
 // Export
 saveDiagram()    // Saves as self-contained HTML (Ctrl+S)
-exportPNG()      // Renders to Canvas and downloads PNG (2x retina)
-exportSVG()      // Generates SVG and downloads
+exportSVG()      // Generates SVG and downloads (PNG export was removed — Chrome/Edge taint local canvases under file://)
 
 // Import
 showPasteModal()       // Opens AI Import modal (paste LLM HTML output)
@@ -316,12 +315,12 @@ npx vsce publish          # publishes to marketplace (needs PAT)
 ## TECHNOLOGY STACK
 
 - **Zero dependencies** — pure vanilla JS, HTML5, CSS3
-- **Canvas API** — used for PNG export and minimap
-- **SVG** — arrows/connections layer
+- **Canvas API** — used for the minimap
+- **SVG** — arrows/connections layer + SVG export
 - **CSS Variables** — theming system
 - **LocalStorage/SessionStorage** — sessionStorage used to pass diagram between saved HTML and editor
 - **HTML5 Drag and Drop API** — sidebar drag to canvas
-- **Blob/URL API** — file downloads (save HTML, export PNG/SVG)
+- **Blob/URL API** — file downloads (save HTML, export SVG)
 - **FileReader API** — opening saved HTML files
 - Google Fonts: `Space Mono` (monospace labels) + `Syne` (UI font)
 
@@ -346,7 +345,7 @@ npx vsce publish          # publishes to marketplace (needs PAT)
 ## ROADMAP / PLANNED FEATURES
 
 - [ ] Templates gallery (10 pre-built architecture diagrams)
-- [ ] PNG export via html2canvas (for better text rendering)
+- [ ] PNG export via a Node CLI (browser path was removed due to Chrome/Edge canvas-tainting under file://)
 - [ ] Snap to grid
 - [ ] Auto-routing arrows (avoid node overlaps)
 - [ ] Mermaid export (Potato → Mermaid syntax)
@@ -393,7 +392,6 @@ After loading this file as context in Copilot:
 - *"Add a share-via-URL feature that compresses the diagram JSON into a URL hash"*
 - *"Add Azure DevOps as a new component category in the sidebar"*
 - *"Add Terraform/CloudFormation HCL import — parse resource blocks into Potato nodes"*
-- *"Fix the PNG export to render node icons (emoji) correctly on all platforms"*
 - *"Add a light mode theme toggle"*
 - *"Add an alignment toolbar — align selected nodes left/right/top/bottom/center"*
 - *"Add Kubernetes component icons to the network tab"*

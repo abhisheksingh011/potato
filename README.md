@@ -128,7 +128,7 @@ Open `✨ Templates` in the toolbar and pick:
 
 **Export & share**
 - `💾 Save` → self-contained `.potato.html`. Reopens in Potato to edit, double-clicks to view standalone.
-- `🖼 PNG` / `✦ SVG` — real provider icons embedded, no `icons/` folder dependency.
+- `✦ SVG` — vector export with real provider icons embedded, no `icons/` folder dependency.
 - The saved-HTML viewer is **interactive** — hover for tooltips, ▶ Play the flow, no editor required.
 
 **Import**
@@ -221,7 +221,7 @@ File size: typically 10–60 KB depending on diagram complexity. No external dep
 ## 🛠 Tech stack
 
 - **Pure vanilla JS** — no React, no Vue, no TypeScript, no build step.
-- **HTML5 Canvas** for PNG export and the minimap.
+- **HTML5 Canvas** for the minimap.
 - **SVG** for the live arrows + saved viewer.
 - **CSS Variables** for theming.
 - **System fonts** — no Google Fonts, no CDN.

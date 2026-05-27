@@ -61,7 +61,7 @@ There is no automated test suite (yet). Manually verify the path your change aff
 3. **AI Import**: paste a sample LLM HTML response → diagram loads → no console errors → toast shows any sanitization rescues.
 4. **Undo / redo** 30+ steps deep, including across drag, delete, paste, sequence-edit.
 5. **Auto-layout LR and TB** produce sensible results on a diagram with at least 8 nodes.
-6. **PNG and SVG export** include the real icons (not the emoji fallback) when the source diagram uses cloud nodes.
+6. **SVG export** includes the real icons (not the emoji fallback) when the source diagram uses cloud nodes.
 7. **Cost Estimator** opens, switches between Small/Medium/Large, shows a per-service breakdown and a total.
 
 For UI changes, open `index.html` in Chrome, Firefox, and Safari. The VS Code extension also needs testing separately via F5.

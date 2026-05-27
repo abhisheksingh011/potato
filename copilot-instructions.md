@@ -56,8 +56,7 @@ markDirty()               // Marks unsaved changes
 fitToContent()            // Zoom/pan to fit all nodes
 updateStatusBar()         // Updates node/arrow counts in status bar
 updateMinimap()           // Redraws minimap canvas
-exportPNG()               // Canvas-based PNG export
-exportSVG()               // SVG string export
+exportSVG()               // SVG string export (PNG export removed — Chrome/Edge taint local canvases under file://)
 parseMermaid(src)         // Converts Mermaid syntax → Potato data
 importFromAI()            // Parses LLM HTML output → loads diagram
 ```
@@ -102,7 +101,7 @@ The `importFromAI()` function has a 3-strategy fallback parser and auto-sanitise
 
 ## Tech stack
 
-Pure vanilla JS + HTML5 Canvas (PNG export + minimap) + SVG (arrows) + CSS Variables (theming)
+Pure vanilla JS + HTML5 Canvas (minimap) + SVG (arrows + SVG export) + CSS Variables (theming)
 Google Fonts: Space Mono + Syne (loaded from CDN, works offline after first load)
 FileReader API (open files) + Blob/URL API (download files) + HTML5 Drag and Drop (sidebar)
 
