@@ -1044,6 +1044,7 @@ kbd {
     <button class="tb-btn" onclick="autoLayout('lr')" title="Auto Layout Left→Right" aria-label="Auto-layout left to right"><span class="tb-icon" aria-hidden="true">→</span><span class="tb-label">Layout LR</span></button>
     <button class="tb-btn" onclick="autoLayout('tb')" title="Auto Layout Top→Bottom" aria-label="Auto-layout top to bottom"><span class="tb-icon" aria-hidden="true">↓</span><span class="tb-label">Layout TB</span></button>
     <button id="btn-grid-snap" class="tb-btn" onclick="toggleGridSnap()" title="Toggle snap to 20px grid" aria-label="Toggle grid snap" aria-pressed="false"><span class="tb-icon" aria-hidden="true">⌗</span><span class="tb-label">Snap</span></button>
+    <button class="tb-btn" onclick="showCostEstimator()" title="Estimate monthly cost based on the services in this diagram" aria-label="Estimate monthly cost"><span class="tb-icon" aria-hidden="true">💰</span><span class="tb-label">Cost</span></button>
     <button id="btn-play-flow" class="tb-btn" onclick="togglePlayFlow()" title="Animate the data flow through the diagram (Space)" aria-label="Play flow animation"><span class="tb-icon" aria-hidden="true">▶</span><span class="tb-label">Play</span></button>
     <select id="play-speed" class="tb-btn" onchange="setPlaySpeed(this.value)" title="Animation speed" aria-label="Animation speed" style="padding:6px 8px;font-size:11px">
       <option value="2500">🐢 Slow</option>
@@ -1271,6 +1272,43 @@ flowchart LR
       <button onclick="closeTemplatesModal()" style="background:none;border:none;color:var(--text-muted);font-size:22px;cursor:pointer;line-height:1">×</button>
     </div>
     <div id="templates-grid" style="display:grid;grid-template-columns:repeat(2,1fr);gap:12px;overflow-y:auto"></div>
+  </div>
+</div>
+
+<!-- COST ESTIMATOR MODAL -->
+<div id="cost-modal-overlay" role="dialog" aria-modal="true" aria-labelledby="cost-modal-title" style="position:fixed;inset:0;background:rgba(0,0,0,0.75);z-index:8500;display:none;align-items:center;justify-content:center;backdrop-filter:blur(4px)">
+  <div style="background:var(--bg2);border:1px solid var(--border);border-radius:14px;padding:24px;width:780px;max-width:96vw;max-height:90vh;display:flex;flex-direction:column;box-shadow:0 24px 80px rgba(0,0,0,0.8)">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+      <div>
+        <h2 id="cost-modal-title" style="font-size:17px;font-weight:800">💰 Cost Estimator</h2>
+        <p style="font-size:11px;color:var(--text-muted);font-family:var(--font-mono);margin-top:3px">Rough monthly USD estimate based on the services in this diagram. Pick a workload size to see a baseline number.</p>
+      </div>
+      <button onclick="closeCostEstimator()" aria-label="Close" style="background:none;border:none;color:var(--text-muted);font-size:22px;cursor:pointer;line-height:1">×</button>
+    </div>
+
+    <div style="display:flex;gap:8px;margin-top:6px;margin-bottom:8px;flex-wrap:wrap;align-items:center">
+      <span style="font-size:11px;color:var(--text-muted);font-family:var(--font-mono)">Workload:</span>
+      <div id="cost-presets" role="tablist" style="display:flex;gap:6px"></div>
+      <div style="flex:1"></div>
+      <span id="cost-asof" style="font-size:10px;color:var(--text-dim);font-family:var(--font-mono)"></span>
+    </div>
+
+    <div id="cost-table-container" style="flex:1;overflow-y:auto;border:1px solid var(--border);border-radius:8px;background:var(--bg);min-height:200px"></div>
+
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-top:10px;padding:10px 12px;background:var(--bg3);border:1px solid var(--border);border-radius:8px">
+      <div>
+        <div style="font-size:10px;letter-spacing:1px;text-transform:uppercase;color:var(--text-muted);font-family:var(--font-mono)">Estimated monthly total</div>
+        <div id="cost-total" style="font-size:24px;font-weight:800;margin-top:2px">—</div>
+        <div id="cost-coverage" style="font-size:10px;color:var(--text-dim);font-family:var(--font-mono);margin-top:2px"></div>
+      </div>
+      <div style="max-width:380px;font-size:10px;line-height:1.5;color:var(--text-dim);font-family:var(--font-mono)">
+        ⚠️ Estimates are reference-grade, not authoritative. Excludes data egress, support plans, NAT-gateway processing, and many add-ons. Always verify with the official AWS / Azure / GCP pricing calculators before committing.
+      </div>
+    </div>
+
+    <div style="display:flex;gap:8px;margin-top:14px;justify-content:flex-end">
+      <button class="tb-btn" onclick="closeCostEstimator()">Close</button>
+    </div>
   </div>
 </div>
 
@@ -2854,6 +2892,7 @@ function findComp(id, tab) {
 // To update, edit service_kb.json then run `node _generate_kb.js`.
 // Data as of 2026-Q2.
 const SERVICE_KB_AS_OF = "2026-Q2";
+const SERVICE_KB_COST_PRESETS = {"small":{"label":"Small (dev / hobby)","summary":"≈ 30k req/day, single-AZ, minimal data"},"medium":{"label":"Medium (small production)","summary":"≈ 1M req/day, multi-AZ where applicable"},"large":{"label":"Large (busy production)","summary":"≈ 30M req/day, multi-region considerations"}};
 const SERVICE_KB = {
   'lambda': {
     name: "AWS Lambda",
@@ -2861,6 +2900,7 @@ const SERVICE_KB = {
     limits: "Max execution: 15 min timeout | Memory: 128 MB–10 GB | Payload: 6 MB sync / 256 KB async | Cold start: 100ms–1s | Concurrency: 1,000 default (soft limit) | Deployment pkg: 50 MB zipped / 250 MB unzipped | /tmp storage: 512 MB–10 GB",
     whenToUse: "Best for short-lived, event-driven tasks. Scales to zero — no idle cost. Ideal for API handlers, S3 triggers, scheduled jobs under 15 min.",
     cost: "$0.20 per 1M requests + $0.0000166 per GB-second. Free tier: 1M requests + 400k GB-s/mo forever. ARM (Graviton) is ~20% cheaper than x86. (as of Q2 2026)",
+    costEstimate: {"small":0,"medium":12,"large":350},
     pitfalls: ["VPC cold starts add 1-5s — keep Lambda outside VPC unless you need private resources","Concurrency soft-cap of 1,000 — request limit increase early for production workloads","/tmp is 512 MB by default, ephemeral — provision more if processing large files","Pay for the full GB-s allocation, not actual usage — over-provisioning memory is expensive"],
   },
   'ec2': {
@@ -2869,6 +2909,7 @@ const SERVICE_KB = {
     limits: "No execution timeout (runs indefinitely) | Requires manual scaling or ASG | EBS I/O depends on instance type | Instance startup: 30–90s | No built-in HA without ALB + ASG",
     whenToUse: "Best for long-running workloads, stateful apps, or when you need full OS control. Use when Lambda timeout or memory limits are a constraint.",
     cost: "On-demand t3.medium ~$30/mo. Reserved 1yr saves ~40%, 3yr saves ~62%. Spot saves 70-90% but can be interrupted. Data egress: $0.09/GB to internet. (as of Q2 2026)",
+    costEstimate: {"small":30,"medium":120,"large":600},
     pitfalls: ["Stopped instances still charge for attached EBS — terminate to fully stop billing","NAT Gateway for private subnet egress costs ~$32/mo + $0.045/GB — often the surprise bill","Cross-AZ data transfer is $0.01/GB each way — pin chatty services to one AZ","Default instance limits per region are low — request limit increases before launching at scale"],
   },
   'ecs': {
@@ -2877,6 +2918,7 @@ const SERVICE_KB = {
     limits: "Task CPU: 0.25–16 vCPU | Task memory: 512 MB–120 GB | Max containers per task: 10 | Service startup: ~30–60s | No automatic rollback without CodeDeploy",
     whenToUse: "Best for containerised microservices needing persistent processes. Easier ops than raw EC2, more flexible than Lambda for long-running workloads.",
     cost: "EC2 launch type: pay for EC2 instances + EBS (no ECS premium). Fargate launch type: $0.04048/vCPU-hour + $0.004445/GB-hour. ARM Fargate ~20% cheaper. (as of Q2 2026)",
+    costEstimate: {"small":35,"medium":150,"large":700},
     pitfalls: ["Fargate has no Spot option for older platform versions — check before assuming Spot savings","Task definitions are immutable — every change creates a new revision (old revisions accrue)","Service Auto Scaling default cooldowns are slow — tune for traffic patterns","Container insights metrics are NOT free — opt-in adds CloudWatch costs"],
   },
   'eks': {
@@ -2885,6 +2927,7 @@ const SERVICE_KB = {
     limits: "Max pods per node: 110 (t3.medium) to 750 (large) | Max nodes per cluster: 5,000 | Control plane SLA: 99.95% | Add-on updates require manual intervention | Higher ops overhead than ECS",
     whenToUse: "Best when you need full Kubernetes compatibility, multi-cloud portability, or advanced scheduling. Higher complexity than ECS — justify with scale or K8s-specific tooling.",
     cost: "Control plane: $0.10/hour per cluster (~$73/mo). Plus EC2/Fargate for nodes. EKS Auto Mode adds $0.0029/vCPU-hr for AWS-managed nodes. (as of Q2 2026)",
+    costEstimate: {"small":73,"medium":250,"large":1200},
     pitfalls: ["Control plane charge is per-cluster — running dev/staging/prod = 3x the base cost","AWS Load Balancer Controller pods cost extra and must be in place before ingress works","Cluster Autoscaler vs Karpenter — Karpenter is faster and cheaper for most workloads now","Kubernetes version upgrades every ~3 months, AWS supports each version for ~14 months"],
   },
   'fargate': {
@@ -2893,6 +2936,7 @@ const SERVICE_KB = {
     limits: "Max CPU: 16 vCPU | Max memory: 120 GB | No persistent local storage (use EFS) | Cold start: 30–60s | Cannot access EC2 instance metadata",
     whenToUse: "Serverless containers — no EC2 management. Pay per task second. Best for unpredictable or bursty container workloads.",
     cost: "$0.04048/vCPU-hour + $0.004445/GB-hour (x86). ARM ~20% cheaper. Spot ~70% off. Billed per second, 1-min minimum. (as of Q2 2026)",
+    costEstimate: {"small":15,"medium":90,"large":450},
     pitfalls: ["Cold starts are 30-60s — not suitable for latency-sensitive scale-up","No daemonset equivalent — each task gets its own networking","Ephemeral storage is 20 GB default; charged extra above that","Cheaper than EC2 only for low-utilization workloads — high-utilization EC2 Reserved wins"],
   },
   'batch': {
@@ -2909,6 +2953,7 @@ const SERVICE_KB = {
     limits: "Max object size: 5 TB | Single PUT: 5 GB (use multipart above 100 MB) | Max bucket count: 100 per account (soft) | No native query — use Athena/S3 Select | S3 Select: 128 MB max | Lifecycle rules: 1,000 per bucket | Eventual consistency: READ-after-DELETE may return old data",
     whenToUse: "Industry-standard object store. 11 nines durability. Best for files, backups, static assets, data lake landing zone. Not suitable for transactional or low-latency random access.",
     cost: "Standard: $0.023/GB/mo for first 50 TB. PUT: $0.005/1k requests. GET: $0.0004/1k. Data egress: $0.09/GB to internet. Intelligent-Tiering auto-saves 70%+ on cold data. (as of Q2 2026)",
+    costEstimate: {"small":2,"medium":25,"large":200},
     pitfalls: ["Data egress is the single biggest S3 surprise bill — pair with CloudFront for served content","Lifecycle policies don't apply retroactively to existing objects without a transition rule","Versioning + lifecycle requires careful policy design or versioned objects multiply storage","Cross-region replication doubles storage cost AND adds egress charges"],
   },
   'ebs': {
@@ -2941,6 +2986,7 @@ const SERVICE_KB = {
     limits: "Max DB size: 64 TB (Aurora) / 16–32 TB (others) | Max connections: depends on instance RAM (e.g. db.t3.medium ≈ 60 connections) | Read replicas: max 15 (Aurora) / 5 (MySQL/Postgres) | Failover time: 60–120s | No horizontal write scaling — single primary writer",
     whenToUse: "Best for relational, ACID-compliant workloads. Managed patching, backups, Multi-AZ HA. Use Aurora for better performance and auto-scaling storage.",
     cost: "On-demand db.t3.medium MySQL: ~$60/mo + storage. Multi-AZ doubles compute cost. Reserved 1yr saves ~40%. Backups: free up to allocated storage size. (as of Q2 2026)",
+    costEstimate: {"small":60,"medium":240,"large":1100},
     pitfalls: ["Storage can only grow, never shrink — overprovisioning is permanent","Multi-AZ standby is NOT a read replica — it's idle until failover","Engine version upgrades require downtime — schedule maintenance windows carefully","Reserved instances are tied to instance type — wrong size = wasted commitment"],
   },
   'dynamo': {
@@ -2949,6 +2995,7 @@ const SERVICE_KB = {
     limits: "Max item size: 400 KB | Max partition key throughput: 3,000 RCU / 1,000 WCU per partition | Query must use partition key — cannot do full table scans efficiently | GSI propagation: eventual consistency | Max GSIs: 20 per table | BatchWriteItem: max 25 items | Transactions: max 100 items / 4 MB",
     whenToUse: "Best for high-throughput key-value or document access at any scale. Sub-millisecond latency. Avoid for complex queries, joins, or aggregations — use Athena or Aurora instead.",
     cost: "On-demand: $1.25/M write requests + $0.25/M read requests + $0.25/GB/mo storage. Provisioned: $0.00065/WCU-hr + $0.00013/RCU-hr. Standard-IA tier saves ~60% on rarely-read data. (as of Q2 2026)",
+    costEstimate: {"small":5,"medium":80,"large":900},
     pitfalls: ["Scans cost the same as full reads — design access patterns around partition key from day one","Hot partitions cap at 3,000 RCU / 1,000 WCU regardless of table provisioning","GSI propagation lag (~100ms) makes them unsuitable for read-after-write consistency","Backup costs (PITR + on-demand) often exceed table storage costs","Item size limit of 400 KB — large items overflow into S3 pointer pattern"],
   },
   'elasticache': {
@@ -2957,6 +3004,7 @@ const SERVICE_KB = {
     limits: "Redis max memory: node-type dependent (e.g. r6g.large = 13 GB) | Redis Cluster max nodes: 500 | Memcached max nodes: 300 | No persistence in Memcached | Redis AOF persistence adds latency | Max key size: 512 MB | Max value: 512 MB",
     whenToUse: "In-memory cache for sub-millisecond reads. Best for session storage, leaderboards, rate limiting, DB query caching. Use Redis for persistence/pub-sub, Memcached for pure caching.",
     cost: "cache.t4g.micro Redis: ~$12/mo. cache.r6g.large: ~$185/mo. Reserved 1yr saves ~40%. Serverless: $0.125/GB-hr storage + $0.0034/ECU. (as of Q2 2026)",
+    costEstimate: {"small":12,"medium":90,"large":400},
     pitfalls: ["Multi-AZ replication doubles cost — confirm RPO/RTO needs justify it","Cluster mode enabled requires app-side awareness (CRC16 slot routing)","Backups (snapshots) charge separately — set sensible retention","Reserved nodes are tied to specific node type — wrong choice = stuck"],
   },
   'aurora': {
@@ -2965,6 +3013,7 @@ const SERVICE_KB = {
     limits: "Max storage: 128 TB (auto-scales) | Max read replicas: 15 | Failover: ~30s | Aurora Serverless v2 min: 0.5 ACU | Max connections: instance-dependent | Writer endpoint is single — no multi-writer by default (except Aurora Global)",
     whenToUse: "MySQL/Postgres compatible with up to 5x performance. Auto-scaling storage, 6-way replication, fast failover. Best when RDS limits are hit or high availability is critical.",
     cost: "db.r6g.large: ~$210/mo. Storage: $0.10/GB/mo. I/O: $0.20/M requests. Aurora Serverless v2: $0.12/ACU-hr (~$87/mo for 1 ACU 24/7). (as of Q2 2026)",
+    costEstimate: {"small":87,"medium":350,"large":1800},
     pitfalls: ["I/O charges can dominate cost for write-heavy workloads — consider I/O-Optimized cluster ($0.225/GB but no I/O charge)","Serverless v2 minimum 0.5 ACU bills 24/7 — not truly serverless for idle workloads","Aurora Global is expensive (~2x storage) — worth it only for cross-region DR","Cluster volume can't be downsized once grown"],
   },
   'redshift': {
@@ -2981,6 +3030,7 @@ const SERVICE_KB = {
     limits: "Max VPCs per region: 5 (soft) | Max subnets per VPC: 200 | Max security groups per ENI: 5 | Max rules per SG: 60 inbound + 60 outbound | VPC peering: non-transitive — A↔B, B↔C does not mean A↔C | Max route table entries: 1,000",
     whenToUse: "Isolated network boundary for your AWS resources. Use private subnets for databases/Lambda, public subnets for ALB/NAT. Design CIDR ranges for future peering needs.",
     cost: "VPC itself: free. NAT Gateway: ~$32/mo + $0.045/GB processed. VPC Endpoints (Interface): $0.01/hr + $0.01/GB. PrivateLink: $0.01/hr + data. (as of Q2 2026)",
+    costEstimate: {"small":32,"medium":100,"large":300},
     pitfalls: ["NAT Gateway is the #1 surprise bill — one per AZ + data processing adds up fast","CIDR ranges can't be expanded, only added — plan for 5-10x growth on day one","Default VPCs in every region cost nothing but waste IP space — delete unused","Cross-AZ data transfer is $0.01/GB each way even inside a VPC"],
   },
   'alb': {
@@ -2989,6 +3039,7 @@ const SERVICE_KB = {
     limits: "Max target groups: 100 | Max rules per listener: 100 | Max targets per group: 1,000 | SSL cert limit: 25 per ALB | WebSocket support: yes | gRPC: yes | Sticky sessions: yes (cookie-based) | Not suitable for TCP/UDP — use NLB",
     whenToUse: "Layer 7 HTTP/HTTPS load balancer. Routes by path, host, headers. Best for web apps, microservices, API routing. Pair with ECS/EKS/EC2 target groups.",
     cost: "$0.0225/hr (~$16/mo) + $0.008/LCU-hr. Free SSL via ACM. NLB is similar pricing structure for L4. (as of Q2 2026)",
+    costEstimate: {"small":18,"medium":35,"large":120},
     pitfalls: ["LCU charges scale with new connections, active connections, processed bytes, and rule evaluations","Idle ALBs still bill the hourly base — delete unused dev/staging LBs","Cross-zone load balancing is enabled by default but adds inter-AZ data transfer cost"],
   },
   'cloudfront': {
@@ -2997,6 +3048,7 @@ const SERVICE_KB = {
     limits: "Max distributions: 200 per account | Cache TTL: 0–31,536,000s | Max object size: 20 GB | Custom origin timeout: max 60s | Functions max execution: 2ms (CloudFront Functions) / 30s (Lambda@Edge) | Lambda@Edge cold start adds 100–500ms",
     whenToUse: "Global CDN with 400+ edge locations. Reduces latency for static/dynamic content. Best for S3 static sites, API caching, WAF integration. Configure cache policies carefully to avoid stale data.",
     cost: "Data out to internet: $0.085/GB (US/EU), tiered down to $0.02/GB at PB scale. HTTPS requests: $0.0075-$0.0120/10k. Free tier: 1 TB out + 10M requests/mo forever. (as of Q2 2026)",
+    costEstimate: {"small":0,"medium":35,"large":400},
     pitfalls: ["Origin requests still cost S3 GET fees — high cache miss rate doubles your bill","Lambda@Edge runs at every edge region — debugging is hard, costs add up","Invalidations: first 1000/mo free, then $0.005 each — use versioned filenames instead","WAF on CloudFront is in us-east-1 only — region-specific quirk"],
   },
   'route53': {
@@ -3013,6 +3065,7 @@ const SERVICE_KB = {
     limits: "Max timeout: 29s (REST) / 29s (HTTP) / no limit (WebSocket) | Max payload: 10 MB (REST) / 10 MB (HTTP) | Throttling: 10,000 RPS default (account-wide soft limit) | Max stages: 10 per API | Caching: 0.5 GB–237 GB, adds latency on misses | Max integrations per API: 300",
     whenToUse: "Managed API front door for Lambda, HTTP backends, AWS services. Best for REST/WebSocket APIs with auth, throttling, caching built-in. Use HTTP API for lower cost/latency, REST API for full features.",
     cost: "REST API: $3.50/M calls. HTTP API: $1.00/M calls (much cheaper for simple Lambda proxy). WebSocket: $1.00/M messages + $0.25/M connection-min. Cache: $0.02/hr per GB. (as of Q2 2026)",
+    costEstimate: {"small":1,"medium":30,"large":600},
     pitfalls: ["REST API is 3.5x more expensive than HTTP API — only pay for it if you need features like usage plans or full request transforms","Caching has a flat hourly cost regardless of utilization — measure cache hit rate","29s timeout is hard — long requests need WebSocket or async patterns","Authorizers and custom domains are billed extra"],
   },
   'waf': {
@@ -3029,6 +3082,7 @@ const SERVICE_KB = {
     limits: "RPM/TPM limits per model vary — Claude Sonnet: ~500 RPM default | Max context: model-dependent (Claude Sonnet 4.6: 200K tokens) | No training — inference only | Cross-region inference available | On-demand pricing — no reserved capacity | Knowledge base chunking: max 10,000 chars",
     whenToUse: "Managed foundation model API — no infrastructure to manage. Best for generative AI features, RAG pipelines, agent orchestration. Choose model based on latency vs capability trade-off.",
     cost: "Claude Sonnet 4.6: $3/M input tokens + $15/M output tokens. Claude Haiku 4.5: $1/M in + $5/M out. Provisioned Throughput: hourly commitment for guaranteed capacity. Prompt caching saves up to 90% on cached prefix. (as of Q2 2026)",
+    costEstimate: {"small":30,"medium":600,"large":5000},
     pitfalls: ["Output tokens cost 3-5x input tokens — verbose prompts/responses double the bill fast","RPM/TPM quotas are low by default — request increases early for production","Knowledge Base storage uses OpenSearch Serverless underneath — that's a separate, significant bill","Cross-region inference adds latency and inter-region data transfer cost"],
   },
   'sagemaker': {
@@ -3109,6 +3163,7 @@ const SERVICE_KB = {
     limits: "Max message size: 256 KB (use S3 Extended Client for larger) | Max retention: 14 days | Visibility timeout: max 12hrs | Standard: at-least-once delivery, out-of-order | FIFO: exactly-once, ordered, max 3,000 msg/s (batching) | Max in-flight messages: 120,000 (Standard) / 20,000 (FIFO) | DLQ redrive: max 1,000 messages/s",
     whenToUse: "Decouples producers from consumers. Use Standard for high throughput, FIFO for ordered processing. Best for async workloads, retry logic, load levelling. Pair with Lambda or ECS consumers.",
     cost: "Standard: $0.40 per 1M requests (free tier: 1M/mo forever). FIFO: $0.50 per 1M. Long polling reduces empty receives. Each batch of 10 = 1 request. (as of Q2 2026)",
+    costEstimate: {"small":0,"medium":5,"large":80},
     pitfalls: ["Empty receives still count as requests — use long polling (WaitTimeSeconds=20)","FIFO message group ID determines parallelism — single group = single consumer","Visibility timeout too short = duplicate processing, too long = stuck messages","Always set up a DLQ — silently dropped messages are the worst failure mode"],
   },
   'sns': {
@@ -3117,6 +3172,7 @@ const SERVICE_KB = {
     limits: "Max message size: 256 KB | Max subscriptions per topic: 12,500,000 | Max topics: 100,000 | FIFO topic: max 300 msg/s | Email delivery: not guaranteed (spam filters) | No message retention — fire and forget | SMS costs vary by country",
     whenToUse: "Fan-out pub/sub — one message to many subscribers (SQS, Lambda, HTTP, email, SMS). Best for event broadcasting, alerts, decoupled notification systems.",
     cost: "$0.50 per 1M publishes. Delivery: $0.50/M to SQS, $0.60/M to Lambda, $1.00/M to email, SMS varies by country (often $0.01-$0.075 per message). (as of Q2 2026)",
+    costEstimate: {"small":0,"medium":5,"large":90},
     pitfalls: ["SMS to international numbers is expensive AND has unpredictable delivery rates","Email throttled to 50/day for sandbox accounts — request production access early","No message retention — failed deliveries lost without DLQ on each subscription"],
   },
   'eventbridge': {
@@ -3149,6 +3205,7 @@ const SERVICE_KB = {
     limits: "Metric resolution: 1s (high-res, extra cost) / 60s standard | Log retention: 1 day–10 years (set per log group!) | Dashboard widgets: max 500 | Alarms: max 10 dimensions per metric | Logs Insights: max 20 log groups per query / 15 min query timeout | GetMetricData: max 500 metrics per request",
     whenToUse: "AWS-native monitoring. Set log retention explicitly — default is never expire (costly). Use metric filters to turn logs into metrics. Alarm on p99 latency, error rate, not just average.",
     cost: "Metrics: $0.30/metric/mo (first 10k). Logs ingestion: $0.50/GB. Logs storage: $0.03/GB/mo. Insights queries: $0.005/GB scanned. Alarms: $0.10/mo each. Dashboards: $3/mo each. (as of Q2 2026)",
+    costEstimate: {"small":5,"medium":60,"large":400},
     pitfalls: ["Default 'never expire' log retention causes silent bills that compound for years — set retention on every log group","Custom metrics at 1s resolution are 4x the cost of 60s — only use for critical latency tracking","Logs Insights queries against terabytes can cost dollars per query — scope time range","Container Insights enabled per task adds per-task metric cost"],
   },
   'xray': {
@@ -5113,7 +5170,110 @@ function renderFlowEditor() {
 (function () {
   const ov = document.getElementById('flow-editor-overlay');
   if (ov) ov.addEventListener('click', (e) => { if (e.target === e.currentTarget) closeFlowEditor(false); });
+  const ov2 = document.getElementById('cost-modal-overlay');
+  if (ov2) ov2.addEventListener('click', (e) => { if (e.target === e.currentTarget) closeCostEstimator(); });
 })();
+
+// ===== COST ESTIMATOR =====
+// Walks the current diagram, looks up each node's structured costEstimate from
+// the SERVICE_KB, and shows a per-service breakdown + monthly total at a chosen
+// workload size. Services without a structured estimate are listed separately
+// so the user knows what is and isn't covered by the auto-sum.
+let _costPreset = 'medium';
+
+function showCostEstimator() {
+  if (!nodes.length) { notify('Add services first', 'warning'); return; }
+  // Reset preset choice to whatever the user picked last (or 'medium').
+  renderCostPresets();
+  renderCostTable();
+  document.getElementById('cost-modal-overlay').style.display = 'flex';
+  // asOf footnote
+  const asEl = document.getElementById('cost-asof');
+  if (asEl && typeof SERVICE_KB_AS_OF === 'string' && SERVICE_KB_AS_OF) asEl.textContent = 'Pricing data as of ' + SERVICE_KB_AS_OF;
+}
+function closeCostEstimator() {
+  document.getElementById('cost-modal-overlay').style.display = 'none';
+}
+function setCostPreset(key) {
+  _costPreset = key;
+  renderCostPresets();
+  renderCostTable();
+}
+
+function renderCostPresets() {
+  const presets = (typeof SERVICE_KB_COST_PRESETS === 'object' && SERVICE_KB_COST_PRESETS) ? SERVICE_KB_COST_PRESETS : {
+    small:  { label: 'Small' },
+    medium: { label: 'Medium' },
+    large:  { label: 'Large' }
+  };
+  const wrap = document.getElementById('cost-presets');
+  if (!wrap) return;
+  wrap.innerHTML = ['small','medium','large'].map(k => {
+    const p = presets[k] || { label: k };
+    const active = k === _costPreset;
+    return `<button class="tb-btn ${active ? 'active' : ''}" onclick="setCostPreset('${k}')" title="${escHtml(p.summary || '')}" style="font-size:11px">${escHtml(p.label || k)}</button>`;
+  }).join('');
+}
+
+function renderCostTable() {
+  const container = document.getElementById('cost-table-container');
+  if (!container) return;
+
+  // Group nodes by KB entry so we sum properly when the same service is used N times.
+  const rows = [];     // entries WITH a structured costEstimate
+  const unknown = [];  // entries WITHOUT one (free-text cost only, or no KB at all)
+  for (const n of nodes) {
+    const kb = inferKbForNode(n);
+    if (kb && kb.costEstimate && typeof kb.costEstimate[_costPreset] === 'number') {
+      rows.push({ node: n, kb });
+    } else if (kb) {
+      unknown.push({ node: n, kb, reason: 'no structured estimate yet' });
+    } else {
+      unknown.push({ node: n, kb: null, reason: 'no KB entry' });
+    }
+  }
+
+  const fmt = (n) => '$' + Number(n).toLocaleString(undefined, { maximumFractionDigits: 0 });
+
+  // Aggregate identical KB entries (count + total per service)
+  const grouped = new Map();
+  for (const r of rows) {
+    const key = r.kb.name || r.node.type || r.node.id;
+    if (!grouped.has(key)) grouped.set(key, { kb: r.kb, count: 0, unit: r.kb.costEstimate[_costPreset] });
+    grouped.get(key).count++;
+  }
+
+  let total = 0;
+  let html = '<table style="width:100%;border-collapse:collapse;font-size:12px">';
+  html += '<thead><tr style="text-align:left;color:var(--text-muted);font-family:var(--font-mono);font-size:10px;text-transform:uppercase;letter-spacing:0.5px"><th style="padding:8px 12px;border-bottom:1px solid var(--border)">Service</th><th style="padding:8px 12px;border-bottom:1px solid var(--border)">Count</th><th style="padding:8px 12px;border-bottom:1px solid var(--border);text-align:right">Per-unit / mo</th><th style="padding:8px 12px;border-bottom:1px solid var(--border);text-align:right">Subtotal</th></tr></thead><tbody>';
+  if (grouped.size) {
+    for (const [key, g] of grouped.entries()) {
+      const subtotal = g.unit * g.count;
+      total += subtotal;
+      html += `<tr style="border-bottom:1px solid var(--border)">
+        <td style="padding:10px 12px"><div style="font-weight:600">${escHtml(key)}</div><div style="font-size:10px;color:var(--text-dim);font-family:var(--font-mono);margin-top:2px">${escHtml((g.kb.cost || '').slice(0, 140))}${g.kb.cost && g.kb.cost.length > 140 ? '…' : ''}</div></td>
+        <td style="padding:10px 12px;font-family:var(--font-mono)">×${g.count}</td>
+        <td style="padding:10px 12px;font-family:var(--font-mono);text-align:right">${fmt(g.unit)}</td>
+        <td style="padding:10px 12px;font-family:var(--font-mono);text-align:right;font-weight:700">${fmt(subtotal)}</td>
+      </tr>`;
+    }
+  } else {
+    html += `<tr><td colspan="4" style="padding:18px;text-align:center;color:var(--text-dim);font-family:var(--font-mono);font-size:11px">No services in this diagram have a structured cost estimate yet.</td></tr>`;
+  }
+  html += '</tbody></table>';
+
+  if (unknown.length) {
+    html += `<div style="padding:10px 12px;margin-top:8px;border-top:1px solid var(--border);font-size:11px;color:var(--text-muted);font-family:var(--font-mono)">
+      <div style="font-size:10px;letter-spacing:0.5px;text-transform:uppercase;color:var(--text-dim);margin-bottom:6px">Not included in the auto-sum</div>
+      ${unknown.map(u => `<div style="margin-bottom:4px">• <strong>${escHtml(u.node.label || u.node.type || u.node.id)}</strong> — ${escHtml(u.reason)}${u.kb && u.kb.cost ? '<div style="margin-left:14px;font-size:10px;color:var(--text-dim);margin-top:2px">' + escHtml(u.kb.cost.slice(0, 160)) + (u.kb.cost.length > 160 ? '…' : '') + '</div>' : ''}</div>`).join('')}
+    </div>`;
+  }
+
+  container.innerHTML = html;
+  document.getElementById('cost-total').textContent = grouped.size ? '~ ' + fmt(total) + ' / month' : '—';
+  const cov = `${rows.length} of ${nodes.length} services priced${unknown.length ? ' · ' + unknown.length + ' missing structured cost' : ''}`;
+  document.getElementById('cost-coverage').textContent = cov;
+}
 
 // ===== SAVE / LOAD =====
 let autosaveTimer = null;
@@ -5178,14 +5338,14 @@ function getDiagramData() {
   return { nodes, arrows, groups, playFlow, meta: { version: '1.0', created: new Date().toISOString(), name: document.getElementById('filename-input').value } };
 }
 
-function saveDiagram() {
+async function saveDiagram() {
   const name = document.getElementById('filename-input').value || 'diagram';
   const data = getDiagramData();
   // Escape closing-script tags so user content can't break out of the JSON island.
   const dataStr = JSON.stringify(data, null, 2).replace(/<\/scr(ipt)/gi, '<\\/scr$1');
 
   // Build the saved HTML (self-contained SVG viewer + re-openable in editor)
-  const svgMarkup = buildDiagramSVG();
+  const svgMarkup = await buildDiagramSVG();
   const savedHtml = buildSavedHTML(name, dataStr, svgMarkup);
 
   const blob = new Blob([savedHtml], { type: 'text/html' });
@@ -5458,9 +5618,16 @@ ${svgMarkup}
 }
 
 // Build an SVG snapshot of the current diagram (used by saved HTML viewer).
-function buildDiagramSVG() {
+async function buildDiagramSVG() {
   if (!nodes.length && !groups.length) {
     return '<p style="color:#7986cb;font-family:monospace;text-align:center;padding:40px">Empty diagram.</p>';
+  }
+  // Preload icons + rasterize to data URLs so the saved HTML stays self-contained.
+  const iconImgs = await preloadIconBitmaps(nodes.map(n => n.iconUrl));
+  const iconDataUrls = new Map();
+  for (const [url, img] of iconImgs.entries()) {
+    const data = iconImageToPngDataUrl(img, 48);
+    if (data) iconDataUrls.set(url, data);
   }
   let minX=Infinity, minY=Infinity, maxX=-Infinity, maxY=-Infinity;
   nodes.forEach(n => {
@@ -5532,9 +5699,13 @@ function buildDiagramSVG() {
     const nw=el?el.offsetWidth:160, nh=el?el.offsetHeight:80;
     const nx=n.x+ox, ny=n.y+oy;
     const col=themeColors[n.theme]||'#7986cb';
+    const iconData = n.iconUrl ? iconDataUrls.get(n.iconUrl) : null;
+    const iconMarkup = iconData
+      ? `    <image href="${iconData}" x="${nx+8}" y="${ny+8}" width="24" height="24"/>`
+      : `    <text x="${nx+12}" y="${ny+24}" font-size="18">${escHtml(n.icon||'⬜')}</text>`;
     svg += `  <g class="potato-node" data-node-id="${escHtml(n.id)}" style="cursor:pointer">
     <rect x="${nx}" y="${ny}" width="${nw}" height="${nh}" rx="10" fill="#12152a" stroke="${col}" stroke-width="1" opacity="0.95"/>
-    <text x="${nx+12}" y="${ny+24}" font-size="18">${escHtml(n.icon||'⬜')}</text>
+${iconMarkup}
     <text x="${nx+12}" y="${ny+39}" class="node-label">${escHtml((n.category||n.type||'').toUpperCase().slice(0,22))}</text>
     <text x="${nx+12}" y="${ny+55}" class="node-name">${escHtml((n.label||'').slice(0,20))}</text>
 ${n.sublabel ? `    <text x="${nx+12}" y="${ny+68}" class="node-sub">${escHtml((n.sublabel||'').slice(0,24))}</text>\n` : ''}  </g>
@@ -5616,9 +5787,40 @@ function newDiagram() {
 
 // ===== EXPORT PNG =====
 // ===== PNG EXPORT (html2canvas-free, native Canvas approach) =====
-function exportPNG() {
+// Async helpers used by PNG/SVG/saved-viewer exports to load icon bitmaps
+// off the local disk and convert them to data URLs so the output is fully
+// self-contained.
+function loadIconBitmap(url) {
+  return new Promise(resolve => {
+    if (!url) return resolve(null);
+    const img = new Image();
+    img.onload = () => resolve(img);
+    img.onerror = () => resolve(null);
+    img.src = url;
+  });
+}
+async function preloadIconBitmaps(urls) {
+  const unique = [...new Set(urls.filter(Boolean))];
+  const map = new Map();
+  await Promise.all(unique.map(async (u) => {
+    const img = await loadIconBitmap(u);
+    if (img) map.set(u, img);
+  }));
+  return map;
+}
+function iconImageToPngDataUrl(img, sizePx) {
+  const c = document.createElement('canvas');
+  c.width = sizePx; c.height = sizePx;
+  const cx = c.getContext('2d');
+  try { cx.drawImage(img, 0, 0, sizePx, sizePx); } catch (e) { return ''; }
+  try { return c.toDataURL('image/png'); } catch (e) { return ''; }
+}
+
+async function exportPNG() {
   notify('Preparing PNG export...');
   fitToContent();
+  // Preload all icon bitmaps once before drawing.
+  const iconImgs = await preloadIconBitmaps(nodes.map(n => n.iconUrl));
   setTimeout(() => {
     try {
       // Find bounds of all nodes
@@ -5770,9 +5972,14 @@ function exportPNG() {
         roundRect(ctx, nx, ny, nw, nh, 10);
         ctx.stroke();
         // Icon
-        // Use the platform's native color-emoji font when present.
-        ctx.font = '18px "Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji","Twemoji Mozilla",sans-serif';
-        ctx.fillText(n.icon||'⬜', nx+12, ny+26);
+        // Prefer the real provider icon when we have it; emoji is fallback.
+        const iconImg = n.iconUrl ? iconImgs.get(n.iconUrl) : null;
+        if (iconImg) {
+          ctx.drawImage(iconImg, nx + 8, ny + 8, 24, 24);
+        } else {
+          ctx.font = '18px "Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji","Twemoji Mozilla",sans-serif';
+          ctx.fillText(n.icon||'⬜', nx+12, ny+26);
+        }
         // Category label
         ctx.font = 'bold 8px ui-monospace, Menlo, Consolas, monospace';
         ctx.fillStyle = 'rgba(255,255,255,0.35)';
@@ -5838,8 +6045,15 @@ function roundRect(ctx, x, y, w, h, r) {
 }
 
 // ===== SVG EXPORT =====
-function exportSVG() {
+async function exportSVG() {
   if (!nodes.length) { notify('Add some nodes first!', 'warning'); return; }
+  // Preload icons + convert to base64 PNG so the exported SVG is self-contained.
+  const iconImgs = await preloadIconBitmaps(nodes.map(n => n.iconUrl));
+  const iconDataUrls = new Map();
+  for (const [url, img] of iconImgs.entries()) {
+    const data = iconImageToPngDataUrl(img, 48);
+    if (data) iconDataUrls.set(url, data);
+  }
   let minX=Infinity, minY=Infinity, maxX=-Infinity, maxY=-Infinity;
   nodes.forEach(n => {
     const el = document.getElementById('node-'+n.id);
@@ -5915,8 +6129,11 @@ function exportSVG() {
     const nw=el?el.offsetWidth:160, nh=el?el.offsetHeight:80;
     const nx=n.x+ox, ny=n.y+oy;
     const col=themeColors[n.theme]||'#7986cb';
+    const iconData = n.iconUrl ? iconDataUrls.get(n.iconUrl) : null;
     svg += `  <rect x="${nx}" y="${ny}" width="${nw}" height="${nh}" rx="10" fill="#12152a" stroke="${col}" stroke-width="1" opacity="0.9"/>
-  <text x="${nx+12}" y="${ny+24}" font-size="18">${n.icon||'⬜'}</text>
+${iconData
+  ? `  <image href="${iconData}" x="${nx+8}" y="${ny+8}" width="24" height="24"/>`
+  : `  <text x="${nx+12}" y="${ny+24}" font-size="18">${escHtml(n.icon||'⬜')}</text>`}
   <text x="${nx+12}" y="${ny+39}" class="node-label">${escHtml((n.category||n.type||'').toUpperCase().slice(0,22))}</text>
   <text x="${nx+12}" y="${ny+55}" class="node-name">${escHtml((n.label||'').slice(0,20))}</text>
 `;

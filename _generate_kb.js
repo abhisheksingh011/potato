@@ -8,9 +8,11 @@ const HTML_FILE = path.join(__dirname, 'index.html');
 
 const kb = JSON.parse(fs.readFileSync(JSON_FILE, 'utf8'));
 
-// Strip the $-prefixed JSON metadata keys from the runtime object.
+// Strip the $-prefixed JSON metadata keys from the runtime object, keeping
+// the few we need at runtime (asOf + costPresets).
 const runtimeKB = {};
-let metaAsOf = kb.$asOf || null;
+const metaAsOf = kb.$asOf || null;
+const costPresets = kb.$costPresets || null;
 for (const [k, v] of Object.entries(kb)) {
   if (k.startsWith('$')) continue;
   runtimeKB[k] = v;
@@ -24,12 +26,13 @@ function jsString(s) {
 
 function renderEntry(key, entry) {
   let out = `  '${key.replace(/'/g, "\\'")}': {\n`;
-  if (entry.name)      out += `    name: ${jsString(entry.name)},\n`;
-  if (entry.matches)   out += `    matches: ${JSON.stringify(entry.matches)},\n`;
-  if (entry.limits)    out += `    limits: ${jsString(entry.limits)},\n`;
-  if (entry.whenToUse) out += `    whenToUse: ${jsString(entry.whenToUse)},\n`;
-  if (entry.cost)      out += `    cost: ${jsString(entry.cost)},\n`;
-  if (entry.pitfalls)  out += `    pitfalls: ${JSON.stringify(entry.pitfalls)},\n`;
+  if (entry.name)         out += `    name: ${jsString(entry.name)},\n`;
+  if (entry.matches)      out += `    matches: ${JSON.stringify(entry.matches)},\n`;
+  if (entry.limits)       out += `    limits: ${jsString(entry.limits)},\n`;
+  if (entry.whenToUse)    out += `    whenToUse: ${jsString(entry.whenToUse)},\n`;
+  if (entry.cost)         out += `    cost: ${jsString(entry.cost)},\n`;
+  if (entry.costEstimate) out += `    costEstimate: ${JSON.stringify(entry.costEstimate)},\n`;
+  if (entry.pitfalls)     out += `    pitfalls: ${JSON.stringify(entry.pitfalls)},\n`;
   out += '  }';
   return out;
 }
@@ -39,6 +42,7 @@ body += `// Service Knowledge Base — generated from service_kb.json by _genera
 body += `// To update, edit service_kb.json then run \`node _generate_kb.js\`.\n`;
 if (metaAsOf) body += `// Data as of ${metaAsOf}.\n`;
 body += `const SERVICE_KB_AS_OF = ${jsString(metaAsOf || '')};\n`;
+body += `const SERVICE_KB_COST_PRESETS = ${JSON.stringify(costPresets || {})};\n`;
 body += `const SERVICE_KB = {\n`;
 body += Object.entries(runtimeKB).map(([k, v]) => renderEntry(k, v)).join(',\n');
 body += `\n};`;
