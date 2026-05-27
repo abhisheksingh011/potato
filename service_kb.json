@@ -1,6 +1,11 @@
 {
-  "$comment": "Potato Service Knowledge Base. Edit this file, then run `node _generate_kb.js` to splice it into index.html. Each entry has the 4 high-value fields: limits, whenToUse, cost, pitfalls. The `matches` array drives runtime lookup against a node's type/category. Update the asOf date in cost strings when refreshing.",
+  "$comment": "Potato Service Knowledge Base. Edit this file, then run `node _generate_kb.js` to splice it into index.html. Each entry has the 4 high-value fields: limits, whenToUse, cost, pitfalls plus an OPTIONAL costEstimate { small, medium, large } used by the Cost Estimator. The `matches` array drives runtime lookup against a node's type/category. Update the asOf date in cost strings when refreshing.",
   "$asOf": "2026-Q2",
+  "$costPresets": {
+    "small":  { "label": "Small (dev / hobby)",         "summary": "≈ 30k req/day, single-AZ, minimal data" },
+    "medium": { "label": "Medium (small production)",   "summary": "≈ 1M req/day, multi-AZ where applicable" },
+    "large":  { "label": "Large (busy production)",     "summary": "≈ 30M req/day, multi-region considerations" }
+  },
 
   "lambda": {
     "name": "AWS Lambda",
@@ -8,6 +13,7 @@
     "limits": "Max execution: 15 min timeout | Memory: 128 MB–10 GB | Payload: 6 MB sync / 256 KB async | Cold start: 100ms–1s | Concurrency: 1,000 default (soft limit) | Deployment pkg: 50 MB zipped / 250 MB unzipped | /tmp storage: 512 MB–10 GB",
     "whenToUse": "Best for short-lived, event-driven tasks. Scales to zero — no idle cost. Ideal for API handlers, S3 triggers, scheduled jobs under 15 min.",
     "cost": "$0.20 per 1M requests + $0.0000166 per GB-second. Free tier: 1M requests + 400k GB-s/mo forever. ARM (Graviton) is ~20% cheaper than x86. (as of Q2 2026)",
+    "costEstimate": { "small": 0, "medium": 12, "large": 350 },
     "pitfalls": [
       "VPC cold starts add 1-5s — keep Lambda outside VPC unless you need private resources",
       "Concurrency soft-cap of 1,000 — request limit increase early for production workloads",
@@ -21,6 +27,7 @@
     "limits": "No execution timeout (runs indefinitely) | Requires manual scaling or ASG | EBS I/O depends on instance type | Instance startup: 30–90s | No built-in HA without ALB + ASG",
     "whenToUse": "Best for long-running workloads, stateful apps, or when you need full OS control. Use when Lambda timeout or memory limits are a constraint.",
     "cost": "On-demand t3.medium ~$30/mo. Reserved 1yr saves ~40%, 3yr saves ~62%. Spot saves 70-90% but can be interrupted. Data egress: $0.09/GB to internet. (as of Q2 2026)",
+    "costEstimate": { "small": 30, "medium": 120, "large": 600 },
     "pitfalls": [
       "Stopped instances still charge for attached EBS — terminate to fully stop billing",
       "NAT Gateway for private subnet egress costs ~$32/mo + $0.045/GB — often the surprise bill",
@@ -34,6 +41,7 @@
     "limits": "Task CPU: 0.25–16 vCPU | Task memory: 512 MB–120 GB | Max containers per task: 10 | Service startup: ~30–60s | No automatic rollback without CodeDeploy",
     "whenToUse": "Best for containerised microservices needing persistent processes. Easier ops than raw EC2, more flexible than Lambda for long-running workloads.",
     "cost": "EC2 launch type: pay for EC2 instances + EBS (no ECS premium). Fargate launch type: $0.04048/vCPU-hour + $0.004445/GB-hour. ARM Fargate ~20% cheaper. (as of Q2 2026)",
+    "costEstimate": { "small": 35, "medium": 150, "large": 700 },
     "pitfalls": [
       "Fargate has no Spot option for older platform versions — check before assuming Spot savings",
       "Task definitions are immutable — every change creates a new revision (old revisions accrue)",
@@ -47,6 +55,7 @@
     "limits": "Max pods per node: 110 (t3.medium) to 750 (large) | Max nodes per cluster: 5,000 | Control plane SLA: 99.95% | Add-on updates require manual intervention | Higher ops overhead than ECS",
     "whenToUse": "Best when you need full Kubernetes compatibility, multi-cloud portability, or advanced scheduling. Higher complexity than ECS — justify with scale or K8s-specific tooling.",
     "cost": "Control plane: $0.10/hour per cluster (~$73/mo). Plus EC2/Fargate for nodes. EKS Auto Mode adds $0.0029/vCPU-hr for AWS-managed nodes. (as of Q2 2026)",
+    "costEstimate": { "small": 73, "medium": 250, "large": 1200 },
     "pitfalls": [
       "Control plane charge is per-cluster — running dev/staging/prod = 3x the base cost",
       "AWS Load Balancer Controller pods cost extra and must be in place before ingress works",
@@ -60,6 +69,7 @@
     "limits": "Max CPU: 16 vCPU | Max memory: 120 GB | No persistent local storage (use EFS) | Cold start: 30–60s | Cannot access EC2 instance metadata",
     "whenToUse": "Serverless containers — no EC2 management. Pay per task second. Best for unpredictable or bursty container workloads.",
     "cost": "$0.04048/vCPU-hour + $0.004445/GB-hour (x86). ARM ~20% cheaper. Spot ~70% off. Billed per second, 1-min minimum. (as of Q2 2026)",
+    "costEstimate": { "small": 15, "medium": 90, "large": 450 },
     "pitfalls": [
       "Cold starts are 30-60s — not suitable for latency-sensitive scale-up",
       "No daemonset equivalent — each task gets its own networking",
@@ -86,6 +96,7 @@
     "limits": "Max object size: 5 TB | Single PUT: 5 GB (use multipart above 100 MB) | Max bucket count: 100 per account (soft) | No native query — use Athena/S3 Select | S3 Select: 128 MB max | Lifecycle rules: 1,000 per bucket | Eventual consistency: READ-after-DELETE may return old data",
     "whenToUse": "Industry-standard object store. 11 nines durability. Best for files, backups, static assets, data lake landing zone. Not suitable for transactional or low-latency random access.",
     "cost": "Standard: $0.023/GB/mo for first 50 TB. PUT: $0.005/1k requests. GET: $0.0004/1k. Data egress: $0.09/GB to internet. Intelligent-Tiering auto-saves 70%+ on cold data. (as of Q2 2026)",
+    "costEstimate": { "small": 2, "medium": 25, "large": 200 },
     "pitfalls": [
       "Data egress is the single biggest S3 surprise bill — pair with CloudFront for served content",
       "Lifecycle policies don't apply retroactively to existing objects without a transition rule",
@@ -137,6 +148,7 @@
     "limits": "Max DB size: 64 TB (Aurora) / 16–32 TB (others) | Max connections: depends on instance RAM (e.g. db.t3.medium ≈ 60 connections) | Read replicas: max 15 (Aurora) / 5 (MySQL/Postgres) | Failover time: 60–120s | No horizontal write scaling — single primary writer",
     "whenToUse": "Best for relational, ACID-compliant workloads. Managed patching, backups, Multi-AZ HA. Use Aurora for better performance and auto-scaling storage.",
     "cost": "On-demand db.t3.medium MySQL: ~$60/mo + storage. Multi-AZ doubles compute cost. Reserved 1yr saves ~40%. Backups: free up to allocated storage size. (as of Q2 2026)",
+    "costEstimate": { "small": 60, "medium": 240, "large": 1100 },
     "pitfalls": [
       "Storage can only grow, never shrink — overprovisioning is permanent",
       "Multi-AZ standby is NOT a read replica — it's idle until failover",
@@ -150,6 +162,7 @@
     "limits": "Max item size: 400 KB | Max partition key throughput: 3,000 RCU / 1,000 WCU per partition | Query must use partition key — cannot do full table scans efficiently | GSI propagation: eventual consistency | Max GSIs: 20 per table | BatchWriteItem: max 25 items | Transactions: max 100 items / 4 MB",
     "whenToUse": "Best for high-throughput key-value or document access at any scale. Sub-millisecond latency. Avoid for complex queries, joins, or aggregations — use Athena or Aurora instead.",
     "cost": "On-demand: $1.25/M write requests + $0.25/M read requests + $0.25/GB/mo storage. Provisioned: $0.00065/WCU-hr + $0.00013/RCU-hr. Standard-IA tier saves ~60% on rarely-read data. (as of Q2 2026)",
+    "costEstimate": { "small": 5, "medium": 80, "large": 900 },
     "pitfalls": [
       "Scans cost the same as full reads — design access patterns around partition key from day one",
       "Hot partitions cap at 3,000 RCU / 1,000 WCU regardless of table provisioning",
@@ -164,6 +177,7 @@
     "limits": "Redis max memory: node-type dependent (e.g. r6g.large = 13 GB) | Redis Cluster max nodes: 500 | Memcached max nodes: 300 | No persistence in Memcached | Redis AOF persistence adds latency | Max key size: 512 MB | Max value: 512 MB",
     "whenToUse": "In-memory cache for sub-millisecond reads. Best for session storage, leaderboards, rate limiting, DB query caching. Use Redis for persistence/pub-sub, Memcached for pure caching.",
     "cost": "cache.t4g.micro Redis: ~$12/mo. cache.r6g.large: ~$185/mo. Reserved 1yr saves ~40%. Serverless: $0.125/GB-hr storage + $0.0034/ECU. (as of Q2 2026)",
+    "costEstimate": { "small": 12, "medium": 90, "large": 400 },
     "pitfalls": [
       "Multi-AZ replication doubles cost — confirm RPO/RTO needs justify it",
       "Cluster mode enabled requires app-side awareness (CRC16 slot routing)",
@@ -177,6 +191,7 @@
     "limits": "Max storage: 128 TB (auto-scales) | Max read replicas: 15 | Failover: ~30s | Aurora Serverless v2 min: 0.5 ACU | Max connections: instance-dependent | Writer endpoint is single — no multi-writer by default (except Aurora Global)",
     "whenToUse": "MySQL/Postgres compatible with up to 5x performance. Auto-scaling storage, 6-way replication, fast failover. Best when RDS limits are hit or high availability is critical.",
     "cost": "db.r6g.large: ~$210/mo. Storage: $0.10/GB/mo. I/O: $0.20/M requests. Aurora Serverless v2: $0.12/ACU-hr (~$87/mo for 1 ACU 24/7). (as of Q2 2026)",
+    "costEstimate": { "small": 87, "medium": 350, "large": 1800 },
     "pitfalls": [
       "I/O charges can dominate cost for write-heavy workloads — consider I/O-Optimized cluster ($0.225/GB but no I/O charge)",
       "Serverless v2 minimum 0.5 ACU bills 24/7 — not truly serverless for idle workloads",
@@ -204,6 +219,7 @@
     "limits": "Max VPCs per region: 5 (soft) | Max subnets per VPC: 200 | Max security groups per ENI: 5 | Max rules per SG: 60 inbound + 60 outbound | VPC peering: non-transitive — A↔B, B↔C does not mean A↔C | Max route table entries: 1,000",
     "whenToUse": "Isolated network boundary for your AWS resources. Use private subnets for databases/Lambda, public subnets for ALB/NAT. Design CIDR ranges for future peering needs.",
     "cost": "VPC itself: free. NAT Gateway: ~$32/mo + $0.045/GB processed. VPC Endpoints (Interface): $0.01/hr + $0.01/GB. PrivateLink: $0.01/hr + data. (as of Q2 2026)",
+    "costEstimate": { "small": 32, "medium": 100, "large": 300 },
     "pitfalls": [
       "NAT Gateway is the #1 surprise bill — one per AZ + data processing adds up fast",
       "CIDR ranges can't be expanded, only added — plan for 5-10x growth on day one",
@@ -217,6 +233,7 @@
     "limits": "Max target groups: 100 | Max rules per listener: 100 | Max targets per group: 1,000 | SSL cert limit: 25 per ALB | WebSocket support: yes | gRPC: yes | Sticky sessions: yes (cookie-based) | Not suitable for TCP/UDP — use NLB",
     "whenToUse": "Layer 7 HTTP/HTTPS load balancer. Routes by path, host, headers. Best for web apps, microservices, API routing. Pair with ECS/EKS/EC2 target groups.",
     "cost": "$0.0225/hr (~$16/mo) + $0.008/LCU-hr. Free SSL via ACM. NLB is similar pricing structure for L4. (as of Q2 2026)",
+    "costEstimate": { "small": 18, "medium": 35, "large": 120 },
     "pitfalls": [
       "LCU charges scale with new connections, active connections, processed bytes, and rule evaluations",
       "Idle ALBs still bill the hourly base — delete unused dev/staging LBs",
@@ -229,6 +246,7 @@
     "limits": "Max distributions: 200 per account | Cache TTL: 0–31,536,000s | Max object size: 20 GB | Custom origin timeout: max 60s | Functions max execution: 2ms (CloudFront Functions) / 30s (Lambda@Edge) | Lambda@Edge cold start adds 100–500ms",
     "whenToUse": "Global CDN with 400+ edge locations. Reduces latency for static/dynamic content. Best for S3 static sites, API caching, WAF integration. Configure cache policies carefully to avoid stale data.",
     "cost": "Data out to internet: $0.085/GB (US/EU), tiered down to $0.02/GB at PB scale. HTTPS requests: $0.0075-$0.0120/10k. Free tier: 1 TB out + 10M requests/mo forever. (as of Q2 2026)",
+    "costEstimate": { "small": 0, "medium": 35, "large": 400 },
     "pitfalls": [
       "Origin requests still cost S3 GET fees — high cache miss rate doubles your bill",
       "Lambda@Edge runs at every edge region — debugging is hard, costs add up",
@@ -254,6 +272,7 @@
     "limits": "Max timeout: 29s (REST) / 29s (HTTP) / no limit (WebSocket) | Max payload: 10 MB (REST) / 10 MB (HTTP) | Throttling: 10,000 RPS default (account-wide soft limit) | Max stages: 10 per API | Caching: 0.5 GB–237 GB, adds latency on misses | Max integrations per API: 300",
     "whenToUse": "Managed API front door for Lambda, HTTP backends, AWS services. Best for REST/WebSocket APIs with auth, throttling, caching built-in. Use HTTP API for lower cost/latency, REST API for full features.",
     "cost": "REST API: $3.50/M calls. HTTP API: $1.00/M calls (much cheaper for simple Lambda proxy). WebSocket: $1.00/M messages + $0.25/M connection-min. Cache: $0.02/hr per GB. (as of Q2 2026)",
+    "costEstimate": { "small": 1, "medium": 30, "large": 600 },
     "pitfalls": [
       "REST API is 3.5x more expensive than HTTP API — only pay for it if you need features like usage plans or full request transforms",
       "Caching has a flat hourly cost regardless of utilization — measure cache hit rate",
@@ -280,6 +299,7 @@
     "limits": "RPM/TPM limits per model vary — Claude Sonnet: ~500 RPM default | Max context: model-dependent (Claude Sonnet 4.6: 200K tokens) | No training — inference only | Cross-region inference available | On-demand pricing — no reserved capacity | Knowledge base chunking: max 10,000 chars",
     "whenToUse": "Managed foundation model API — no infrastructure to manage. Best for generative AI features, RAG pipelines, agent orchestration. Choose model based on latency vs capability trade-off.",
     "cost": "Claude Sonnet 4.6: $3/M input tokens + $15/M output tokens. Claude Haiku 4.5: $1/M in + $5/M out. Provisioned Throughput: hourly commitment for guaranteed capacity. Prompt caching saves up to 90% on cached prefix. (as of Q2 2026)",
+    "costEstimate": { "small": 30, "medium": 600, "large": 5000 },
     "pitfalls": [
       "Output tokens cost 3-5x input tokens — verbose prompts/responses double the bill fast",
       "RPM/TPM quotas are low by default — request increases early for production",
@@ -406,6 +426,7 @@
     "limits": "Max message size: 256 KB (use S3 Extended Client for larger) | Max retention: 14 days | Visibility timeout: max 12hrs | Standard: at-least-once delivery, out-of-order | FIFO: exactly-once, ordered, max 3,000 msg/s (batching) | Max in-flight messages: 120,000 (Standard) / 20,000 (FIFO) | DLQ redrive: max 1,000 messages/s",
     "whenToUse": "Decouples producers from consumers. Use Standard for high throughput, FIFO for ordered processing. Best for async workloads, retry logic, load levelling. Pair with Lambda or ECS consumers.",
     "cost": "Standard: $0.40 per 1M requests (free tier: 1M/mo forever). FIFO: $0.50 per 1M. Long polling reduces empty receives. Each batch of 10 = 1 request. (as of Q2 2026)",
+    "costEstimate": { "small": 0, "medium": 5, "large": 80 },
     "pitfalls": [
       "Empty receives still count as requests — use long polling (WaitTimeSeconds=20)",
       "FIFO message group ID determines parallelism — single group = single consumer",
@@ -419,6 +440,7 @@
     "limits": "Max message size: 256 KB | Max subscriptions per topic: 12,500,000 | Max topics: 100,000 | FIFO topic: max 300 msg/s | Email delivery: not guaranteed (spam filters) | No message retention — fire and forget | SMS costs vary by country",
     "whenToUse": "Fan-out pub/sub — one message to many subscribers (SQS, Lambda, HTTP, email, SMS). Best for event broadcasting, alerts, decoupled notification systems.",
     "cost": "$0.50 per 1M publishes. Delivery: $0.50/M to SQS, $0.60/M to Lambda, $1.00/M to email, SMS varies by country (often $0.01-$0.075 per message). (as of Q2 2026)",
+    "costEstimate": { "small": 0, "medium": 5, "large": 90 },
     "pitfalls": [
       "SMS to international numbers is expensive AND has unpredictable delivery rates",
       "Email throttled to 50/day for sandbox accounts — request production access early",
@@ -469,6 +491,7 @@
     "limits": "Metric resolution: 1s (high-res, extra cost) / 60s standard | Log retention: 1 day–10 years (set per log group!) | Dashboard widgets: max 500 | Alarms: max 10 dimensions per metric | Logs Insights: max 20 log groups per query / 15 min query timeout | GetMetricData: max 500 metrics per request",
     "whenToUse": "AWS-native monitoring. Set log retention explicitly — default is never expire (costly). Use metric filters to turn logs into metrics. Alarm on p99 latency, error rate, not just average.",
     "cost": "Metrics: $0.30/metric/mo (first 10k). Logs ingestion: $0.50/GB. Logs storage: $0.03/GB/mo. Insights queries: $0.005/GB scanned. Alarms: $0.10/mo each. Dashboards: $3/mo each. (as of Q2 2026)",
+    "costEstimate": { "small": 5, "medium": 60, "large": 400 },
     "pitfalls": [
       "Default 'never expire' log retention causes silent bills that compound for years — set retention on every log group",
       "Custom metrics at 1s resolution are 4x the cost of 60s — only use for critical latency tracking",
