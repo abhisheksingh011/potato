@@ -364,6 +364,20 @@ body {
   z-index: 100;
 }
 .node:hover .port, .node.selected .port { opacity: 1; }
+/* One-shot port discoverability pulse — shown on the first node a new user
+   hovers, so they realize ports exist and are draggable. */
+.node.port-hint .port { opacity: 1 !important; animation: port-pulse 1.1s ease-in-out 3; }
+@keyframes port-pulse {
+  0%, 100% { transform: scale(1) translateX(-50%); box-shadow: 0 0 0 0 rgba(123,47,190,0.55); }
+  50%      { transform: scale(1.6)  translateX(-50%); box-shadow: 0 0 0 8px rgba(123,47,190,0); }
+}
+.node.port-hint .port.top, .node.port-hint .port.bottom { animation-name: port-pulse; }
+.node.port-hint .port.left { animation: port-pulse-y 1.1s ease-in-out 3; }
+.node.port-hint .port.right { animation: port-pulse-y 1.1s ease-in-out 3; }
+@keyframes port-pulse-y {
+  0%, 100% { transform: scale(1) translateY(-50%); box-shadow: 0 0 0 0 rgba(123,47,190,0.55); }
+  50%      { transform: scale(1.6) translateY(-50%); box-shadow: 0 0 0 8px rgba(123,47,190,0); }
+}
 .port:hover { transform: scale(1.4); background: var(--teal); }
 .port.top    { top: -5px;    left: 50%; transform: translateX(-50%); }
 .port.bottom { bottom: -5px; left: 50%; transform: translateX(-50%); }
@@ -544,6 +558,52 @@ body {
   border-bottom: 2px solid var(--text-muted);
 }
 .group-node:hover .group-resize { opacity: 0.7; }
+
+/* Empty-state overlay */
+#empty-state {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;   /* let drops/drags pass through to the canvas */
+  z-index: 5;
+  padding: 24px;
+}
+#empty-state.hidden { display: none; }
+#empty-state .es-card {
+  pointer-events: auto;
+  background: rgba(18,21,42,0.85);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 28px 30px;
+  max-width: 560px;
+  text-align: center;
+  backdrop-filter: blur(12px);
+  box-shadow: 0 12px 40px rgba(0,0,0,0.4);
+}
+#empty-state .es-title { font-size: 19px; font-weight: 800; background: linear-gradient(135deg, #7986cb, #e91e63, #1abc9c); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+#empty-state .es-subtitle { font-size: 12px; color: var(--text-muted); font-family: var(--font-mono); margin-top: 4px; }
+#empty-state .es-actions { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin: 18px 0 12px; }
+#empty-state .es-action {
+  background: var(--bg3);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 14px 10px;
+  color: var(--text);
+  cursor: pointer;
+  transition: all 0.18s;
+  font-family: inherit;
+  text-align: center;
+}
+#empty-state .es-action:hover { border-color: var(--purple); background: var(--bg2); transform: translateY(-2px); box-shadow: 0 6px 20px rgba(123,47,190,0.25); }
+#empty-state .es-action-icon { font-size: 26px; margin-bottom: 6px; }
+#empty-state .es-action-label { font-size: 12px; font-weight: 700; }
+#empty-state .es-action-hint { font-size: 10px; color: var(--text-muted); font-family: var(--font-mono); margin-top: 3px; line-height: 1.4; }
+#empty-state .es-foot { font-size: 10px; color: var(--text-dim); font-family: var(--font-mono); margin-top: 8px; }
+@media (max-width: 720px) {
+  #empty-state .es-actions { grid-template-columns: 1fr; }
+}
 
 /* Selection rectangle */
 #selection-rect {
@@ -1120,6 +1180,32 @@ kbd {
       <!-- Nodes are injected here -->
       <div id="selection-rect"></div>
     </div>
+
+    <!-- Empty-state guidance — visible when nodes.length === 0 -->
+    <div id="empty-state" aria-hidden="false">
+      <div class="es-card">
+        <div class="es-title">Start your first diagram</div>
+        <div class="es-subtitle">Three ways in. Pick any one.</div>
+        <div class="es-actions">
+          <button class="es-action" onclick="switchSidebarTab('aws')">
+            <div class="es-action-icon">🪣</div>
+            <div class="es-action-label">Drag from sidebar</div>
+            <div class="es-action-hint">1067 AWS / Azure / GCP icons</div>
+          </button>
+          <button class="es-action" onclick="showTemplatesModal()">
+            <div class="es-action-icon">✨</div>
+            <div class="es-action-label">Pick a template</div>
+            <div class="es-action-hint">10 ready architectures</div>
+          </button>
+          <button class="es-action" onclick="showPasteModal()">
+            <div class="es-action-icon">🤖</div>
+            <div class="es-action-label">Paste from AI</div>
+            <div class="es-action-hint">Describe to ChatGPT/Claude/Gemini</div>
+          </button>
+        </div>
+        <div class="es-foot">Connect nodes by dragging from the dots that appear on their edges.</div>
+      </div>
+    </div>
   </div>
 
   <!-- RIGHT PROPERTIES PANEL -->
@@ -1191,7 +1277,7 @@ kbd {
 <div id="notifications" role="status" aria-live="polite" aria-atomic="false"></div>
 
 <!-- Hidden file input -->
-<input type="file" id="file-input" accept=".html" style="display:none" onchange="loadDiagramFile(event)">
+<input type="file" id="file-input" accept=".html,.potato.html" style="display:none" onchange="loadDiagramFile(event)">
 
 
 <!-- MERMAID / JSON IMPORT MODAL -->
@@ -2781,18 +2867,39 @@ let currentSidebarTab = 'shapes';
 function renderSidebar(tab, filter = '') {
   currentSidebarTab = tab;
   const list = document.getElementById('component-list');
-  const cats = COMPONENTS[tab] || [];
   list.innerHTML = '';
 
+  // When a search query is active, ignore tab boundaries and walk every tab
+  // — users searching for "Lambda" shouldn't have to know it's an AWS thing.
+  // Each category header is prefixed with the provider so results stay readable.
+  const q = filter.trim().toLowerCase();
+  let cats;
+  if (q) {
+    cats = [];
+    const tabPrefix = { shapes: 'Shapes', aws: 'AWS', azure: 'Azure', gcp: 'GCP' };
+    for (const tk of ['shapes', 'aws', 'azure', 'gcp']) {
+      for (const c of (COMPONENTS[tk] || [])) {
+        const matched = c.items.filter(i => i.name.toLowerCase().includes(q) || i.type.toLowerCase().includes(q));
+        if (matched.length) {
+          cats.push({ cat: (tabPrefix[tk] || tk) + ' · ' + c.cat, items: matched });
+        }
+      }
+    }
+    if (!cats.length) {
+      list.innerHTML = `<p style="color:var(--text-dim);font-size:11px;font-family:var(--font-mono);text-align:center;padding:32px 12px;line-height:1.6">No matches for <strong>${escHtml(filter)}</strong> across any tab.</p>`;
+      return;
+    }
+  } else {
+    cats = COMPONENTS[tab] || [];
+  }
+
   cats.forEach(cat => {
-    const items = filter
-      ? cat.items.filter(i => i.name.toLowerCase().includes(filter.toLowerCase()) || i.type.toLowerCase().includes(filter.toLowerCase()))
-      : cat.items;
+    const items = cat.items;
     if (!items.length) return;
 
     const catEl = document.createElement('div');
     catEl.className = 'component-category';
-    catEl.innerHTML = `<div class="category-title">${cat.cat}</div>`;
+    catEl.innerHTML = `<div class="category-title">${escHtml(cat.cat)}</div>`;
 
     items.forEach(item => {
       const el = document.createElement('div');
@@ -3475,6 +3582,9 @@ function bindNodeRootEvents(el, node) {
       tt.innerHTML = '<strong style="color:var(--text);display:block;margin-bottom:5px;font-size:12px">' + escHtml(n.label) + '</strong><span style="white-space:pre-wrap">' + escHtml(n.description) + '</span>';
       tt.style.display = 'block';
     }
+    // First time the user hovers any node in this session, pulse the ports so
+    // they discover the connection feature. Once shown, never again in this tab.
+    maybeShowFirstHoverPortHint(el);
   });
   el.addEventListener('mousemove', (e) => {
     const tt = document.getElementById('tooltip');
@@ -3493,6 +3603,23 @@ function bindNodeRootEvents(el, node) {
     e.preventDefault();
     showContextMenu(e, node.id);
   });
+}
+
+// One-shot helper: the first time the user hovers a node this session,
+// pulse all 4 ports for ~3.3s so they discover the connection affordance.
+let _portHintShown = false;
+function maybeShowFirstHoverPortHint(el) {
+  if (_portHintShown) return;
+  try {
+    if (sessionStorage.getItem('potato-port-hint-shown') === '1') {
+      _portHintShown = true;
+      return;
+    }
+  } catch (_) { /* private mode — fall through; we'll still gate by the in-memory flag */ }
+  _portHintShown = true;
+  try { sessionStorage.setItem('potato-port-hint-shown', '1'); } catch (_) {}
+  el.classList.add('port-hint');
+  setTimeout(() => el.classList.remove('port-hint'), 3500);
 }
 
 // ===== INLINE EDIT =====
@@ -5332,6 +5459,9 @@ function updateStatusBar() {
   document.getElementById('status-nodes').textContent = nodes.length + ' node' + (nodes.length!==1?'s':'');
   document.getElementById('status-arrows').textContent = arrows.length + ' connection' + (arrows.length!==1?'s':'');
   updateMinimap();
+  // Show the empty-state hint when the canvas is blank, hide it otherwise.
+  const es = document.getElementById('empty-state');
+  if (es) es.classList.toggle('hidden', nodes.length > 0);
 }
 
 function getDiagramData() {
@@ -5352,7 +5482,7 @@ async function saveDiagram() {
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
-  a.download = name.replace(/[^a-zA-Z0-9_-]/g, '_') + '.html';
+  a.download = potatoDownloadName(name, 'html');
   a.click();
   URL.revokeObjectURL(url);
 
@@ -6002,7 +6132,7 @@ async function exportPNG() {
       // Save
       const name = document.getElementById('filename-input').value || 'diagram';
       const link = document.createElement('a');
-      link.download = name.replace(/[^a-zA-Z0-9_-]/g,'_') + '.png';
+      link.download = potatoDownloadName(name, 'png');
       link.href = canvas.toDataURL('image/png');
       link.click();
       notify('PNG exported ✅ — ' + W + '×' + H + 'px');
@@ -6147,7 +6277,7 @@ ${iconData
   const blob = new Blob([svg], {type:'image/svg+xml'});
   const url = URL.createObjectURL(blob);
   const a2 = document.createElement('a');
-  a2.href = url; a2.download = name.replace(/[^a-zA-Z0-9_-]/g,'_') + '.svg';
+  a2.href = url; a2.download = potatoDownloadName(name, 'svg');
   a2.click(); URL.revokeObjectURL(url);
   notify('SVG exported ✅');
 }
@@ -6486,6 +6616,20 @@ document.getElementById('modal-overlay').addEventListener('click', (e) => { if (
 // ===== HELPERS =====
 function getNode(id) { return nodes.find(n => n.id === id); }
 function escHtml(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+
+// Build a download filename in the form `<safe-name>.potato.<ext>`.
+// Strips any trailing `.potato` the user already typed so we never double-up
+// (`my-diagram.potato.potato.html`). Also collapses unsafe chars to underscores.
+function potatoDownloadName(name, ext) {
+  const safe = String(name || 'diagram')
+    .replace(/\.(potato\.)?(html|png|svg)$/i, '')   // strip any existing extension
+    .replace(/\.potato$/i, '')                      // strip a bare .potato suffix
+    .replace(/[^a-zA-Z0-9_-]/g, '_')                // sanitize remaining chars
+    .replace(/_+/g, '_')                            // collapse repeated underscores
+    .replace(/^_+|_+$/g, '')                        // trim leading/trailing
+    || 'diagram';
+  return safe + '.potato.' + ext;
+}
 
 // ===== LLM PROMPT (inlined so users don't need to leave the app) =====
 const POTATO_LLM_PROMPT_TEXT = `You are a diagram generator for Potato (https://github.com/potato-diagram/potato).
