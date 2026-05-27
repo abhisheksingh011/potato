@@ -82,6 +82,33 @@ GROUP SCHEMA — visual container (VPC, subnet, service boundary)
 }
 
 ================================================================
+PLAY FLOW (OPTIONAL but recommended) — narrated step-by-step animation
+================================================================
+"playFlow" is a top-level array (sibling of nodes/arrows/groups) that drives
+Potato's Play button. Each entry references an existing arrow and provides a
+1-2 sentence narration of what happens at that step. Potato animates the steps
+in the order you list them and shows the text underneath the diagram.
+
+"playFlow": [
+  { "arrow": "a_1", "text": "User opens the web app and clicks Sign In." },
+  { "arrow": "a_2", "text": "Browser sends an HTTPS request to CloudFront." },
+  { "arrow": "a_3", "text": "CloudFront routes the dynamic request to the ALB." },
+  { "arrow": "a_4", "text": "ALB picks an API task in ECS and forwards the call." },
+  { "arrow": "a_5", "text": "API service queries PostgreSQL for the user record." },
+  { "arrow": "a_6", "text": "API enqueues a background job in SQS so the response stays fast." }
+]
+
+Rules:
+- Each `arrow` value MUST match an arrow.id from the arrows[] array.
+- `text` is the on-screen narration (max ~280 chars; 1-2 sentences is ideal).
+- The user can reorder, edit, remove or add steps in Potato's Sequence Editor
+  after import, so this is a starting point, not a contract.
+- Cover the full request lifecycle from entry point to final state. Skip arrows
+  that are purely observability or auth setup unless they matter to the story.
+- An arrow can appear multiple times if the same connection is exercised
+  multiple times in the flow (e.g. retry loops).
+
+================================================================
 ALLOWED VALUES
 ================================================================
 - node theme: green, orange, blue, purple, red, teal, pink, yellow, cyan, gray, gradient
@@ -237,6 +264,15 @@ WORKED EXAMPLE — paste this verbatim back if asked for a starter
   ],
   "groups": [
     { "id": "g_1", "x": 700, "y": 140, "w": 460, "h": 320, "label": "Private Subnet", "color": "purple" }
+  ],
+  "playFlow": [
+    { "arrow": "a_1", "text": "User opens the app — browser hits CloudFront over HTTPS." },
+    { "arrow": "a_2", "text": "CloudFront forwards the dynamic request to the regional ALB." },
+    { "arrow": "a_3", "text": "ALB routes the call to a healthy API task in the ECS cluster." },
+    { "arrow": "a_4", "text": "API service reads the user's record from PostgreSQL." },
+    { "arrow": "a_5", "text": "API enqueues a slow background job in SQS so the API response stays fast." },
+    { "arrow": "a_6", "text": "Worker service polls SQS and picks up the job." },
+    { "arrow": "a_7", "text": "Worker writes the processed result back to PostgreSQL." }
   ]
 }
 </script>
@@ -253,6 +289,9 @@ CHECKLIST BEFORE YOU REPLY
 [ ] iconUrl paths (if used) start with `icons/aws/`, `icons/azure/`, or `icons/gcp/`.
 [ ] Groups visually enclose their contained nodes with >=20px padding.
 [ ] zIndex values increment per node.
+[ ] playFlow (if included) only references arrow ids that exist in arrows[].
+[ ] playFlow text fields are 1-2 sentences each, telling the user what happens
+    at that step (the data, the action, why) — not just restating from/to.
 
 Now describe the architecture you want me to diagram:
 ````

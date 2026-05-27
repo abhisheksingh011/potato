@@ -1044,7 +1044,13 @@ kbd {
     <button class="tb-btn" onclick="autoLayout('lr')" title="Auto Layout Left→Right" aria-label="Auto-layout left to right"><span class="tb-icon" aria-hidden="true">→</span><span class="tb-label">Layout LR</span></button>
     <button class="tb-btn" onclick="autoLayout('tb')" title="Auto Layout Top→Bottom" aria-label="Auto-layout top to bottom"><span class="tb-icon" aria-hidden="true">↓</span><span class="tb-label">Layout TB</span></button>
     <button id="btn-grid-snap" class="tb-btn" onclick="toggleGridSnap()" title="Toggle snap to 20px grid" aria-label="Toggle grid snap" aria-pressed="false"><span class="tb-icon" aria-hidden="true">⌗</span><span class="tb-label">Snap</span></button>
-    <button id="btn-play-flow" class="tb-btn" onclick="togglePlayFlow()" title="Animate the data flow through the diagram" aria-label="Play flow animation"><span class="tb-icon" aria-hidden="true">▶</span><span class="tb-label">Play</span></button>
+    <button id="btn-play-flow" class="tb-btn" onclick="togglePlayFlow()" title="Animate the data flow through the diagram (Space)" aria-label="Play flow animation"><span class="tb-icon" aria-hidden="true">▶</span><span class="tb-label">Play</span></button>
+    <select id="play-speed" class="tb-btn" onchange="setPlaySpeed(this.value)" title="Animation speed" aria-label="Animation speed" style="padding:6px 8px;font-size:11px">
+      <option value="2500">🐢 Slow</option>
+      <option value="1400" selected>Normal</option>
+      <option value="700">🐇 Fast</option>
+    </select>
+    <button id="btn-edit-flow" class="tb-btn" onclick="showFlowEditor()" title="Edit the play sequence and narration" aria-label="Edit play sequence"><span class="tb-icon" aria-hidden="true">📝</span><span class="tb-label">Sequence</span></button>
   </div>
 
   <div style="flex:1;"></div>
@@ -1268,6 +1274,29 @@ flowchart LR
   </div>
 </div>
 
+<!-- FLOW SEQUENCE EDITOR MODAL -->
+<div id="flow-editor-overlay" role="dialog" aria-modal="true" aria-labelledby="flow-editor-title" style="position:fixed;inset:0;background:rgba(0,0,0,0.75);z-index:8500;display:none;align-items:center;justify-content:center;backdrop-filter:blur(4px)">
+  <div style="background:var(--bg2);border:1px solid var(--border);border-radius:14px;padding:24px;width:720px;max-width:95vw;max-height:88vh;display:flex;flex-direction:column;box-shadow:0 24px 80px rgba(0,0,0,0.8)">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+      <div>
+        <h2 id="flow-editor-title" style="font-size:17px;font-weight:800">📝 Play Sequence Editor</h2>
+        <p style="font-size:11px;color:var(--text-muted);font-family:var(--font-mono);margin-top:3px">Set the order, narration, and which connections appear in the Play animation. The LLM seeds this — edit freely.</p>
+      </div>
+      <button onclick="closeFlowEditor()" aria-label="Close" style="background:none;border:none;color:var(--text-muted);font-size:22px;cursor:pointer;line-height:1">×</button>
+    </div>
+    <div style="display:flex;gap:8px;margin-top:6px;margin-bottom:10px;flex-wrap:wrap">
+      <button type="button" class="tb-btn" onclick="flowEditorAddStep()" style="font-size:11px">+ Add step</button>
+      <button type="button" class="tb-btn" onclick="flowEditorResetToAuto()" style="font-size:11px" title="Replace sequence with the auto-derived BFS order">↺ Reset to auto-order</button>
+      <button type="button" class="tb-btn danger" onclick="flowEditorClear()" style="font-size:11px">Clear all</button>
+    </div>
+    <div id="flow-editor-list" style="flex:1;overflow-y:auto;border:1px solid var(--border);border-radius:8px;padding:8px;background:var(--bg);min-height:200px"></div>
+    <div style="display:flex;gap:8px;margin-top:14px;justify-content:flex-end">
+      <button class="tb-btn" onclick="closeFlowEditor()">Cancel</button>
+      <button class="tb-btn primary" onclick="closeFlowEditor(true)">✓ Save sequence</button>
+    </div>
+  </div>
+</div>
+
 <!-- AI IMPORT MODAL -->
 <div id="ai-modal-overlay" role="dialog" aria-modal="true" aria-labelledby="ai-modal-title" style="position:fixed;inset:0;background:rgba(0,0,0,0.75);z-index:8500;display:none;align-items:center;justify-content:center;backdrop-filter:blur(4px)">
   <div style="background:var(--bg2);border:1px solid var(--border);border-radius:14px;padding:24px;width:680px;max-width:95vw;max-height:90vh;display:flex;flex-direction:column;box-shadow:0 24px 80px rgba(0,0,0,0.8);overflow-y:auto">
@@ -1345,6 +1374,7 @@ flowchart LR
 let nodes = [];       // { id, x, y, w, h, type, label, sublabel, category, icon, theme, zIndex }
 let arrows = [];      // { id, from, to, fromPort, toPort, color, style, label, animated }
 let groups = [];      // { id, x, y, w, h, label, color }
+let playFlow = [];    // OPTIONAL ordered narration: [{ arrow: arrowId, text: "User opens app..." }, ...]
 let selectedIds = new Set();
 let selectedArrow = null;
 let currentTool = 'select';
@@ -4407,6 +4437,7 @@ function removeArrowDom(id) {
 function deleteArrow(id) {
   pushHistory();
   arrows = arrows.filter(a => a.id !== id);
+  playFlow = playFlow.filter(s => s.arrow !== id);
   removeArrowDom(id);
   selectedArrow = null;
   markDirty();
@@ -4435,6 +4466,9 @@ function deleteSelected() {
     arrows.filter(a => a.from === id || a.to === id).forEach(a => removeArrowDom(a.id));
     arrows = arrows.filter(a => a.from !== id && a.to !== id);
   });
+  // Drop any playFlow steps that reference removed arrows.
+  const keepIds = new Set(arrows.map(a => a.id));
+  playFlow = playFlow.filter(s => keepIds.has(s.arrow));
   selectedIds.clear();
   selectedArrow = null;
   markDirty();
@@ -4492,7 +4526,7 @@ function pasteNodes() {
 // ===== HISTORY =====
 const HISTORY_CAP = 60;
 function snapshotState() {
-  return JSON.stringify({ nodes, arrows, groups });
+  return JSON.stringify({ nodes, arrows, groups, playFlow });
 }
 function pushHistory() {
   historyStack.push(snapshotState());
@@ -4522,6 +4556,7 @@ function restoreState(state) {
   nodes = state.nodes || [];
   arrows = state.arrows || [];
   groups = state.groups || [];
+  playFlow = Array.isArray(state.playFlow) ? state.playFlow : [];
   selectedIds.clear();
   selectedArrow = null;
   // Clear DOM
@@ -4669,13 +4704,36 @@ function autoLayout(dir) {
 // Steps are derived by BFS from source nodes (no incoming arrows), so a
 // well-formed left-to-right architecture diagram plays in the order the
 // user reads it. Cycles fall back to creation order.
-const PLAY_STEP_MS = 1400;
+let _playStepMs = 1400;
 let _playFlowTimer = null;
 let _playFlowSteps = [];
 let _playFlowIdx = 0;
 
+function setPlaySpeed(ms) {
+  _playStepMs = Math.max(250, Math.min(5000, parseInt(ms, 10) || 1400));
+  // If currently playing, restart the timer so the new cadence applies immediately.
+  if (_playFlowTimer) {
+    clearInterval(_playFlowTimer);
+    _playFlowTimer = setInterval(runPlayStep, _playStepMs);
+  }
+}
+
+// Returns an ordered list of { arrow, text } steps.
+// If `playFlow` is set (from LLM or Sequence Editor), honor that order + narration.
+// Otherwise derive an auto-order via BFS from source nodes.
 function buildPlaySteps() {
   if (!arrows.length) return [];
+
+  // Authored sequence wins — but skip steps whose arrow is gone.
+  if (playFlow && playFlow.length) {
+    const byId = new Map(arrows.map(a => [a.id, a]));
+    const authored = playFlow
+      .map(s => ({ arrow: byId.get(s.arrow), text: s.text || '' }))
+      .filter(s => s.arrow);
+    if (authored.length) return authored;
+  }
+
+  // Auto-order via BFS from source nodes.
   const inDeg = {}, outArrows = {};
   nodes.forEach(n => { inDeg[n.id] = 0; outArrows[n.id] = []; });
   arrows.forEach(a => {
@@ -4683,10 +4741,8 @@ function buildPlaySteps() {
     if (outArrows[a.from]) outArrows[a.from].push(a);
   });
 
-  // Sources first (no incoming), then by leftmost x for predictable order.
   let queue = nodes.filter(n => inDeg[n.id] === 0).sort((a,b) => (a.x - b.x) || (a.y - b.y)).map(n => n.id);
   if (!queue.length && nodes.length) {
-    // Pure cycle — start from leftmost node.
     queue = [[...nodes].sort((a,b) => a.x - b.x)[0].id];
   }
 
@@ -4698,7 +4754,6 @@ function buildPlaySteps() {
     const id = queue.shift();
     if (visited.has(id)) continue;
     visited.add(id);
-    // Sort outgoing edges by target position (left-to-right then top-to-bottom).
     const outs = (outArrows[id] || []).slice().sort((a,b) => {
       const tA = getNode(a.to), tB = getNode(b.to);
       if (!tA || !tB) return 0;
@@ -4707,14 +4762,11 @@ function buildPlaySteps() {
     outs.forEach(arrow => {
       if (emitted.has(arrow.id)) return;
       emitted.add(arrow.id);
-      steps.push(arrow);
+      steps.push({ arrow, text: '' });
       if (!visited.has(arrow.to)) queue.push(arrow.to);
     });
   }
-
-  // Catch any arrows missed by traversal (cycles or orphans) so the play
-  // shows the full diagram, not just the reachable part.
-  arrows.forEach(a => { if (!emitted.has(a.id)) steps.push(a); });
+  arrows.forEach(a => { if (!emitted.has(a.id)) steps.push({ arrow: a, text: '' }); });
   return steps;
 }
 
@@ -4738,7 +4790,7 @@ function startPlayFlow() {
   }
   document.getElementById('play-indicator').classList.add('show');
   runPlayStep();
-  _playFlowTimer = setInterval(runPlayStep, PLAY_STEP_MS);
+  _playFlowTimer = setInterval(runPlayStep, _playStepMs);
 }
 
 function stopPlayFlow() {
@@ -4757,27 +4809,30 @@ function stopPlayFlow() {
 function runPlayStep() {
   clearPlayHighlights();
   if (_playFlowIdx >= _playFlowSteps.length) { stopPlayFlow(); return; }
-  const arrow = _playFlowSteps[_playFlowIdx];
+  const step = _playFlowSteps[_playFlowIdx];
+  const arrow = step.arrow;
   const total = _playFlowSteps.length;
 
-  // Highlight source + destination nodes
   ['from', 'to'].forEach(end => {
     const el = document.getElementById('node-' + arrow[end]);
     if (el) el.classList.add('playing-flow');
   });
-
-  // Animate the arrow
   const g = document.getElementById('arrow-' + arrow.id);
   if (g) {
     const path = g.querySelector('.arrow-path');
     if (path) path.classList.add('playing-flow');
   }
 
-  // Step indicator label
   const fromName = (getNode(arrow.from) || {}).label || arrow.from;
-  const toName = (getNode(arrow.to) || {}).label || arrow.to;
-  const tail = arrow.label ? ` — ${arrow.label}` : '';
-  document.getElementById('play-indicator').textContent = `Step ${_playFlowIdx + 1} / ${total} · ${fromName} → ${toName}${tail}`;
+  const toName   = (getNode(arrow.to)   || {}).label || arrow.to;
+  const arrowSummary = `${fromName} → ${toName}${arrow.label ? ' — ' + arrow.label : ''}`;
+  const counter = `Step ${_playFlowIdx + 1} / ${total}`;
+  // Narration if present takes the spotlight; fall back to from→to summary.
+  const ind = document.getElementById('play-indicator');
+  ind.innerHTML = step.text
+    ? `<div style="font-size:10px;opacity:0.7;letter-spacing:0.5px;text-transform:uppercase">${counter} · ${escHtml(arrowSummary)}</div>
+       <div style="font-size:13px;margin-top:4px;color:var(--text)">${escHtml(step.text)}</div>`
+    : `${counter} · ${escHtml(arrowSummary)}`;
 
   _playFlowIdx++;
 }
@@ -4786,6 +4841,110 @@ function clearPlayHighlights() {
   document.querySelectorAll('.node.playing-flow').forEach(n => n.classList.remove('playing-flow'));
   document.querySelectorAll('.arrow-path.playing-flow').forEach(p => p.classList.remove('playing-flow'));
 }
+
+// ===== PLAY SEQUENCE EDITOR =====
+// Editor maintains its own draft copy of the sequence so users can Cancel.
+let _flowDraft = null;
+
+function showFlowEditor() {
+  if (!arrows.length) { notify('Add some connections first', 'warning'); return; }
+  // Seed the draft: if playFlow has entries, use them; otherwise materialize the auto-order
+  // so the user can edit it from a real starting point.
+  if (playFlow && playFlow.length) {
+    _flowDraft = playFlow.map(s => ({ arrow: s.arrow, text: s.text || '' }));
+  } else {
+    _flowDraft = buildPlaySteps().map(s => ({ arrow: s.arrow.id, text: '' }));
+  }
+  renderFlowEditor();
+  document.getElementById('flow-editor-overlay').style.display = 'flex';
+}
+
+function closeFlowEditor(save) {
+  if (save) {
+    pushHistory();
+    // Only keep steps that still reference an existing arrow.
+    const ids = new Set(arrows.map(a => a.id));
+    playFlow = _flowDraft.filter(s => ids.has(s.arrow)).map(s => ({ arrow: s.arrow, text: (s.text || '').trim() }));
+    markDirty();
+    notify(`Saved ${playFlow.length} step${playFlow.length !== 1 ? 's' : ''}`);
+  }
+  document.getElementById('flow-editor-overlay').style.display = 'none';
+  _flowDraft = null;
+}
+
+function flowEditorAddStep() {
+  // Default to the first arrow not yet in the draft, else the first arrow.
+  const usedIds = new Set(_flowDraft.map(s => s.arrow));
+  const next = arrows.find(a => !usedIds.has(a.id)) || arrows[0];
+  if (!next) return;
+  _flowDraft.push({ arrow: next.id, text: '' });
+  renderFlowEditor();
+}
+
+function flowEditorResetToAuto() {
+  if (!confirm('Replace the current sequence with the auto-derived BFS order? Edits will be lost.')) return;
+  _flowDraft = buildPlaySteps().map(s => ({ arrow: s.arrow.id, text: '' }));
+  renderFlowEditor();
+}
+
+function flowEditorClear() {
+  if (!confirm('Remove all steps from the sequence?')) return;
+  _flowDraft = [];
+  renderFlowEditor();
+}
+
+function flowEditorMove(i, delta) {
+  const j = i + delta;
+  if (j < 0 || j >= _flowDraft.length) return;
+  const tmp = _flowDraft[i]; _flowDraft[i] = _flowDraft[j]; _flowDraft[j] = tmp;
+  renderFlowEditor();
+}
+function flowEditorRemove(i) {
+  _flowDraft.splice(i, 1);
+  renderFlowEditor();
+}
+function flowEditorChangeArrow(i, arrowId) {
+  _flowDraft[i].arrow = arrowId;
+  renderFlowEditor();
+}
+function flowEditorChangeText(i, text) {
+  _flowDraft[i].text = String(text || '').slice(0, 280);
+}
+
+function renderFlowEditor() {
+  const list = document.getElementById('flow-editor-list');
+  if (!_flowDraft.length) {
+    list.innerHTML = `<p style="color:var(--text-dim);font-size:11px;font-family:var(--font-mono);text-align:center;padding:32px">No steps yet. Click <strong>+ Add step</strong> or <strong>↺ Reset to auto-order</strong> to seed from the diagram.</p>`;
+    return;
+  }
+  const arrowOptions = arrows.map(a => {
+    const f = (getNode(a.from) || {}).label || a.from;
+    const t = (getNode(a.to) || {}).label || a.to;
+    const tail = a.label ? ' — ' + a.label : '';
+    return `<option value="${escHtml(a.id)}">${escHtml(f + ' → ' + t + tail)}</option>`;
+  }).join('');
+
+  list.innerHTML = _flowDraft.map((step, i) => `
+    <div style="display:flex;gap:8px;align-items:flex-start;padding:8px;border:1px solid var(--border);border-radius:8px;background:var(--bg3);margin-bottom:6px">
+      <div style="display:flex;flex-direction:column;align-items:center;gap:2px;padding-top:2px">
+        <span style="font-size:10px;font-family:var(--font-mono);color:var(--text-muted);font-weight:700;min-width:18px;text-align:center">${i + 1}</span>
+        <button class="tb-btn" onclick="flowEditorMove(${i}, -1)" ${i === 0 ? 'disabled' : ''} title="Move up" aria-label="Move up" style="padding:2px 6px;font-size:11px;line-height:1">↑</button>
+        <button class="tb-btn" onclick="flowEditorMove(${i}, 1)" ${i === _flowDraft.length - 1 ? 'disabled' : ''} title="Move down" aria-label="Move down" style="padding:2px 6px;font-size:11px;line-height:1">↓</button>
+      </div>
+      <div style="flex:1;display:flex;flex-direction:column;gap:6px;min-width:0">
+        <select onchange="flowEditorChangeArrow(${i}, this.value)" class="prop-select" style="font-size:11px">${arrowOptions.replace(`value="${escHtml(step.arrow)}"`, `value="${escHtml(step.arrow)}" selected`)}</select>
+        <textarea oninput="flowEditorChangeText(${i}, this.value)" rows="2" maxlength="280" placeholder="Narration for this step — what's happening here? (e.g. 'User logs in via Cognito; JWT is stored in browser cookie')"
+          style="width:100%;background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--text);font-family:var(--font-mono);font-size:11px;padding:6px 8px;resize:vertical;line-height:1.5">${escHtml(step.text || '')}</textarea>
+      </div>
+      <button class="tb-btn danger" onclick="flowEditorRemove(${i})" title="Remove step" aria-label="Remove step" style="padding:4px 8px;font-size:13px;line-height:1">×</button>
+    </div>`).join('');
+}
+
+// Wire overlay-click-to-close once at startup (the element is in the DOM by now).
+(function () {
+  const ov = document.getElementById('flow-editor-overlay');
+  if (ov) ov.addEventListener('click', (e) => { if (e.target === e.currentTarget) closeFlowEditor(false); });
+})();
 
 // ===== SAVE / LOAD =====
 let autosaveTimer = null;
@@ -4847,7 +5006,7 @@ function updateStatusBar() {
 }
 
 function getDiagramData() {
-  return { nodes, arrows, groups, meta: { version: '1.0', created: new Date().toISOString(), name: document.getElementById('filename-input').value } };
+  return { nodes, arrows, groups, playFlow, meta: { version: '1.0', created: new Date().toISOString(), name: document.getElementById('filename-input').value } };
 }
 
 function saveDiagram() {
@@ -5028,6 +5187,12 @@ function loadDiagramData(data) {
   nodes = data.nodes || [];
   arrows = data.arrows || [];
   groups = data.groups || [];
+  // Validate playFlow: keep only entries that reference an arrow we actually have.
+  playFlow = Array.isArray(data.playFlow)
+    ? data.playFlow
+        .filter(s => s && typeof s.arrow === 'string' && arrows.some(a => a.id === s.arrow))
+        .map(s => ({ arrow: s.arrow, text: String(s.text || '').slice(0, 280) }))
+    : [];
   selectedIds.clear();
   selectedArrow = null;
   // Clear
@@ -5046,7 +5211,7 @@ function newDiagram() {
   if (isDirty && nodes.length) {
     if (!confirm('Discard unsaved changes and start a new diagram?')) return;
   }
-  nodes = []; arrows = []; groups = [];
+  nodes = []; arrows = []; groups = []; playFlow = [];
   selectedIds.clear(); selectedArrow = null;
   historyStack = []; redoStack = [];
   canvasViewport.querySelectorAll('.node').forEach(el => el.remove());
@@ -5786,8 +5951,24 @@ THEME GUIDANCE:
   Azure → blue (all) | GCP → red (all)
   Generic frontend → teal | Users → gray | Caches → red
 
+PLAY FLOW (OPTIONAL but recommended) — an ordered narration of the diagram:
+"playFlow": [
+  { "arrow": "a_1", "text": "User opens the app and clicks Sign In." },
+  { "arrow": "a_2", "text": "API Gateway validates the JWT and routes to the Auth Lambda." },
+  ...
+]
+
+Rules:
+- Each entry references an existing arrow.id.
+- "text" is 1-2 sentences describing what happens at that step (the data, the action, why).
+- The order in the array is the order Potato will animate when the user hits Play.
+- Cover the full request lifecycle from start to end. Skip arrows that are pure observability
+  unless they're meaningful to the story.
+- The user can edit, reorder, or add steps in Potato's Sequence Editor after import.
+
 USAGE: the user can save your reply as my-diagram.potato.html and open it via File → Open
-in Potato, or paste it into the 🤖 AI Import modal.
+in Potato, or paste it into the 🤖 AI Import modal. The Play button at the top of Potato
+walks through your playFlow with the narration text shown step-by-step.
 
 Now describe the architecture you want me to diagram:`;
 
@@ -5992,6 +6173,14 @@ function importFromAI() {
     label: g.label || g.name || 'Group',
     color: g.color || 'purple',
   }));
+
+  // playFlow is optional narration; keep only steps whose arrow exists.
+  const arrowIds = new Set(data.arrows.map(a => a.id));
+  data.playFlow = Array.isArray(data.playFlow)
+    ? data.playFlow
+        .filter(s => s && typeof s.arrow === 'string' && arrowIds.has(s.arrow))
+        .map(s => ({ arrow: s.arrow, text: String(s.text || '').slice(0, 280) }))
+    : [];
 
   closeAiModal();
   loadDiagramData(data);
