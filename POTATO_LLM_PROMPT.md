@@ -223,8 +223,11 @@ LAYOUT RULES
 5. Choose ports by relative position:
    A left of B  → fromPort: "right",  toPort: "left"
    A above B    → fromPort: "bottom", toPort: "top"
-6. Use groups to wrap related services (VPC, subnet, microservice boundary, agent
-   workers). The group's x/y/w/h must enclose every contained node with >=20px padding.
+6. Use groups SPARINGLY — only to highlight a meaningful boundary like a VPC,
+   private subnet, microservice cluster, or agent workers. Each group should
+   wrap 2-6 related nodes max, with >=20px padding. NEVER create a single
+   group that wraps the whole diagram — that just adds visual noise and
+   makes editing harder. If unsure, prefer `"groups": []`.
 7. Typical positions for a 5-tier app:
    user/browser at x=60, y=300
    CDN/edge    at x=280, y=300
