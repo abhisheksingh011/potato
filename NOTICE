@@ -1,0 +1,84 @@
+Potato — Third-Party Assets and Licenses
+=========================================
+
+This file documents the licensing of bundled third-party assets that are
+NOT covered by the project's MIT LICENSE. Everything in this repository
+that is not listed below is original work, licensed under MIT (see LICENSE).
+
+
+----------------------------------------------------------------------
+icons/aws/
+----------------------------------------------------------------------
+  Artwork source:   AWS Architecture Icons
+                    https://aws.amazon.com/architecture/icons/
+  Acquired via:     github.com/tf2d2/icons (Apache License 2.0)
+  Rights holder:    Amazon Web Services, Inc.
+  Usage:            Subject to the AWS Trademark Guidelines.
+                    https://aws.amazon.com/trademark-guidelines/
+                    These icons are intended for use only in diagrams that
+                    depict AWS architectures. They may not be used as
+                    product or company logos, in advertisements, on
+                    merchandise, or in any way that implies AWS
+                    endorsement or affiliation.
+
+
+----------------------------------------------------------------------
+icons/azure/
+----------------------------------------------------------------------
+  Artwork source:   Microsoft Azure Architecture Icons
+                    https://learn.microsoft.com/en-us/azure/architecture/icons/
+  Acquired via:     github.com/tf2d2/icons (Apache License 2.0)
+  Rights holder:    Microsoft Corporation
+  Usage:            Subject to the Microsoft Trademark and Brand
+                    Guidelines.
+                    https://www.microsoft.com/en-us/legal/intellectualproperty/trademarks
+                    These icons are intended for use only in diagrams that
+                    depict Microsoft Azure architectures. The icons may not
+                    be altered (other than scaling), used as product or
+                    company logos, or used in ways that imply Microsoft
+                    endorsement or affiliation.
+
+
+----------------------------------------------------------------------
+icons/gcp/
+----------------------------------------------------------------------
+  Artwork source:   Google Cloud Icons
+                    https://cloud.google.com/icons
+  Acquired via:     github.com/tf2d2/icons (Apache License 2.0)
+  Rights holder:    Google LLC
+  Usage:            Subject to the Google Brand and Trademark Guidelines.
+                    https://about.google/brand-resource-center/
+                    These icons are intended for use only in diagrams that
+                    depict Google Cloud architectures. They may not be
+                    used as company logos, in advertising, or in ways
+                    that imply Google endorsement or affiliation.
+
+
+----------------------------------------------------------------------
+service_kb.json — service knowledge base data
+----------------------------------------------------------------------
+  Author:           Potato contributors
+  License:          MIT
+  Note on data:     The "cost", "limits", "whenToUse", and "pitfalls"
+                    fields summarize public documentation from each
+                    respective cloud provider. The summaries themselves
+                    are original editorial work and are MIT-licensed,
+                    but the underlying facts and pricing numbers belong
+                    to the providers and change over time. Each entry
+                    carries an "asOf" timestamp; please verify against
+                    official pricing calculators before making
+                    purchasing decisions.
+
+
+----------------------------------------------------------------------
+Fonts
+----------------------------------------------------------------------
+  Potato uses only system fonts (-apple-system / Segoe UI / system-ui /
+  Roboto / Helvetica Neue / Arial / ui-monospace / SF Mono / Menlo /
+  Consolas / monospace). No web fonts are downloaded.
+
+
+If you are a rights holder of any of the assets above and have concerns
+about their inclusion or attribution, please open an issue at
+https://github.com/abhisheksingh011/potato/issues and we will address
+it promptly.

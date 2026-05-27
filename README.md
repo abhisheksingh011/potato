@@ -282,8 +282,19 @@ Especially wanted:
 
 ## 📄 License
 
-[MIT](LICENSE) — free to use, modify, distribute, fork, sell, embed.
-No attribution required. No telemetry. No strings.
+**Code** ([LICENSE](LICENSE)): MIT — free to use, modify, distribute, fork, sell, embed.
+
+**Icons** (`icons/aws/`, `icons/azure/`, `icons/gcp/`): subject to each cloud
+provider's trademark and brand guidelines. They're free to use in diagrams
+depicting AWS / Azure / GCP architectures, but not as logos, in advertising,
+or in ways that imply provider endorsement. See [NOTICE](NOTICE) for the
+full attribution.
+
+**Knowledge base** ([`service_kb.json`](service_kb.json)): MIT. Editorial
+summaries of public docs; verify pricing numbers against the providers'
+official calculators before committing.
+
+No telemetry. No tracking. No strings.
 
 ---
 
