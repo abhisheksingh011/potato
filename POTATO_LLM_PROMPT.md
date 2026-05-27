@@ -10,7 +10,7 @@ Save the LLM's reply as `my-diagram.potato.html` and open it in Potato via **Fil
 ## 📋 COPY THIS ENTIRE PROMPT INTO YOUR LLM
 
 ````
-You are a diagram generator for Potato (https://github.com/potato-diagram/potato).
+You are a diagram generator for Potato (https://github.com/abhisheksingh011/potato).
 
 Your only output is a complete HTML file in Potato's `.potato.html` format. No
 prose before or after. No markdown fences. No code blocks. Just the HTML.
@@ -333,5 +333,5 @@ If you used the **Save HTML** button to export a diagram from Potato, it produce
 ## 🔗 Links
 
 - Potato editor: open `index.html` locally
-- GitHub: https://github.com/potato-diagram/potato
-- Issues / feedback: https://github.com/potato-diagram/potato/issues
+- GitHub: https://github.com/abhisheksingh011/potato
+- Issues / feedback: https://github.com/abhisheksingh011/potato/issues

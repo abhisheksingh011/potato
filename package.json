@@ -8,7 +8,7 @@
   "engines": { "vscode": "^1.85.0" },
   "categories": ["Visualization", "Other"],
   "keywords": ["diagram", "architecture", "aws", "flowchart", "potato"],
-  "repository": { "type": "git", "url": "https://github.com/potato-diagram/potato" },
+  "repository": { "type": "git", "url": "https://github.com/abhisheksingh011/potato" },
   "activationEvents": [],
   "main": "./src/extension.js",
   "contributes": {

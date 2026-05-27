@@ -223,7 +223,7 @@ ${dataStr}
 <\/script>
 <h2>🥔 Potato — ${safeName}</h2>
 <p id="potato-summary">Loading…</p>
-<p>Open this file in VS Code (with the Potato extension) or in the <a href="https://github.com/potato-diagram/potato">Potato editor</a> to edit.</p>
+<p>Open this file in VS Code (with the Potato extension) or in the <a href="https://github.com/abhisheksingh011/potato">Potato editor</a> to edit.</p>
 <script>
 (function(){
   try {
