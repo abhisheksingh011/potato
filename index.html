@@ -561,10 +561,13 @@ body {
   border: 2px dashed rgba(255,255,255,0.15);
   background: rgba(255,255,255,0.02);
   z-index: 1;
-  cursor: move;
   user-select: none;
   min-width: 200px;
   min-height: 120px;
+  /* Body is pointer-transparent so clicks on nodes/arrows INSIDE the group's
+     rectangle reach them, not the group. To move/resize/rename the group,
+     use the label (top-left) or the resize handle (bottom-right). */
+  pointer-events: none;
 }
 .group-node:hover { border-color: rgba(123,47,190,0.4); }
 .group-node.selected { border-color: var(--purple); background: rgba(123,47,190,0.05); }
@@ -577,15 +580,20 @@ body {
   color: rgba(255,255,255,0.35);
   text-transform: uppercase;
   letter-spacing: 1px;
-  cursor: text;
+  cursor: grab;
+  pointer-events: auto;
+  padding: 2px 6px;
+  border-radius: 4px;
 }
-.group-label[contenteditable="true"] { outline: none; background: rgba(123,47,190,0.15); border-radius: 3px; padding: 1px 4px; color: var(--text); }
+.group-label:hover { background: rgba(123,47,190,0.15); color: rgba(255,255,255,0.7); }
+.group-label[contenteditable="true"] { outline: none; background: rgba(123,47,190,0.15); border-radius: 3px; padding: 1px 4px; color: var(--text); cursor: text; }
 .group-resize {
   position: absolute;
   bottom: 4px; right: 4px;
   width: 12px; height: 12px;
   cursor: se-resize;
   opacity: 0.3;
+  pointer-events: auto;
 }
 .group-resize::after {
   content: '';
@@ -4604,6 +4612,32 @@ function renderGroup(grp) {
       lblEl.contentEditable = 'false';
       updateGroupLabel(grp.id, lblEl.textContent);
     });
+    // Drag the group rectangle from its label. Nodes inside stay put —
+    // they're independent. To move a node, click and drag the node itself.
+    lblEl.addEventListener('pointerdown', (e) => {
+      if (lblEl.contentEditable === 'true') return;
+      e.stopPropagation();
+      let moved = false;
+      const sx = e.clientX, sy = e.clientY, gox = grp.x, goy = grp.y;
+      const onMove = (e2) => {
+        const dx = (e2.clientX - sx) / zoom;
+        const dy = (e2.clientY - sy) / zoom;
+        if (!moved && (Math.abs(dx) > 2 || Math.abs(dy) > 2)) { pushHistory(); moved = true; }
+        grp.x = gox + dx;
+        grp.y = goy + dy;
+        el.style.left = grp.x + 'px';
+        el.style.top = grp.y + 'px';
+      };
+      const onUp = () => {
+        if (moved) markDirty();
+        window.removeEventListener('pointermove', onMove);
+        window.removeEventListener('pointerup', onUp);
+        window.removeEventListener('pointercancel', onUp);
+      };
+      window.addEventListener('pointermove', onMove);
+      window.addEventListener('pointerup', onUp);
+      window.addEventListener('pointercancel', onUp);
+    });
   }
   const rh = el.querySelector('.group-resize');
   if (rh) rh.addEventListener('pointerdown', (e) => {
@@ -4627,48 +4661,10 @@ function renderGroup(grp) {
     window.addEventListener('pointercancel', onUp);
   });
 
-  // Root drag listener — attach only once per element.
-  if (isNew) {
-    el.addEventListener('pointerdown', (e) => {
-      if (e.target.classList.contains('group-resize') || e.target.classList.contains('group-label')) return;
-      // Capture contained nodes at drag start so dropping nodes mid-drag doesn't surprise us.
-      const contained = nodes.filter(n => {
-        const nEl = document.getElementById('node-' + n.id);
-        const nw = nEl ? nEl.offsetWidth : 160;
-        const nh = nEl ? nEl.offsetHeight : 80;
-        return n.x >= grp.x && n.y >= grp.y && (n.x + nw) <= (grp.x + grp.w) && (n.y + nh) <= (grp.y + grp.h);
-      });
-      const startPositions = contained.map(n => ({ n, ox: n.x, oy: n.y }));
-
-      let moved = false;
-      const sx = e.clientX, sy = e.clientY, gox = grp.x, goy = grp.y;
-      const onMove = (e2) => {
-        const dx = (e2.clientX - sx) / zoom;
-        const dy = (e2.clientY - sy) / zoom;
-        if (!moved && (Math.abs(dx) > 2 || Math.abs(dy) > 2)) { pushHistory(); moved = true; }
-        grp.x = gox + dx;
-        grp.y = goy + dy;
-        el.style.left = grp.x + 'px';
-        el.style.top = grp.y + 'px';
-        startPositions.forEach(p => {
-          p.n.x = p.ox + dx;
-          p.n.y = p.oy + dy;
-          const nEl = document.getElementById('node-' + p.n.id);
-          if (nEl) { nEl.style.left = p.n.x + 'px'; nEl.style.top = p.n.y + 'px'; }
-        });
-        if (startPositions.length) redrawArrows();
-      };
-      const onUp = () => {
-        if (moved) markDirty();
-        window.removeEventListener('pointermove', onMove);
-        window.removeEventListener('pointerup', onUp);
-        window.removeEventListener('pointercancel', onUp);
-      };
-      window.addEventListener('pointermove', onMove);
-      window.addEventListener('pointerup', onUp);
-      window.addEventListener('pointercancel', onUp);
-    });
-  }
+  // Note: the group body is pointer-transparent (see .group-node CSS), so
+  // clicks on nodes/arrows inside the group reach them. The label above
+  // handles group dragging; .group-resize handles resize. Nothing else to
+  // wire on the root element.
 }
 
 function updateGroupLabel(id, text) {
@@ -6812,7 +6808,7 @@ LAYOUT RULES:
 - Space nodes 220px horizontally, 150px vertically. Never overlap.
 - Width=160, height=null for all nodes.
 - Choose port pairs by relative position: A left of B → fromPort right, toPort left.
-- Use groups to wrap related services (VPCs, subnets, service boundaries).
+- Use groups SPARINGLY — only to highlight a real boundary (VPC, private subnet, microservice cluster, agent workers). Each group wraps 2-6 related nodes max, with >=20px padding. NEVER wrap the whole diagram in one group — prefer "groups": [] if unsure.
 - icon: use the most fitting emoji (⚡ Lambda, 🪣 S3, 🗄️ DB, 🚪 Gateway, 🤖 agent, 👤 user, etc.)
 
 THEME GUIDANCE:
