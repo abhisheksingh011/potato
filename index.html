@@ -1378,6 +1378,7 @@ flowchart LR
       <div style="flex:1"></div>
       <span id="cost-asof" style="font-size:10px;color:var(--text-dim);font-family:var(--font-mono)"></span>
     </div>
+    <div id="cost-preset-summary" style="font-size:11px;color:var(--text-muted);font-family:var(--font-mono);background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:8px 12px;margin-bottom:10px;line-height:1.5"></div>
 
     <div id="cost-table-container" style="flex:1;overflow-y:auto;border:1px solid var(--border);border-radius:8px;background:var(--bg);min-height:200px"></div>
 
@@ -4194,6 +4195,18 @@ function promptArrowLabel(arrowId, e) {
 // ===== CANVAS EVENTS =====
 function setupEventListeners() {
   // Canvas pointerdown for pan / selection rect — works for mouse and touch.
+  // Right-click on empty canvas → contextual menu (Add note here, Paste here,
+  // Fit, Reset zoom). The existing context-menu div is reused; we just rewrite
+  // its innerHTML for the canvas variant.
+  canvasArea.addEventListener('contextmenu', (e) => {
+    if (e.target !== canvasArea && e.target !== canvasViewport && e.target !== arrowsSvg) return;
+    e.preventDefault();
+    const rect = canvasArea.getBoundingClientRect();
+    const worldX = (e.clientX - rect.left - panX) / zoom;
+    const worldY = (e.clientY - rect.top - panY) / zoom;
+    showCanvasContextMenu(e.clientX, e.clientY, worldX, worldY);
+  });
+
   canvasArea.addEventListener('pointerdown', (e) => {
     if (e.target === canvasArea || e.target === canvasViewport || e.target === arrowsSvg) {
       clearSelection();
@@ -4931,10 +4944,65 @@ function showContextMenu(e, id) {
   ctxTargetId = id;
   if (!selectedIds.has(id)) { clearSelection(); selectNode(id); }
   const menu = document.getElementById('context-menu');
+  // Restore the node-context menu HTML in case the canvas variant overwrote it.
+  menu.innerHTML = `
+    <div class="ctx-item" onclick="ctxAction('edit')">✏️ Edit Label</div>
+    <div class="ctx-item" onclick="ctxAction('duplicate')">📋 Duplicate</div>
+    <div class="ctx-item" onclick="ctxAction('toFront')">⬆️ Bring to Front</div>
+    <div class="ctx-item" onclick="ctxAction('toBack')">⬇️ Send to Back</div>
+    <div class="ctx-sep"></div>
+    <div class="ctx-item" onclick="ctxAction('copy')">📄 Copy</div>
+    <div class="ctx-item" onclick="ctxAction('paste')">📌 Paste</div>
+    <div class="ctx-sep"></div>
+    <div class="ctx-item danger" onclick="ctxAction('delete')">🗑️ Delete</div>`;
   menu.style.display = 'block';
   menu.style.left = e.clientX + 'px';
   menu.style.top = e.clientY + 'px';
   e.stopPropagation();
+}
+
+// Background right-click — actions that make sense without a target node.
+let _ctxWorldPos = { x: 0, y: 0 };
+function showCanvasContextMenu(screenX, screenY, worldX, worldY) {
+  _ctxWorldPos = { x: worldX, y: worldY };
+  const menu = document.getElementById('context-menu');
+  const hasClipboard = (Array.isArray(clipboard) && clipboard.length) ||
+                      (clipboard && clipboard.nodes && clipboard.nodes.length);
+  menu.innerHTML = `
+    <div class="ctx-item" onclick="canvasCtx('addNote')">📝 Add note here</div>
+    <div class="ctx-item" onclick="canvasCtx('paste')" ${hasClipboard ? '' : 'style="opacity:0.4;pointer-events:none"'}>📌 Paste here</div>
+    <div class="ctx-sep"></div>
+    <div class="ctx-item" onclick="canvasCtx('fit')">⤢ Fit to content</div>
+    <div class="ctx-item" onclick="canvasCtx('reset')">⊙ Reset zoom (100%)</div>
+    <div class="ctx-item" onclick="canvasCtx('selectAll')">☑️ Select all (Ctrl+A)</div>`;
+  menu.style.display = 'block';
+  menu.style.left = screenX + 'px';
+  menu.style.top = screenY + 'px';
+}
+
+function canvasCtx(action) {
+  document.getElementById('context-menu').style.display = 'none';
+  if (action === 'addNote') {
+    addTextNode(_ctxWorldPos.x, _ctxWorldPos.y);
+  } else if (action === 'paste') {
+    // Move the pasted nodes so their group center lands at the click point.
+    const data = Array.isArray(clipboard) ? { nodes: clipboard, arrows: [] } : clipboard;
+    if (!data || !data.nodes || !data.nodes.length) return;
+    const cx = data.nodes.reduce((s, n) => s + n.x, 0) / data.nodes.length;
+    const cy = data.nodes.reduce((s, n) => s + n.y, 0) / data.nodes.length;
+    const dx = _ctxWorldPos.x - cx, dy = _ctxWorldPos.y - cy;
+    // Temporarily shift clipboard positions, paste, restore.
+    const orig = data.nodes.map(n => ({ x: n.x, y: n.y }));
+    data.nodes.forEach((n, i) => { n.x = orig[i].x + dx; n.y = orig[i].y + dy; });
+    pasteNodes();
+    data.nodes.forEach((n, i) => { n.x = orig[i].x; n.y = orig[i].y; });
+  } else if (action === 'fit') {
+    fitToContent();
+  } else if (action === 'reset') {
+    zoomReset();
+  } else if (action === 'selectAll') {
+    selectAll();
+  }
 }
 
 function showArrowContextMenu(e, id) {
@@ -5340,6 +5408,16 @@ function renderCostPresets() {
     const active = k === _costPreset;
     return `<button class="tb-btn ${active ? 'active' : ''}" onclick="setCostPreset('${k}')" title="${escHtml(p.summary || '')}" style="font-size:11px">${escHtml(p.label || k)}</button>`;
   }).join('');
+  // Surface the active preset's assumption block so users know what numbers
+  // we're using (the title-attribute tooltip was too easy to miss).
+  const summaryEl = document.getElementById('cost-preset-summary');
+  if (summaryEl) {
+    const active = presets[_costPreset] || {};
+    const text = active.summary || '';
+    summaryEl.innerHTML = text
+      ? `<strong style="color:var(--text)">${escHtml(active.label || _costPreset)}</strong> — assumes ${escHtml(text)}.`
+      : `<em>No assumption description for this preset.</em>`;
+  }
 }
 
 function renderCostTable() {
@@ -5591,6 +5669,7 @@ ${viewerPayload}
   <h1>🥔 ${escHtml(name)}</h1>
   <small>Potato Diagram · hover any service for limits + cost · click Play to walk the flow</small>
   <div class="header-spacer"></div>
+  <button class="ctrl" onclick="potatoShowEditHint()" title="How to edit this diagram">✏️ Edit</button>
   <button class="ctrl primary" id="potato-play-btn" onclick="potatoTogglePlay()">▶ Play Flow</button>
   <select class="ctrl" id="potato-speed" onchange="potatoSetSpeed(this.value)" title="Animation speed">
     <option value="2500">🐢 Slow</option>
@@ -5605,6 +5684,24 @@ ${svgMarkup}
 
 <div id="potato-step-text" aria-live="polite"></div>
 <div id="potato-tooltip" role="tooltip"></div>
+
+<!-- Edit-instructions modal — shown when the viewer's ✏️ Edit button is clicked. -->
+<div id="potato-edit-modal" role="dialog" aria-modal="true" style="position:fixed;inset:0;background:rgba(0,0,0,0.78);z-index:9000;display:none;align-items:center;justify-content:center;backdrop-filter:blur(6px)" onclick="if(event.target===this)potatoHideEditHint()">
+  <div style="background:var(--bg2,#12152a);border:1px solid var(--border);border-radius:14px;padding:24px 28px;width:520px;max-width:92vw;box-shadow:0 24px 80px rgba(0,0,0,0.7)">
+    <h2 style="font-size:17px;font-weight:800;margin:0 0 4px">✏️ Edit this diagram</h2>
+    <p style="font-size:11px;color:var(--muted,#7986cb);font-family:var(--font-mono);margin:0 0 16px">This is the read-only viewer. To edit, open the file in Potato:</p>
+    <ol style="font-size:13px;line-height:1.8;color:var(--text,#e8eaf6);padding-left:22px;margin:0 0 16px">
+      <li>Open <strong>Potato</strong> — clone <a href="https://github.com/abhisheksingh011/potato" target="_blank" style="color:#1abc9c">github.com/abhisheksingh011/potato</a> and double-click <code style="font-family:var(--font-mono);background:rgba(255,255,255,0.06);padding:1px 5px;border-radius:3px">index.html</code>, or use the VS Code extension.</li>
+      <li>Click <strong>📂 Open</strong> in the toolbar.</li>
+      <li>Select this <code style="font-family:var(--font-mono);background:rgba(255,255,255,0.06);padding:1px 5px;border-radius:3px">.potato.html</code> file.</li>
+    </ol>
+    <p style="font-size:11px;color:var(--muted,#7986cb);font-family:var(--font-mono);margin:0 0 18px">The diagram loads with all your nodes, connections, narration, and cost data ready to edit. Save again to overwrite this file or pick a new name.</p>
+    <div style="display:flex;gap:8px;justify-content:flex-end">
+      <button class="ctrl" onclick="potatoCopyFilePath()" title="Copy this file's path to clipboard">📋 Copy file path</button>
+      <button class="ctrl primary" onclick="potatoHideEditHint()">Got it</button>
+    </div>
+  </div>
+</div>
 
 <div class="potato-footer">
   Read-only view. To edit: open <a href="https://github.com/potato-diagram/potato" style="color:#1abc9c">Potato</a>, click 📂 Open, and select this file.
@@ -5734,6 +5831,21 @@ ${svgMarkup}
   window.potatoSetSpeed = function (ms) {
     _stepMs = Math.max(250, Math.min(5000, parseInt(ms, 10) || 1400));
     if (_timer) { clearInterval(_timer); _timer = setInterval(tick, _stepMs); }
+  };
+  window.potatoShowEditHint = function () { document.getElementById('potato-edit-modal').style.display = 'flex'; };
+  window.potatoHideEditHint = function () { document.getElementById('potato-edit-modal').style.display = 'none'; };
+  window.potatoCopyFilePath = function () {
+    // Best-effort: copy the current file's URL / path to clipboard so the user
+    // can paste it into Potato's File → Open dialog.
+    const url = decodeURIComponent(window.location.href);
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(url).then(
+        () => { alert('Copied:\n' + url + '\n\nNow open Potato and use File → Open.'); },
+        () => { alert('Could not copy automatically. Path:\n\n' + url); }
+      );
+    } else {
+      alert('Path:\n\n' + url);
+    }
   };
 
   // Esc/Space shortcuts
@@ -6565,7 +6677,12 @@ function notify(msg, type = 'info') {
   el.className = 'notif' + (type === 'error' ? ' error' : type === 'warning' ? ' warning' : '');
   el.textContent = msg;
   container.appendChild(el);
-  setTimeout(() => { el.style.opacity = '0'; setTimeout(() => el.remove(), 400); }, 2800);
+  // Dwell time scales with message length so important multi-sentence toasts
+  // (like the AI Import icon-rescue summary) don't vanish before a non-native
+  // reader can parse them. ~280ms per word, clamped to [3s, 9s].
+  const words = String(msg || '').trim().split(/\s+/).length;
+  const dwell = Math.max(3000, Math.min(9000, words * 280));
+  setTimeout(() => { el.style.opacity = '0'; setTimeout(() => el.remove(), 400); }, dwell);
 }
 
 // ===== PANEL TOGGLE =====
