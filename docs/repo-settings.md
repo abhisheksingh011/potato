@@ -125,7 +125,7 @@ First public release.
 
 **Export**
 - 💾 Save as self-contained `.potato.html` (interactive viewer included)
-- 🖼 PNG and ✦ SVG exports with real icons embedded
+- ✦ SVG export with real icons embedded
 - Mermaid + JSON import
 
 **Templates**

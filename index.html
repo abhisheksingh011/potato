@@ -35,7 +35,7 @@
   --border: rgba(255,255,255,0.07);
   --border-hover: rgba(255,255,255,0.18);
   --sidebar-w: 240px;
-  --toolbar-h: 54px;
+  --toolbar-h: 86px;
   --props-w: 280px;
 }
 
@@ -53,16 +53,44 @@ body {
 
 /* ===== TOOLBAR ===== */
 #toolbar {
-  height: var(--toolbar-h);
+  min-height: var(--toolbar-h);
   background: rgba(10,12,22,0.98);
   border-bottom: 1px solid var(--border);
   display: flex;
-  align-items: center;
-  padding: 0 12px;
-  gap: 6px;
+  flex-direction: column;
+  align-items: stretch;
+  padding: 6px 12px;
+  gap: 0;
   z-index: 200;
   flex-shrink: 0;
   backdrop-filter: blur(10px);
+}
+.toolbar-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 36px;
+}
+.toolbar-row.secondary {
+  border-top: 1px solid var(--border);
+  padding-top: 6px;
+  margin-top: 4px;
+  gap: 3px;
+}
+.toolbar-row.secondary .tb-btn { height: 28px; padding: 0 7px; font-size: 11px; }
+.toolbar-row.secondary .tb-icon { font-size: 12px; }
+.toolbar-row.secondary .tb-label { font-size: 10px; }
+.toolbar-row.secondary .tool-mode-btn { width: 28px; height: 28px; font-size: 13px; }
+.row-label {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 1.5px;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  margin: 0 6px 0 4px;
+  white-space: nowrap;
+  user-select: none;
 }
 
 .toolbar-brand {
@@ -1057,81 +1085,86 @@ kbd {
   <div class="loading-bar"><div class="loading-bar-inner"></div></div>
 </div>
 
-<!-- TOOLBAR -->
+<!-- TOOLBAR — two rows: PRIMARY (the 8 things you do most) + SECONDARY (everything else, grouped) -->
 <div id="toolbar" role="toolbar" aria-label="Diagram tools">
-  <div class="toolbar-brand">🥔 Potato</div>
-  <div class="toolbar-sep"></div>
 
-  <!-- File ops -->
-  <div class="tool-group">
-    <button class="tb-btn" onclick="newDiagram()" title="New Diagram"><span class="tb-icon">📄</span><span class="tb-label">New</span></button>
-    <button class="tb-btn" onclick="openDiagram()" title="Open HTML"><span class="tb-icon">📂</span><span class="tb-label">Open</span></button>
-    <button class="tb-btn" onclick="showRecentFilesModal()" title="Reopen a recently saved diagram" aria-label="Recent diagrams"><span class="tb-icon" aria-hidden="true">🕘</span><span class="tb-label">Recent</span></button>
-    <button class="tb-btn" onclick="showTemplatesModal()" title="Start from a template"><span class="tb-icon">✨</span><span class="tb-label">Templates</span></button>
-    <button class="tb-btn" onclick="showPasteModal()" title="Paste LLM output (JSON or HTML)"><span class="tb-icon">🤖</span><span class="tb-label">AI Import</span></button>
+  <!-- ROW 1 — PRIMARY -->
+  <div class="toolbar-row primary">
+    <div class="toolbar-brand">🥔 Potato</div>
+    <div class="toolbar-sep"></div>
+
+    <button class="tb-btn" onclick="showTemplatesModal()" title="Start from a template" aria-label="Templates"><span class="tb-icon" aria-hidden="true">✨</span><span class="tb-label">Templates</span></button>
+    <button class="tb-btn" onclick="showPasteModal()" title="Paste LLM output (JSON or HTML)" aria-label="AI Import"><span class="tb-icon" aria-hidden="true">🤖</span><span class="tb-label">AI Import</span></button>
     <button class="tb-btn primary" onclick="saveDiagram()" title="Save diagram (Ctrl+S)" aria-label="Save diagram"><span class="tb-icon" aria-hidden="true">💾</span><span class="tb-label">Save</span></button>
-    <button class="tb-btn" onclick="duplicateDiagram()" title="Save a copy with a new name" aria-label="Duplicate diagram"><span class="tb-icon" aria-hidden="true">🗂️</span><span class="tb-label">Duplicate</span></button>
-    <button class="tb-btn" onclick="exportPNG()" title="Export as PNG"><span class="tb-icon">🖼️</span><span class="tb-label">PNG</span></button>
-    <button class="tb-btn" onclick="exportSVG()" title="Export as SVG"><span class="tb-icon">✦</span><span class="tb-label">SVG</span></button>
-    <button class="tb-btn" onclick="showMermaidModal()" title="Import Mermaid or JSON"><span class="tb-icon">🌊</span><span class="tb-label">Mermaid</span></button>
-  </div>
 
-  <div class="toolbar-sep"></div>
+    <div class="toolbar-sep"></div>
 
-  <!-- Edit ops -->
-  <div class="tool-group">
-    <button class="tb-btn" onclick="undo()" title="Undo (Ctrl+Z)"><span class="tb-icon">↩️</span></button>
-    <button class="tb-btn" onclick="redo()" title="Redo (Ctrl+Y)"><span class="tb-icon">↪️</span></button>
-    <button class="tb-btn" onclick="copySelected()" title="Copy (Ctrl+C)"><span class="tb-icon">📋</span></button>
-    <button class="tb-btn" onclick="pasteNodes()" title="Paste (Ctrl+V)"><span class="tb-icon">📌</span></button>
-    <button class="tb-btn danger" onclick="deleteSelected()" title="Delete (Del)"><span class="tb-icon">🗑️</span></button>
-  </div>
+    <button class="tb-btn" onclick="undo()" title="Undo (Ctrl+Z)" aria-label="Undo"><span class="tb-icon" aria-hidden="true">↩️</span><span class="tb-label">Undo</span></button>
+    <button class="tb-btn" onclick="redo()" title="Redo (Ctrl+Y)" aria-label="Redo"><span class="tb-icon" aria-hidden="true">↪️</span><span class="tb-label">Redo</span></button>
 
-  <div class="toolbar-sep"></div>
+    <div class="toolbar-sep"></div>
 
-  <!-- Tools -->
-  <div class="tool-group">
-    <button class="tool-mode-btn active" id="tool-select" onclick="setTool('select')" title="Select (S)">↖</button>
-    <button class="tool-mode-btn" id="tool-pan" onclick="setTool('pan')" title="Pan (H)">✋</button>
-    <button class="tool-mode-btn" id="tool-text" onclick="setTool('text')" title="Text Label (T)">T</button>
-    <button class="tool-mode-btn" id="tool-group" onclick="addGroup()" title="Add Group (G)">⬜</button>
-  </div>
-
-  <div class="toolbar-sep"></div>
-
-  <!-- Zoom -->
-  <div class="tool-group">
-    <button class="tool-mode-btn" onclick="zoomOut()" title="Zoom Out (-)" aria-label="Zoom out">−</button>
-    <button class="zoom-display" id="zoom-label" onclick="promptZoomLevel(event)" title="Click to set zoom %" aria-label="Set zoom level">100%</button>
-    <button class="tool-mode-btn" onclick="zoomIn()" title="Zoom In (+)" aria-label="Zoom in">+</button>
-    <button class="tb-btn" onclick="zoomReset()" title="Reset zoom to 100% (0)" aria-label="Reset zoom" style="font-size:11px;padding:0 8px"><span class="tb-label">Reset</span></button>
-    <button class="tb-btn" onclick="fitToContent()" title="Fit all content (F)" aria-label="Fit to content" style="font-size:11px;padding:0 8px"><span class="tb-label">Fit</span></button>
-  </div>
-
-  <div class="toolbar-sep"></div>
-
-  <!-- Layout -->
-  <div class="tool-group">
-    <button class="tb-btn" onclick="autoLayout('lr')" title="Auto Layout Left→Right" aria-label="Auto-layout left to right"><span class="tb-icon" aria-hidden="true">→</span><span class="tb-label">Layout LR</span></button>
-    <button class="tb-btn" onclick="autoLayout('tb')" title="Auto Layout Top→Bottom" aria-label="Auto-layout top to bottom"><span class="tb-icon" aria-hidden="true">↓</span><span class="tb-label">Layout TB</span></button>
-    <button id="btn-grid-snap" class="tb-btn" onclick="toggleGridSnap()" title="Toggle snap to 20px grid" aria-label="Toggle grid snap" aria-pressed="false"><span class="tb-icon" aria-hidden="true">⌗</span><span class="tb-label">Snap</span></button>
-    <button class="tb-btn" onclick="showCostEstimator()" title="Estimate monthly cost based on the services in this diagram" aria-label="Estimate monthly cost"><span class="tb-icon" aria-hidden="true">💰</span><span class="tb-label">Cost</span></button>
     <button id="btn-play-flow" class="tb-btn" onclick="togglePlayFlow()" title="Animate the data flow through the diagram (Space)" aria-label="Play flow animation"><span class="tb-icon" aria-hidden="true">▶</span><span class="tb-label">Play</span></button>
     <select id="play-speed" class="tb-btn" onchange="setPlaySpeed(this.value)" title="Animation speed" aria-label="Animation speed" style="padding:6px 8px;font-size:11px">
       <option value="2500">🐢 Slow</option>
       <option value="1400" selected>Normal</option>
       <option value="700">🐇 Fast</option>
     </select>
-    <button id="btn-edit-flow" class="tb-btn" onclick="showFlowEditor()" title="Edit the play sequence and narration" aria-label="Edit play sequence"><span class="tb-icon" aria-hidden="true">📝</span><span class="tb-label">Sequence</span></button>
+    <button class="tb-btn" onclick="showCostEstimator()" title="Estimate monthly cost based on the services in this diagram" aria-label="Estimate monthly cost"><span class="tb-icon" aria-hidden="true">💰</span><span class="tb-label">Cost</span></button>
+
+    <div style="flex:1;"></div>
+
+    <input type="text" id="filename-input" value="my-diagram" placeholder="diagram name" aria-label="Diagram name">
+    <button class="tb-btn" onclick="showHelp()" title="Help & Shortcuts" aria-label="Help and shortcuts">?</button>
   </div>
 
-  <div style="flex:1;"></div>
+  <!-- ROW 2 — SECONDARY (labeled sections) -->
+  <div class="toolbar-row secondary">
 
-  <input type="text" id="filename-input" value="my-diagram" placeholder="diagram name" aria-label="Diagram name">
+    <span class="row-label">File</span>
+    <button class="tb-btn" onclick="newDiagram()" title="New Diagram" aria-label="New diagram"><span class="tb-icon" aria-hidden="true">📄</span><span class="tb-label">New</span></button>
+    <button class="tb-btn" onclick="openDiagram()" title="Open HTML" aria-label="Open diagram"><span class="tb-icon" aria-hidden="true">📂</span><span class="tb-label">Open</span></button>
+    <button class="tb-btn" onclick="showRecentFilesModal()" title="Reopen a recently saved diagram" aria-label="Recent diagrams"><span class="tb-icon" aria-hidden="true">🕘</span><span class="tb-label">Recent</span></button>
+    <button class="tb-btn" onclick="duplicateDiagram()" title="Save a copy with a new name" aria-label="Duplicate diagram"><span class="tb-icon" aria-hidden="true">🗂️</span><span class="tb-label">Duplicate</span></button>
+    <button class="tb-btn" onclick="exportSVG()" title="Export as SVG" aria-label="Export SVG"><span class="tb-icon" aria-hidden="true">✦</span><span class="tb-label">SVG</span></button>
+    <button class="tb-btn" onclick="showMermaidModal()" title="Import Mermaid or JSON" aria-label="Import Mermaid"><span class="tb-icon" aria-hidden="true">🌊</span><span class="tb-label">Mermaid</span></button>
 
-  <div class="toolbar-sep"></div>
-  <button class="tb-btn" onclick="togglePanel('props')" title="Toggle Properties Panel" aria-label="Toggle properties panel">⚙</button>
-  <button class="tb-btn" onclick="showHelp()" title="Help & Shortcuts" aria-label="Help and shortcuts">?</button>
+    <div class="toolbar-sep"></div>
+
+    <span class="row-label">Edit</span>
+    <button class="tb-btn" onclick="copySelected()" title="Copy (Ctrl+C)" aria-label="Copy"><span class="tb-icon" aria-hidden="true">📋</span></button>
+    <button class="tb-btn" onclick="pasteNodes()" title="Paste (Ctrl+V)" aria-label="Paste"><span class="tb-icon" aria-hidden="true">📌</span></button>
+    <button class="tb-btn danger" onclick="deleteSelected()" title="Delete (Del)" aria-label="Delete"><span class="tb-icon" aria-hidden="true">🗑️</span></button>
+
+    <div class="toolbar-sep"></div>
+
+    <span class="row-label">Tools</span>
+    <button class="tool-mode-btn active" id="tool-select" onclick="setTool('select')" title="Select (S)" aria-label="Select tool">↖</button>
+    <button class="tool-mode-btn" id="tool-pan" onclick="setTool('pan')" title="Pan (H)" aria-label="Pan tool">✋</button>
+    <button class="tool-mode-btn" id="tool-text" onclick="setTool('text')" title="Text Label (T)" aria-label="Text label tool">T</button>
+    <button class="tool-mode-btn" id="tool-group" onclick="addGroup()" title="Add Group (G)" aria-label="Add group">⬜</button>
+
+    <div class="toolbar-sep"></div>
+
+    <span class="row-label">View</span>
+    <button class="tool-mode-btn" onclick="zoomOut()" title="Zoom Out (-)" aria-label="Zoom out">−</button>
+    <button class="zoom-display" id="zoom-label" onclick="promptZoomLevel(event)" title="Click to set zoom %" aria-label="Set zoom level">100%</button>
+    <button class="tool-mode-btn" onclick="zoomIn()" title="Zoom In (+)" aria-label="Zoom in">+</button>
+    <button class="tb-btn" onclick="zoomReset()" title="Reset zoom to 100% (0)" aria-label="Reset zoom"><span class="tb-label">Reset</span></button>
+    <button class="tb-btn" onclick="fitToContent()" title="Fit all content (F)" aria-label="Fit to content"><span class="tb-label">Fit</span></button>
+
+    <div class="toolbar-sep"></div>
+
+    <span class="row-label">Layout</span>
+    <button class="tb-btn" onclick="autoLayout('lr')" title="Auto Layout Left→Right" aria-label="Auto-layout left to right"><span class="tb-icon" aria-hidden="true">→</span><span class="tb-label">LR</span></button>
+    <button class="tb-btn" onclick="autoLayout('tb')" title="Auto Layout Top→Bottom" aria-label="Auto-layout top to bottom"><span class="tb-icon" aria-hidden="true">↓</span><span class="tb-label">TB</span></button>
+    <button id="btn-grid-snap" class="tb-btn" onclick="toggleGridSnap()" title="Toggle snap to 20px grid" aria-label="Toggle grid snap" aria-pressed="false"><span class="tb-icon" aria-hidden="true">⌗</span><span class="tb-label">Snap</span></button>
+    <button id="btn-edit-flow" class="tb-btn" onclick="showFlowEditor()" title="Edit the play sequence and narration" aria-label="Edit play sequence"><span class="tb-icon" aria-hidden="true">📝</span><span class="tb-label">Sequence</span></button>
+
+    <div style="flex:1;"></div>
+    <button class="tb-btn" onclick="togglePanel('props')" title="Toggle Properties Panel" aria-label="Toggle properties panel">⚙</button>
+  </div>
+
 </div>
 
 <!-- MAIN AREA -->
@@ -6105,19 +6138,63 @@ function newDiagram() {
   notify('New diagram created');
 }
 
-// ===== EXPORT PNG =====
-// ===== PNG EXPORT (html2canvas-free, native Canvas approach) =====
-// Async helpers used by PNG/SVG/saved-viewer exports to load icon bitmaps
-// off the local disk and convert them to data URLs so the output is fully
-// self-contained.
-function loadIconBitmap(url) {
+// ===== ICON LOADING HELPERS =====
+// Used by SVG export and the saved-viewer to embed icon bitmaps as data URLs
+// so the output stays self-contained.
+// Note: PNG export was removed because Chrome/Edge taint local canvases under
+// file:// (every local file is treated as its own opaque origin), so any
+// drawImage() of a sibling icons/...svg poisons toDataURL(). The XHR-text
+// detour below works under HTTP and in Firefox, and silently degrades to
+// emoji fallback under file:// Chrome — which is what SVG export and the
+// saved viewer rely on.
+function fetchTextSync(url) {
   return new Promise(resolve => {
-    if (!url) return resolve(null);
+    try {
+      const xhr = new XMLHttpRequest();
+      xhr.open('GET', url, true);
+      xhr.responseType = 'text';
+      xhr.onload = () => {
+        if ((xhr.status >= 200 && xhr.status < 300) || xhr.status === 0) {
+          resolve(xhr.responseText || '');
+        } else { resolve(''); }
+      };
+      xhr.onerror = () => resolve('');
+      xhr.send();
+    } catch (e) { resolve(''); }
+  });
+}
+function svgTextToDataUrl(svgText) {
+  if (!svgText) return '';
+  try {
+    // unescape(encodeURIComponent(...)) is the bulletproof UTF-8-safe path for btoa.
+    return 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(svgText)));
+  } catch (e) { return ''; }
+}
+function loadImageFromSrc(src) {
+  return new Promise(resolve => {
+    if (!src) return resolve(null);
     const img = new Image();
     img.onload = () => resolve(img);
     img.onerror = () => resolve(null);
-    img.src = url;
+    img.src = src;
   });
+}
+async function loadIconBitmap(url) {
+  if (!url) return null;
+  // First path: read the SVG as text and load it via a data URL. This is what
+  // keeps the canvas un-tainted, so PNG/SVG export and the saved viewer all
+  // get real icons regardless of how the file is being served.
+  const svgText = await fetchTextSync(url);
+  if (svgText) {
+    const dataUrl = svgTextToDataUrl(svgText);
+    if (dataUrl) {
+      const img = await loadImageFromSrc(dataUrl);
+      if (img) return img;
+    }
+  }
+  // Fallback: load directly. Image will display, but drawing it to a canvas
+  // under file:// will taint the canvas — callers handle that downstream.
+  return await loadImageFromSrc(url);
 }
 async function preloadIconBitmaps(urls) {
   const unique = [...new Set(urls.filter(Boolean))];
@@ -6134,203 +6211,6 @@ function iconImageToPngDataUrl(img, sizePx) {
   const cx = c.getContext('2d');
   try { cx.drawImage(img, 0, 0, sizePx, sizePx); } catch (e) { return ''; }
   try { return c.toDataURL('image/png'); } catch (e) { return ''; }
-}
-
-async function exportPNG() {
-  notify('Preparing PNG export...');
-  fitToContent();
-  // Preload all icon bitmaps once before drawing.
-  const iconImgs = await preloadIconBitmaps(nodes.map(n => n.iconUrl));
-  setTimeout(() => {
-    try {
-      // Find bounds of all nodes
-      if (!nodes.length) { notify('Add some nodes first!', 'warning'); return; }
-      let minX=Infinity, minY=Infinity, maxX=-Infinity, maxY=-Infinity;
-      nodes.forEach(n => {
-        const el = document.getElementById('node-'+n.id);
-        const w = el ? el.offsetWidth : 160;
-        const h = el ? el.offsetHeight : 80;
-        minX = Math.min(minX, n.x); minY = Math.min(minY, n.y);
-        maxX = Math.max(maxX, n.x+w); maxY = Math.max(maxY, n.y+h);
-      });
-      groups.forEach(g => {
-        minX = Math.min(minX, g.x); minY = Math.min(minY, g.y);
-        maxX = Math.max(maxX, g.x+g.w); maxY = Math.max(maxY, g.y+g.h);
-      });
-      const PAD = 40;
-      const W = Math.ceil(maxX - minX + PAD*2);
-      const H = Math.ceil(maxY - minY + PAD*2);
-      const SCALE = 2; // retina
-
-      const canvas = document.createElement('canvas');
-      canvas.width = W * SCALE;
-      canvas.height = H * SCALE;
-      const ctx = canvas.getContext('2d');
-      ctx.scale(SCALE, SCALE);
-
-      // Background
-      ctx.fillStyle = '#0d0f1a';
-      ctx.fillRect(0, 0, W, H);
-
-      // Grid dots
-      ctx.fillStyle = 'rgba(255,255,255,0.04)';
-      for (let gx = 0; gx < W; gx += 24)
-        for (let gy = 0; gy < H; gy += 24)
-          { ctx.beginPath(); ctx.arc(gx, gy, 1, 0, Math.PI*2); ctx.fill(); }
-
-      const ox = PAD - minX, oy = PAD - minY;
-
-      // Draw groups
-      groups.forEach(g => {
-        ctx.save();
-        ctx.strokeStyle = 'rgba(123,47,190,0.4)';
-        ctx.setLineDash([6,4]);
-        ctx.lineWidth = 1.5;
-        ctx.fillStyle = 'rgba(255,255,255,0.02)';
-        roundRect(ctx, g.x+ox, g.y+oy, g.w, g.h, 12);
-        ctx.fill(); ctx.stroke();
-        ctx.setLineDash([]);
-        ctx.fillStyle = 'rgba(255,255,255,0.3)';
-        ctx.font = 'bold 11px ui-monospace, Menlo, Consolas, monospace';
-        ctx.fillText((g.label||'Group').toUpperCase(), g.x+ox+12, g.y+oy+22);
-        ctx.restore();
-      });
-
-      // Draw arrows
-      arrows.forEach(a => {
-        const fn = getNode(a.from), tn = getNode(a.to);
-        if (!fn || !tn) return;
-        const fel = document.getElementById('node-'+a.from);
-        const tel = document.getElementById('node-'+a.to);
-        const fw = fel ? fel.offsetWidth : 160, fh = fel ? fel.offsetHeight : 80;
-        const tw = tel ? tel.offsetWidth : 160, th = tel ? tel.offsetHeight : 80;
-        const fp = a.fromPort || 'right', tp = a.toPort || 'left';
-        const from = portPos(fn, fw, fh, fp, ox, oy);
-        const to   = portPos(tn, tw, th, tp, ox, oy);
-        const colorMap = {default:'rgba(255,255,255,0.45)',green:'#4caf50',blue:'#2E86C1',purple:'#9B59B6',red:'#DD344C',teal:'#1ABC9C',orange:'#FF9900',pink:'#E91E63',yellow:'#F1C40F'};
-        const stroke = colorMap[a.color] || colorMap.default;
-        const obstacles = collectObstacleRects(a.from, a.to, (n) => {
-          const ne = document.getElementById('node-' + n.id);
-          return { x: n.x + ox, y: n.y + oy, w: ne ? ne.offsetWidth : 160, h: ne ? ne.offsetHeight : 80 };
-        });
-        const routePts = orthogonalRoute(from, fp, to, tp, obstacles);
-
-        ctx.save();
-        ctx.strokeStyle = stroke;
-        ctx.lineWidth = 1.5;
-        ctx.globalAlpha = 0.75;
-        if (a.style === 'dashed') ctx.setLineDash([6,4]);
-        if (a.style === 'dotted') ctx.setLineDash([2,4]);
-        ctx.beginPath();
-        // Walk the polyline. Use rounded corners between non-collinear segments.
-        const r = ORTH_CORNER_RADIUS;
-        ctx.moveTo(routePts[0].x, routePts[0].y);
-        for (let i = 1; i < routePts.length - 1; i++) {
-          const prev = routePts[i-1], curr = routePts[i], next = routePts[i+1];
-          const inLen  = Math.hypot(curr.x - prev.x, curr.y - prev.y);
-          const outLen = Math.hypot(next.x - curr.x, next.y - curr.y);
-          const rr = Math.max(0, Math.min(r, inLen/2, outLen/2));
-          if (rr < 0.5) { ctx.lineTo(curr.x, curr.y); continue; }
-          const ax = curr.x - (curr.x - prev.x) / (inLen || 1) * rr;
-          const ay = curr.y - (curr.y - prev.y) / (inLen || 1) * rr;
-          const bx = curr.x + (next.x - curr.x) / (outLen || 1) * rr;
-          const by = curr.y + (next.y - curr.y) / (outLen || 1) * rr;
-          ctx.lineTo(ax, ay);
-          ctx.quadraticCurveTo(curr.x, curr.y, bx, by);
-        }
-        const last = routePts[routePts.length - 1];
-        ctx.lineTo(last.x, last.y);
-        ctx.stroke();
-        ctx.setLineDash([]);
-        // Arrow head — direction from the last polyline segment, not Bezier control.
-        const tail = routePts[routePts.length - 2] || routePts[0];
-        const angle = Math.atan2(last.y - tail.y, last.x - tail.x);
-        ctx.globalAlpha = 0.85;
-        ctx.fillStyle = stroke;
-        ctx.beginPath();
-        ctx.moveTo(last.x, last.y);
-        ctx.lineTo(last.x - 9*Math.cos(angle-0.4), last.y - 9*Math.sin(angle-0.4));
-        ctx.lineTo(last.x - 9*Math.cos(angle+0.4), last.y - 9*Math.sin(angle+0.4));
-        ctx.closePath(); ctx.fill();
-        // Label at the polyline midpoint
-        if (a.label) {
-          const mid = midpointOfPolyline(routePts);
-          ctx.globalAlpha = 0.8;
-          ctx.fillStyle = 'rgba(13,15,26,0.85)';
-          const tw2 = ctx.measureText(a.label).width;
-          ctx.fillRect(mid.x - tw2/2 - 3, mid.y - 10, tw2 + 6, 14);
-          ctx.fillStyle = '#7986cb';
-          ctx.font = '9px ui-monospace, Menlo, Consolas, monospace';
-          ctx.textAlign = 'center';
-          ctx.fillText(a.label, mid.x, mid.y);
-          ctx.textAlign = 'left';
-        }
-        ctx.restore();
-      });
-
-      // Draw nodes
-      nodes.forEach(n => {
-        const el = document.getElementById('node-'+n.id);
-        const nw = el ? el.offsetWidth : 160;
-        const nh = el ? el.offsetHeight : 80;
-        const nx = n.x+ox, ny = n.y+oy;
-        const themeColors = {green:'#4caf50',orange:'#FF9900',blue:'#2E86C1',purple:'#7B2FBE',red:'#DD344C',teal:'#1ABC9C',pink:'#E91E63',yellow:'#F1C40F',cyan:'#00BCD4',gray:'#9E9E9E',gradient:'#7B2FBE'};
-        const col = themeColors[n.theme] || '#7986cb';
-
-        ctx.save();
-        // Shadow
-        ctx.shadowColor = col + '55';
-        ctx.shadowBlur = 12;
-        // Background
-        ctx.fillStyle = '#12152a';
-        roundRect(ctx, nx, ny, nw, nh, 10);
-        ctx.fill();
-        ctx.shadowBlur = 0;
-        // Border
-        ctx.strokeStyle = col + 'aa';
-        ctx.lineWidth = 1;
-        roundRect(ctx, nx, ny, nw, nh, 10);
-        ctx.stroke();
-        // Icon
-        // Prefer the real provider icon when we have it; emoji is fallback.
-        const iconImg = n.iconUrl ? iconImgs.get(n.iconUrl) : null;
-        if (iconImg) {
-          ctx.drawImage(iconImg, nx + 8, ny + 8, 24, 24);
-        } else {
-          ctx.font = '18px "Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji","Twemoji Mozilla",sans-serif';
-          ctx.fillText(n.icon||'⬜', nx+12, ny+26);
-        }
-        // Category label
-        ctx.font = 'bold 8px ui-monospace, Menlo, Consolas, monospace';
-        ctx.fillStyle = 'rgba(255,255,255,0.35)';
-        ctx.fillText((n.category||n.type||'').toUpperCase().slice(0,22), nx+12, ny+40);
-        // Main label
-        ctx.font = 'bold 12px -apple-system, "Segoe UI", system-ui, Roboto, sans-serif';
-        ctx.fillStyle = '#e8eaf6';
-        const lbl = n.label || '';
-        ctx.fillText(lbl.length > 20 ? lbl.slice(0,19)+'…' : lbl, nx+12, ny+56);
-        // Sub label
-        if (n.sublabel) {
-          ctx.font = '9px ui-monospace, Menlo, Consolas, monospace';
-          ctx.fillStyle = '#7986cb';
-          const sub = n.sublabel || '';
-          ctx.fillText(sub.length > 24 ? sub.slice(0,23)+'…' : sub, nx+12, ny+68);
-        }
-        ctx.restore();
-      });
-
-      // Save
-      const name = document.getElementById('filename-input').value || 'diagram';
-      const link = document.createElement('a');
-      link.download = potatoDownloadName(name, 'png');
-      link.href = canvas.toDataURL('image/png');
-      link.click();
-      notify('PNG exported ✅ — ' + W + '×' + H + 'px');
-    } catch(err) {
-      notify('Export error: ' + err.message, 'error');
-      console.error(err);
-    }
-  }, 200);
 }
 
 function portPos(n, nw, nh, port, ox, oy) {
