@@ -130,10 +130,19 @@ body {
 .zoom-display {
   font-family: var(--font-mono);
   font-size: 11px;
-  color: var(--text-muted);
-  min-width: 40px;
+  color: var(--text);
+  min-width: 50px;
   text-align: center;
+  background: var(--bg3);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  height: 32px;
+  cursor: text;
+  padding: 0 6px;
+  transition: border-color 0.15s;
 }
+.zoom-display:hover { border-color: var(--border-hover); }
+.zoom-display:focus { outline: none; border-color: var(--purple); }
 
 #filename-input {
   background: transparent;
@@ -1057,9 +1066,11 @@ kbd {
   <div class="tool-group">
     <button class="tb-btn" onclick="newDiagram()" title="New Diagram"><span class="tb-icon">📄</span><span class="tb-label">New</span></button>
     <button class="tb-btn" onclick="openDiagram()" title="Open HTML"><span class="tb-icon">📂</span><span class="tb-label">Open</span></button>
+    <button class="tb-btn" onclick="showRecentFilesModal()" title="Reopen a recently saved diagram" aria-label="Recent diagrams"><span class="tb-icon" aria-hidden="true">🕘</span><span class="tb-label">Recent</span></button>
     <button class="tb-btn" onclick="showTemplatesModal()" title="Start from a template"><span class="tb-icon">✨</span><span class="tb-label">Templates</span></button>
     <button class="tb-btn" onclick="showPasteModal()" title="Paste LLM output (JSON or HTML)"><span class="tb-icon">🤖</span><span class="tb-label">AI Import</span></button>
     <button class="tb-btn primary" onclick="saveDiagram()" title="Save diagram (Ctrl+S)" aria-label="Save diagram"><span class="tb-icon" aria-hidden="true">💾</span><span class="tb-label">Save</span></button>
+    <button class="tb-btn" onclick="duplicateDiagram()" title="Save a copy with a new name" aria-label="Duplicate diagram"><span class="tb-icon" aria-hidden="true">🗂️</span><span class="tb-label">Duplicate</span></button>
     <button class="tb-btn" onclick="exportPNG()" title="Export as PNG"><span class="tb-icon">🖼️</span><span class="tb-label">PNG</span></button>
     <button class="tb-btn" onclick="exportSVG()" title="Export as SVG"><span class="tb-icon">✦</span><span class="tb-label">SVG</span></button>
     <button class="tb-btn" onclick="showMermaidModal()" title="Import Mermaid or JSON"><span class="tb-icon">🌊</span><span class="tb-label">Mermaid</span></button>
@@ -1090,11 +1101,11 @@ kbd {
 
   <!-- Zoom -->
   <div class="tool-group">
-    <button class="tool-mode-btn" onclick="zoomIn()" title="Zoom In (+)">+</button>
-    <span class="zoom-display" id="zoom-label">100%</span>
-    <button class="tool-mode-btn" onclick="zoomOut()" title="Zoom Out (-)">−</button>
-    <button class="tool-mode-btn" onclick="zoomReset()" title="Fit to Screen (0)" style="font-size:11px;">⊙</button>
-    <button class="tool-mode-btn" onclick="fitToContent()" title="Fit Content (F)" style="font-size:11px;">⤢</button>
+    <button class="tool-mode-btn" onclick="zoomOut()" title="Zoom Out (-)" aria-label="Zoom out">−</button>
+    <button class="zoom-display" id="zoom-label" onclick="promptZoomLevel(event)" title="Click to set zoom %" aria-label="Set zoom level">100%</button>
+    <button class="tool-mode-btn" onclick="zoomIn()" title="Zoom In (+)" aria-label="Zoom in">+</button>
+    <button class="tb-btn" onclick="zoomReset()" title="Reset zoom to 100% (0)" aria-label="Reset zoom" style="font-size:11px;padding:0 8px"><span class="tb-label">Reset</span></button>
+    <button class="tb-btn" onclick="fitToContent()" title="Fit all content (F)" aria-label="Fit to content" style="font-size:11px;padding:0 8px"><span class="tb-label">Fit</span></button>
   </div>
 
   <div class="toolbar-sep"></div>
@@ -1347,6 +1358,20 @@ flowchart LR
   </div>
 </div>
 
+<!-- RECENT FILES MODAL -->
+<div id="recent-modal-overlay" role="dialog" aria-modal="true" aria-labelledby="recent-modal-title" style="position:fixed;inset:0;background:rgba(0,0,0,0.75);z-index:8500;display:none;align-items:center;justify-content:center;backdrop-filter:blur(4px)">
+  <div style="background:var(--bg2);border:1px solid var(--border);border-radius:14px;padding:24px;width:600px;max-width:95vw;max-height:80vh;display:flex;flex-direction:column;box-shadow:0 24px 80px rgba(0,0,0,0.8)">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
+      <div>
+        <h2 id="recent-modal-title" style="font-size:17px;font-weight:800">🕘 Recent diagrams</h2>
+        <p style="font-size:11px;color:var(--text-muted);font-family:var(--font-mono);margin-top:3px">Click to reopen. Last 8 saves are kept in this browser.</p>
+      </div>
+      <button onclick="closeRecentFilesModal()" aria-label="Close" style="background:none;border:none;color:var(--text-muted);font-size:22px;cursor:pointer;line-height:1">×</button>
+    </div>
+    <div id="recent-modal-list" style="overflow-y:auto;flex:1;min-height:120px"></div>
+  </div>
+</div>
+
 <!-- TEMPLATES MODAL -->
 <div id="templates-modal-overlay" style="position:fixed;inset:0;background:rgba(0,0,0,0.75);z-index:8500;display:none;align-items:center;justify-content:center;backdrop-filter:blur(4px)">
   <div style="background:var(--bg2);border:1px solid var(--border);border-radius:14px;padding:24px;width:760px;max-width:95vw;max-height:85vh;display:flex;flex-direction:column;box-shadow:0 24px 80px rgba(0,0,0,0.8)">
@@ -1433,34 +1458,25 @@ flowchart LR
       <button onclick="closeAiModal()" aria-label="Close" style="background:none;border:none;color:var(--text-muted);font-size:22px;cursor:pointer;line-height:1">×</button>
     </div>
 
-    <!-- STEP 1 -->
-    <div style="margin-top:14px;padding:12px 14px;background:var(--bg3);border:1px solid var(--border);border-radius:10px">
-      <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
-        <span style="display:inline-flex;align-items:center;justify-content:center;width:20px;height:20px;border-radius:50%;background:var(--purple);color:#fff;font-size:11px;font-weight:700">1</span>
-        <strong style="font-size:13px">Copy the Potato prompt</strong>
-      </div>
-      <p style="font-size:11px;color:var(--text-muted);font-family:ui-monospace,Menlo,Consolas,monospace;line-height:1.5;margin-bottom:8px">Tells the LLM the exact JSON schema Potato expects (nodes, arrows, groups, themes, ports).</p>
-      <button type="button" class="tb-btn primary" onclick="copyLlmPrompt(this)" style="font-size:11px">📋 Copy LLM prompt to clipboard</button>
-    </div>
-
-    <!-- STEP 2 -->
-    <div style="margin-top:10px;padding:12px 14px;background:var(--bg3);border:1px solid var(--border);border-radius:10px">
-      <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
-        <span style="display:inline-flex;align-items:center;justify-content:center;width:20px;height:20px;border-radius:50%;background:var(--purple);color:#fff;font-size:11px;font-weight:700">2</span>
-        <strong style="font-size:13px">Paste it into your LLM and describe your architecture</strong>
-      </div>
-      <p style="font-size:11px;color:var(--text-muted);font-family:ui-monospace,Menlo,Consolas,monospace;line-height:1.6">Open ChatGPT / Claude / Gemini, paste the prompt, then describe what you want in plain English. The LLM replies with one block — a Potato-format HTML file (a <code style="color:var(--text)">&lt;script type="application/json" id="potato-data"&gt;</code> wrapping the diagram). To keep it for later, save the reply as <code style="color:var(--text)">my-diagram.potato.html</code> — Potato reads that format directly from File → Open.</p>
-      <details style="margin-top:8px">
-        <summary style="font-size:11px;color:var(--text-muted);font-family:ui-monospace,Menlo,Consolas,monospace;cursor:pointer">Example prompts</summary>
+    <!-- STEPS 1 + 2 collapsed into a single compact strip so STEP 3 (the
+         actual textarea) is visible without scrolling on 13" laptops. -->
+    <div style="margin-top:14px;padding:10px 12px;background:var(--bg3);border:1px solid var(--border);border-radius:10px;display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+      <div style="display:flex;align-items:center;gap:6px;font-size:12px"><span style="display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;border-radius:50%;background:var(--purple);color:#fff;font-size:10px;font-weight:700">1</span><strong>Copy</strong></div>
+      <button type="button" class="tb-btn primary" onclick="copyLlmPrompt(this)" style="font-size:11px">📋 Copy LLM prompt</button>
+      <span style="font-size:11px;color:var(--text-dim);font-family:ui-monospace,Menlo,Consolas,monospace">→</span>
+      <div style="display:flex;align-items:center;gap:6px;font-size:12px"><span style="display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;border-radius:50%;background:var(--purple);color:#fff;font-size:10px;font-weight:700">2</span><strong>Paste into ChatGPT / Claude / Gemini, describe your architecture</strong></div>
+      <details style="flex-basis:100%;margin-top:6px">
+        <summary style="font-size:11px;color:var(--text-muted);font-family:ui-monospace,Menlo,Consolas,monospace;cursor:pointer">📚 Example prompts &amp; output format details</summary>
         <ul style="font-size:11px;color:var(--text-dim);font-family:ui-monospace,Menlo,Consolas,monospace;line-height:1.7;margin-top:6px;padding-left:18px">
           <li>"Draw an AWS serverless API: API Gateway → 3 Lambdas → DynamoDB + SQS"</li>
           <li>"Show a RAG chatbot: S3 docs → embedding pipeline → vector DB → Bedrock"</li>
           <li>"Diagram a Kubernetes app with ingress, 2 deployments, Redis + Postgres"</li>
         </ul>
+        <p style="font-size:11px;color:var(--text-dim);font-family:ui-monospace,Menlo,Consolas,monospace;line-height:1.6;margin-top:8px">The LLM replies with a Potato-format HTML block (a <code style="color:var(--text)">&lt;script type="application/json" id="potato-data"&gt;</code>). To keep it for later, save the reply as <code style="color:var(--text)">my-diagram.potato.html</code> and use File → Open.</p>
       </details>
     </div>
 
-    <!-- STEP 3 -->
+    <!-- STEP 3 — the only one with a real input, so it gets full real-estate. -->
     <div style="margin-top:10px;padding:12px 14px;background:var(--bg3);border:1px solid var(--border);border-radius:10px;display:flex;flex-direction:column;gap:8px">
       <div style="display:flex;align-items:center;gap:8px">
         <span style="display:inline-flex;align-items:center;justify-content:center;width:20px;height:20px;border-radius:50%;background:var(--purple);color:#fff;font-size:11px;font-weight:700">3</span>
@@ -2846,13 +2862,9 @@ function init() {
   const loadingEl = document.getElementById('loading');
   loadingEl.style.opacity = '0';
   setTimeout(() => { loadingEl.style.display = 'none'; }, 300);
-  // Only welcome first-time users; returning users go straight to work.
-  try {
-    if (!localStorage.getItem('potato-seen-welcome-v1')) {
-      notify('Welcome to Potato! Pick a template or drag components from the left panel.');
-      localStorage.setItem('potato-seen-welcome-v1', '1');
-    }
-  } catch(e) { /* private mode — silently skip */ }
+  // The empty-state overlay on the canvas (visible whenever nodes.length === 0)
+  // is now the welcome surface — clearer, doesn't auto-dismiss, and points to
+  // three concrete next steps. The old fire-and-forget toast was redundant.
 }
 
 // ===== SIDEBAR =====
@@ -4421,6 +4433,49 @@ function zoomIn()    { zoom = Math.min(3, zoom * 1.15); applyTransform(); update
 function zoomOut()   { zoom = Math.max(0.2, zoom / 1.15); applyTransform(); updateMinimap(); }
 function zoomReset() { zoom = 1; panX = 100; panY = 60; applyTransform(); updateMinimap(); }
 
+// Click the zoom % readout to type a specific level. Replaces the label
+// with an input in-place; Enter / blur applies, Esc cancels.
+function promptZoomLevel(evt) {
+  if (evt) evt.preventDefault();
+  const label = document.getElementById('zoom-label');
+  if (!label || label.tagName === 'INPUT') return;
+  const current = Math.round(zoom * 100);
+  const input = document.createElement('input');
+  input.id = 'zoom-label';
+  input.type = 'number';
+  input.min = '10';
+  input.max = '300';
+  input.value = String(current);
+  input.className = 'zoom-display';
+  input.style.width = '56px';
+  label.replaceWith(input);
+  input.focus();
+  input.select();
+  const restore = (commit) => {
+    if (commit) {
+      const v = parseInt(input.value, 10);
+      if (!isNaN(v)) {
+        zoom = Math.min(3, Math.max(0.1, v / 100));
+        applyTransform();
+        updateMinimap();
+      }
+    }
+    const newLabel = document.createElement('button');
+    newLabel.id = 'zoom-label';
+    newLabel.className = 'zoom-display';
+    newLabel.title = 'Click to set zoom %';
+    newLabel.setAttribute('aria-label', 'Set zoom level');
+    newLabel.onclick = promptZoomLevel;
+    newLabel.textContent = Math.round(zoom * 100) + '%';
+    input.replaceWith(newLabel);
+  };
+  input.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') { e.preventDefault(); restore(true); }
+    if (e.key === 'Escape') { e.preventDefault(); restore(false); }
+  });
+  input.addEventListener('blur', () => restore(true), { once: true });
+}
+
 function fitToContent() {
   if (!nodes.length && !groups.length) { zoomReset(); return; }
   let minX=Infinity, minY=Infinity, maxX=-Infinity, maxY=-Infinity;
@@ -5367,6 +5422,8 @@ function renderFlowEditor() {
   if (ov) ov.addEventListener('click', (e) => { if (e.target === e.currentTarget) closeFlowEditor(false); });
   const ov2 = document.getElementById('cost-modal-overlay');
   if (ov2) ov2.addEventListener('click', (e) => { if (e.target === e.currentTarget) closeCostEstimator(); });
+  const ov3 = document.getElementById('recent-modal-overlay');
+  if (ov3) ov3.addEventListener('click', (e) => { if (e.target === e.currentTarget) closeRecentFilesModal(); });
 })();
 
 // ===== COST ESTIMATOR =====
@@ -5544,6 +5601,27 @@ function updateStatusBar() {
 
 function getDiagramData() {
   return { nodes, arrows, groups, playFlow, meta: { version: '1.0', created: new Date().toISOString(), name: document.getElementById('filename-input').value } };
+}
+
+// Duplicate the current diagram on disk. Bumps the filename with -copy (or
+// -copy-2, -copy-3, ...) so the original file is never overwritten, then
+// triggers a normal save. The in-memory diagram continues with the new name.
+async function duplicateDiagram() {
+  const input = document.getElementById('filename-input');
+  let base = (input.value || 'diagram').trim();
+  // Strip trailing `-copy[-N]` so successive duplicates increment cleanly.
+  base = base.replace(/[-_](copy)([-_]\d+)?$/i, '');
+  // Find the next free `-copy[-N]` suffix by checking recent saves.
+  const recent = (typeof getRecentFiles === 'function' ? getRecentFiles() : []).map(r => r.name || '');
+  let candidate = base + '-copy';
+  let n = 2;
+  while (recent.includes(candidate)) {
+    candidate = base + '-copy-' + n;
+    n++;
+  }
+  input.value = candidate;
+  notify(`Duplicating as ${candidate}…`);
+  await saveDiagram();
 }
 
 async function saveDiagram() {
@@ -6946,7 +7024,12 @@ function showPasteModal() {
   document.getElementById('ai-modal-overlay').style.display = 'flex';
   document.getElementById('ai-paste-input').value = '';
   document.getElementById('ai-import-error').style.display = 'none';
-  setTimeout(() => document.getElementById('ai-paste-input').focus(), 100);
+  setTimeout(() => {
+    const ta = document.getElementById('ai-paste-input');
+    ta.focus();
+    // Make sure Step 3 is in view on small viewports.
+    try { ta.scrollIntoView({ block: 'center', behavior: 'smooth' }); } catch (_) {}
+  }, 100);
 }
 
 function closeAiModal() {
@@ -7446,6 +7529,7 @@ function loadRecent(idx) {
   if (!r || !r.data) { notify('Recent diagram is no longer available', 'warning'); return; }
   if (isDirty && nodes.length) { if (!confirm('Discard current diagram and load this recent one?')) return; }
   closeTemplatesModal();
+  closeRecentFilesModal();
   loadDiagramData(JSON.parse(JSON.stringify(r.data)));
   document.getElementById('filename-input').value = r.name;
   notify(`Loaded recent: ${r.name} ✅`);
@@ -7453,6 +7537,33 @@ function loadRecent(idx) {
 
 function closeTemplatesModal() {
   document.getElementById('templates-modal-overlay').style.display = 'none';
+}
+
+function showRecentFilesModal() {
+  const recents = getRecentFiles();
+  const list = document.getElementById('recent-modal-list');
+  if (!recents.length) {
+    list.innerHTML = '<p style="color:var(--text-dim);font-size:12px;font-family:var(--font-mono);text-align:center;padding:40px 16px;line-height:1.6">No recent diagrams yet.<br>Save one with <kbd style="background:var(--bg3);padding:2px 6px;border-radius:4px;border:1px solid var(--border);font-size:11px">Ctrl+S</kbd> and it will show up here.</p>';
+  } else {
+    list.innerHTML = '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:10px">' + recents.map((r, i) => `
+      <div class="recent-card" data-idx="${i}" style="background:var(--bg3);border:1px solid var(--border);border-radius:10px;padding:14px;cursor:pointer;transition:all 0.18s">
+        <div style="font-size:22px;margin-bottom:6px">🗂️</div>
+        <div style="font-size:13px;font-weight:700;margin-bottom:4px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escHtml(r.name)}</div>
+        <div style="font-size:10px;color:var(--text-muted);font-family:var(--font-mono);line-height:1.5;min-height:30px">${escHtml(r.summary || '')}</div>
+        <div style="font-size:9px;color:var(--text-dim);font-family:var(--font-mono);margin-top:6px">${escHtml(new Date(r.ts).toLocaleString())}</div>
+      </div>
+    `).join('') + '</div>';
+    list.querySelectorAll('.recent-card').forEach(card => {
+      card.addEventListener('mouseenter', () => { card.style.borderColor = 'var(--purple)'; card.style.background = 'var(--bg4)'; });
+      card.addEventListener('mouseleave', () => { card.style.borderColor = 'var(--border)'; card.style.background = 'var(--bg3)'; });
+      card.addEventListener('click', () => loadRecent(+card.dataset.idx));
+    });
+  }
+  document.getElementById('recent-modal-overlay').style.display = 'flex';
+}
+
+function closeRecentFilesModal() {
+  document.getElementById('recent-modal-overlay').style.display = 'none';
 }
 
 function loadTemplate(key) {
