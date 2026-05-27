@@ -670,6 +670,10 @@ body {
   padding: 12px 14px 10px;
   border-bottom: 1px solid var(--border);
   flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
 }
 #props-header h3 {
   font-size: 11px;
@@ -679,6 +683,18 @@ body {
   text-transform: uppercase;
   color: var(--text-muted);
 }
+#props-close {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 2px 6px;
+  border-radius: 4px;
+  transition: all 0.15s;
+}
+#props-close:hover { background: var(--bg3); color: var(--text); }
 
 .prop-group { padding: 12px 14px; border-bottom: 1px solid var(--border); }
 .prop-group-title {
@@ -1252,10 +1268,11 @@ kbd {
     </div>
   </div>
 
-  <!-- RIGHT PROPERTIES PANEL -->
-  <div id="props-panel">
+  <!-- RIGHT PROPERTIES PANEL — hidden by default to maximize canvas; auto-opens on selection -->
+  <div id="props-panel" class="hidden">
     <div id="props-header">
       <h3>Properties</h3>
+      <button id="props-close" onclick="togglePanel('props')" title="Hide properties panel" aria-label="Close properties panel">×</button>
     </div>
     <div id="props-content">
       <div id="props-empty">
@@ -4662,6 +4679,12 @@ function updateGroupLabel(id, text) {
 // ===== PROPERTIES PANEL =====
 function updatePropsPanel() {
   const content = document.getElementById('props-content');
+
+  // Auto-open the panel whenever a node or arrow is selected (panel starts hidden).
+  // We never auto-CLOSE on deselect — once open, it stays until manually dismissed
+  // via the × button on the panel header or the ⚙ button on the toolbar.
+  const hasSelection = !!selectedArrow || selectedIds.size > 0;
+  if (hasSelection) propsPanel.classList.remove('hidden');
 
   if (selectedArrow) {
     const arrow = arrows.find(a => a.id === selectedArrow);
