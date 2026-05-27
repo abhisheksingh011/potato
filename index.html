@@ -5034,9 +5034,33 @@ function saveDiagram() {
   notify(`Saved as ${a.download} ✅`);
 }
 
+// Pre-resolve KB lookups for every node so the saved viewer can show
+// limits / cost / pitfalls / whenToUse without re-implementing the matching
+// logic. Returned shape: { [nodeId]: { name, limits, whenToUse, cost, pitfalls } }
+function buildViewerKbMap() {
+  const map = {};
+  nodes.forEach(n => {
+    const kb = inferKbForNode(n);
+    if (!kb) return;
+    map[n.id] = {
+      name:      kb.name || n.type || n.label,
+      limits:    kb.limits || '',
+      whenToUse: kb.whenToUse || '',
+      cost:      kb.cost || '',
+      pitfalls:  Array.isArray(kb.pitfalls) ? kb.pitfalls : []
+    };
+  });
+  return map;
+}
+
 function buildSavedHTML(name, dataStr, svgMarkup) {
-  // Self-contained: embeds JSON data (for re-editing in Potato) + a rendered
-  // SVG viewer so double-clicking the file shows the actual diagram.
+  // Self-contained viewer: embeds the diagram JSON, a pre-resolved KB map,
+  // the rendered SVG, plus inline CSS + JS for hover tooltips and Play Flow.
+  const kbMap   = buildViewerKbMap();
+  const kbAsOf  = (typeof SERVICE_KB_AS_OF === 'string' && SERVICE_KB_AS_OF) ? SERVICE_KB_AS_OF : '';
+  const viewerPayload = JSON.stringify({ kb: kbMap, asOf: kbAsOf }, null, 2)
+    .replace(/<\/scr(ipt)/gi, '<\\/scr$1');
+
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -5044,13 +5068,54 @@ function buildSavedHTML(name, dataStr, svgMarkup) {
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>${escHtml(name)} — Potato</title>
 <style>
-  body { margin: 0; background: #0d0f1a; color: #e8eaf6; font-family: system-ui, sans-serif; min-height: 100vh; }
-  .potato-header { padding: 18px 28px; border-bottom: 1px solid rgba(255,255,255,0.07); display: flex; align-items: center; gap: 12px; }
+  :root {
+    --bg: #0d0f1a; --bg2: #12152a; --bg3: #1a1e35;
+    --text: #e8eaf6; --muted: #7986cb; --dim: #4a5568;
+    --teal: #1abc9c; --purple: #7B2FBE; --pink: #E91E63; --orange: #FF9900;
+    --border: rgba(255,255,255,0.07);
+    --font-mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text); font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif; min-height: 100vh; }
+
+  .potato-header { padding: 18px 28px; border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
   .potato-header h1 { font-size: 18px; font-weight: 800; background: linear-gradient(135deg, #7986cb, #e91e63, #1abc9c); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; margin: 0; }
-  .potato-header small { color: #7986cb; font-family: monospace; font-size: 11px; }
+  .potato-header small { color: var(--muted); font-family: var(--font-mono); font-size: 11px; }
+  .header-spacer { flex: 1; }
+
+  .ctrl { padding: 7px 14px; border-radius: 6px; border: 1px solid var(--border); background: var(--bg3); color: var(--text); font-size: 12px; font-weight: 600; cursor: pointer; font-family: inherit; }
+  .ctrl:hover { border-color: rgba(255,255,255,0.2); }
+  .ctrl.primary { background: linear-gradient(135deg, var(--teal), #2e86c1); border-color: transparent; }
+  .ctrl.primary:hover { opacity: 0.9; }
+  .ctrl.playing { background: linear-gradient(135deg, #e91e63, #dd344c); border-color: transparent; }
+  .ctrl select { background: var(--bg3); border: 1px solid var(--border); color: var(--text); padding: 6px 8px; border-radius: 6px; font-size: 11px; font-family: inherit; }
+  .step-counter { font-family: var(--font-mono); font-size: 11px; color: var(--muted); min-width: 100px; }
+
   .potato-view { padding: 24px; overflow: auto; }
   .potato-view svg { max-width: 100%; height: auto; display: block; margin: 0 auto; }
-  .potato-footer { padding: 14px 28px; border-top: 1px solid rgba(255,255,255,0.07); font-size: 11px; color: #7986cb; font-family: monospace; }
+
+  .potato-node { transition: filter 0.2s; }
+  .potato-node:hover { filter: drop-shadow(0 0 12px rgba(232,234,246,0.4)); }
+  .potato-node.playing-flow rect { stroke: var(--teal) !important; stroke-width: 2.5 !important; filter: drop-shadow(0 0 12px rgba(26,188,156,0.7)); }
+  .potato-arrow { transition: stroke-width 0.2s, opacity 0.2s; }
+  .potato-arrow.playing-flow { stroke-width: 3 !important; opacity: 1 !important; stroke-dasharray: 8, 6; animation: potato-dash 0.6s linear infinite; }
+  @keyframes potato-dash { to { stroke-dashoffset: -28; } }
+
+  /* Step narration overlay (bottom of screen during play) */
+  #potato-step-text { position: fixed; bottom: 28px; left: 50%; transform: translateX(-50%); background: rgba(18,21,42,0.97); border: 1px solid var(--teal); border-radius: 10px; padding: 12px 22px; max-width: 80vw; z-index: 200; box-shadow: 0 8px 32px rgba(0,0,0,0.5), 0 0 24px rgba(26,188,156,0.3); display: none; }
+  #potato-step-text.show { display: block; }
+  #potato-step-text .counter { font-family: var(--font-mono); font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px; }
+  #potato-step-text .narration { font-size: 13px; color: var(--text); margin-top: 4px; line-height: 1.5; }
+
+  /* Service tooltip (hover) */
+  #potato-tooltip { position: fixed; background: rgba(13,15,26,0.98); border: 1px solid var(--border); border-radius: 10px; padding: 14px 16px; max-width: 360px; z-index: 300; display: none; pointer-events: none; backdrop-filter: blur(10px); box-shadow: 0 12px 40px rgba(0,0,0,0.6); }
+  #potato-tooltip h3 { margin: 0 0 8px; font-size: 14px; }
+  #potato-tooltip .tt-section { margin-top: 8px; }
+  #potato-tooltip .tt-title { font-family: var(--font-mono); font-size: 9px; letter-spacing: 1px; text-transform: uppercase; color: var(--muted); margin-bottom: 3px; }
+  #potato-tooltip .tt-body { font-family: var(--font-mono); font-size: 11px; color: rgba(232,234,246,0.85); line-height: 1.55; white-space: pre-wrap; }
+  #potato-tooltip ul.tt-list { margin: 4px 0 0; padding-left: 18px; font-family: var(--font-mono); font-size: 11px; color: rgba(232,234,246,0.85); line-height: 1.6; }
+
+  .potato-footer { padding: 14px 28px; border-top: 1px solid var(--border); font-size: 11px; color: var(--muted); font-family: var(--font-mono); }
 </style>
 </head>
 <body>
@@ -5059,16 +5124,166 @@ function buildSavedHTML(name, dataStr, svgMarkup) {
 <script type="application/json" id="potato-data">
 ${dataStr}
 <\/script>
+<script type="application/json" id="potato-viewer-payload">
+${viewerPayload}
+<\/script>
+
 <div class="potato-header">
   <h1>🥔 ${escHtml(name)}</h1>
-  <small>Potato Diagram · open this file in the Potato editor to edit</small>
+  <small>Potato Diagram · hover any service for limits + cost · click Play to walk the flow</small>
+  <div class="header-spacer"></div>
+  <button class="ctrl primary" id="potato-play-btn" onclick="potatoTogglePlay()">▶ Play Flow</button>
+  <select class="ctrl" id="potato-speed" onchange="potatoSetSpeed(this.value)" title="Animation speed">
+    <option value="2500">🐢 Slow</option>
+    <option value="1400" selected>Normal</option>
+    <option value="700">🐇 Fast</option>
+  </select>
 </div>
+
 <div class="potato-view">
 ${svgMarkup}
 </div>
+
+<div id="potato-step-text" aria-live="polite"></div>
+<div id="potato-tooltip" role="tooltip"></div>
+
 <div class="potato-footer">
   Read-only view. To edit: open <a href="https://github.com/potato-diagram/potato" style="color:#1abc9c">Potato</a>, click 📂 Open, and select this file.
 </div>
+
+<script>
+(function () {
+  function esc(s) { return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
+  let diagram = {}, viewer = { kb: {}, asOf: '' };
+  try { diagram = JSON.parse(document.getElementById('potato-data').textContent); } catch (e) { console.error('potato-data parse failed', e); return; }
+  try { viewer = JSON.parse(document.getElementById('potato-viewer-payload').textContent); } catch (e) { /* optional */ }
+
+  const nodes  = diagram.nodes  || [];
+  const arrows = diagram.arrows || [];
+  const playFlow = Array.isArray(diagram.playFlow) ? diagram.playFlow : [];
+  const nodeById = new Map(nodes.map(n => [n.id, n]));
+  const arrowById = new Map(arrows.map(a => [a.id, a]));
+
+  // -------------------- HOVER TOOLTIPS --------------------
+  const tipEl = document.getElementById('potato-tooltip');
+  function showTooltip(node, evt) {
+    const kb = viewer.kb[node.id];
+    const desc = node.description || '';
+    if (!desc && !kb) { hideTooltip(); return; }
+    let html = '<h3>' + (node.icon ? esc(node.icon) + ' ' : '') + esc(node.label || node.type || node.id) + '</h3>';
+    if (node.sublabel) html += '<div style="font-family:var(--font-mono);font-size:11px;color:var(--muted);margin-bottom:6px">' + esc(node.sublabel) + '</div>';
+    if (desc) {
+      html += '<div class="tt-section"><div class="tt-title">Description</div><div class="tt-body">' + esc(desc) + '</div></div>';
+    }
+    if (kb) {
+      if (kb.limits)    html += '<div class="tt-section"><div class="tt-title">📋 Limits</div><div class="tt-body">' + esc(kb.limits) + '</div></div>';
+      if (kb.whenToUse) html += '<div class="tt-section"><div class="tt-title">💡 When to use</div><div class="tt-body">' + esc(kb.whenToUse) + '</div></div>';
+      if (kb.cost)      html += '<div class="tt-section"><div class="tt-title">💰 Cost' + (viewer.asOf ? ' (as of ' + esc(viewer.asOf) + ')' : '') + '</div><div class="tt-body">' + esc(kb.cost) + '</div></div>';
+      if (kb.pitfalls && kb.pitfalls.length) {
+        html += '<div class="tt-section"><div class="tt-title">⚠️ Common pitfalls</div><ul class="tt-list">' + kb.pitfalls.map(p => '<li>' + esc(p) + '</li>').join('') + '</ul></div>';
+      }
+    }
+    tipEl.innerHTML = html;
+    tipEl.style.display = 'block';
+    moveTooltip(evt);
+  }
+  function moveTooltip(evt) {
+    const x = evt.clientX + 14, y = evt.clientY + 14;
+    const rect = tipEl.getBoundingClientRect();
+    const maxX = window.innerWidth - rect.width - 12;
+    const maxY = window.innerHeight - rect.height - 12;
+    tipEl.style.left = Math.min(x, maxX) + 'px';
+    tipEl.style.top  = Math.min(y, maxY) + 'px';
+  }
+  function hideTooltip() { tipEl.style.display = 'none'; }
+
+  document.querySelectorAll('.potato-node').forEach(g => {
+    const id = g.getAttribute('data-node-id');
+    const node = nodeById.get(id);
+    if (!node) return;
+    g.addEventListener('mouseenter', e => showTooltip(node, e));
+    g.addEventListener('mousemove',  moveTooltip);
+    g.addEventListener('mouseleave', hideTooltip);
+  });
+
+  // -------------------- PLAY FLOW --------------------
+  let _timer = null, _idx = 0, _stepMs = 1400;
+  let _steps = []; // [{ arrow, text }]
+
+  function buildSteps() {
+    if (!arrows.length) return [];
+    if (playFlow.length) {
+      const r = playFlow.map(s => ({ arrow: arrowById.get(s.arrow), text: s.text || '' })).filter(s => s.arrow);
+      if (r.length) return r;
+    }
+    // Fallback: BFS from nodes without incoming arrows.
+    const inDeg = {}, outArrows = {};
+    nodes.forEach(n => { inDeg[n.id] = 0; outArrows[n.id] = []; });
+    arrows.forEach(a => { if (inDeg[a.to] !== undefined) inDeg[a.to]++; if (outArrows[a.from]) outArrows[a.from].push(a); });
+    let q = nodes.filter(n => inDeg[n.id] === 0).sort((a,b) => (a.x - b.x) || (a.y - b.y)).map(n => n.id);
+    if (!q.length && nodes.length) q = [[...nodes].sort((a,b) => a.x - b.x)[0].id];
+    const seen = new Set(), emitted = new Set(), out = [];
+    while (q.length) {
+      const id = q.shift(); if (seen.has(id)) continue; seen.add(id);
+      const outs = (outArrows[id] || []).slice().sort((a,b) => { const tA = nodeById.get(a.to), tB = nodeById.get(b.to); return ((tA && tA.x) || 0) - ((tB && tB.x) || 0); });
+      outs.forEach(a => { if (emitted.has(a.id)) return; emitted.add(a.id); out.push({ arrow: a, text: '' }); if (!seen.has(a.to)) q.push(a.to); });
+    }
+    arrows.forEach(a => { if (!emitted.has(a.id)) out.push({ arrow: a, text: '' }); });
+    return out;
+  }
+
+  function clearHi() {
+    document.querySelectorAll('.potato-node.playing-flow').forEach(n => n.classList.remove('playing-flow'));
+    document.querySelectorAll('.potato-arrow.playing-flow').forEach(p => p.classList.remove('playing-flow'));
+  }
+
+  function tick() {
+    clearHi();
+    if (_idx >= _steps.length) { stopPlay(); return; }
+    const step = _steps[_idx], a = step.arrow;
+    document.querySelector('[data-node-id="' + a.from + '"]')?.classList.add('playing-flow');
+    document.querySelector('[data-node-id="' + a.to   + '"]')?.classList.add('playing-flow');
+    document.querySelector('[data-arrow-id="' + a.id + '"]')?.classList.add('playing-flow');
+
+    const fromN = nodeById.get(a.from), toN = nodeById.get(a.to);
+    const summary = (fromN ? fromN.label : a.from) + ' → ' + (toN ? toN.label : a.to) + (a.label ? ' — ' + a.label : '');
+    const ind = document.getElementById('potato-step-text');
+    ind.innerHTML = '<div class="counter">Step ' + (_idx + 1) + ' / ' + _steps.length + ' · ' + esc(summary) + '</div>' + (step.text ? '<div class="narration">' + esc(step.text) + '</div>' : '');
+    ind.classList.add('show');
+    _idx++;
+  }
+
+  window.potatoTogglePlay = function () {
+    if (_timer) { stopPlay(); return; }
+    _steps = buildSteps();
+    if (!_steps.length) { alert('Nothing to play — this diagram has no connections.'); return; }
+    _idx = 0;
+    const btn = document.getElementById('potato-play-btn');
+    btn.textContent = '⏹ Stop';
+    btn.classList.add('playing');
+    tick();
+    _timer = setInterval(tick, _stepMs);
+  };
+  function stopPlay() {
+    if (_timer) clearInterval(_timer); _timer = null;
+    clearHi();
+    document.getElementById('potato-step-text').classList.remove('show');
+    const btn = document.getElementById('potato-play-btn');
+    btn.textContent = '▶ Play Flow';
+    btn.classList.remove('playing');
+  }
+  window.potatoSetSpeed = function (ms) {
+    _stepMs = Math.max(250, Math.min(5000, parseInt(ms, 10) || 1400));
+    if (_timer) { clearInterval(_timer); _timer = setInterval(tick, _stepMs); }
+  };
+
+  // Esc/Space shortcuts
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape' && _timer) stopPlay();
+    if (e.key === ' ' && document.activeElement === document.body) { e.preventDefault(); potatoTogglePlay(); }
+  });
+})();
+<\/script>
 </body>
 </html>`;
 }
@@ -5130,7 +5345,7 @@ function buildDiagramSVG() {
     const stroke=colorMap[a.color]||colorMap.default;
     const dashArr=a.style==='dashed'?'stroke-dasharray="6 4"':a.style==='dotted'?'stroke-dasharray="2 4"':'';
     const markerId=a.color&&a.color!=='default'?`ah-${a.color}`:'ah';
-    svg += `  <path d="M${from.x},${from.y} C${c1.x},${c1.y} ${c2.x},${c2.y} ${to.x},${to.y}" fill="none" stroke="${stroke}" stroke-width="1.5" ${dashArr} marker-end="url(#${markerId})" opacity="0.75"/>
+    svg += `  <path class="potato-arrow" data-arrow-id="${escHtml(a.id)}" d="M${from.x},${from.y} C${c1.x},${c1.y} ${c2.x},${c2.y} ${to.x},${to.y}" fill="none" stroke="${stroke}" stroke-width="1.5" ${dashArr} marker-end="url(#${markerId})" opacity="0.75"/>
 `;
     if (a.label) {
       const mx=(from.x+to.x)/2, my=(from.y+to.y)/2;
@@ -5144,12 +5359,12 @@ function buildDiagramSVG() {
     const nw=el?el.offsetWidth:160, nh=el?el.offsetHeight:80;
     const nx=n.x+ox, ny=n.y+oy;
     const col=themeColors[n.theme]||'#7986cb';
-    svg += `  <rect x="${nx}" y="${ny}" width="${nw}" height="${nh}" rx="10" fill="#12152a" stroke="${col}" stroke-width="1" opacity="0.95"/>
-  <text x="${nx+12}" y="${ny+24}" font-size="18">${escHtml(n.icon||'⬜')}</text>
-  <text x="${nx+12}" y="${ny+39}" class="node-label">${escHtml((n.category||n.type||'').toUpperCase().slice(0,22))}</text>
-  <text x="${nx+12}" y="${ny+55}" class="node-name">${escHtml((n.label||'').slice(0,20))}</text>
-`;
-    if (n.sublabel) svg += `  <text x="${nx+12}" y="${ny+68}" class="node-sub">${escHtml((n.sublabel||'').slice(0,24))}</text>
+    svg += `  <g class="potato-node" data-node-id="${escHtml(n.id)}" style="cursor:pointer">
+    <rect x="${nx}" y="${ny}" width="${nw}" height="${nh}" rx="10" fill="#12152a" stroke="${col}" stroke-width="1" opacity="0.95"/>
+    <text x="${nx+12}" y="${ny+24}" font-size="18">${escHtml(n.icon||'⬜')}</text>
+    <text x="${nx+12}" y="${ny+39}" class="node-label">${escHtml((n.category||n.type||'').toUpperCase().slice(0,22))}</text>
+    <text x="${nx+12}" y="${ny+55}" class="node-name">${escHtml((n.label||'').slice(0,20))}</text>
+${n.sublabel ? `    <text x="${nx+12}" y="${ny+68}" class="node-sub">${escHtml((n.sublabel||'').slice(0,24))}</text>\n` : ''}  </g>
 `;
   });
 
