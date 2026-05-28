@@ -598,8 +598,8 @@ g.arrow-selected .arrow-endpoint-handle { opacity: 1; pointer-events: all; }
 .group-node {
   position: absolute;
   border-radius: 12px;
-  border: 2px dashed rgba(255,255,255,0.15);
-  background: rgba(255,255,255,0.02);
+  border: 2px dashed var(--group-border, rgba(255,255,255,0.15));
+  background: var(--group-bg, rgba(255,255,255,0.02));
   z-index: 1;
   user-select: none;
   min-width: 200px;
@@ -611,6 +611,11 @@ g.arrow-selected .arrow-endpoint-handle { opacity: 1; pointer-events: all; }
 }
 .group-node:hover { border-color: rgba(123,47,190,0.4); }
 .group-node.selected { border-color: var(--purple); background: rgba(123,47,190,0.05); }
+/* Light theme: white-on-white is invisible, so use a darker dashed border. */
+[data-theme="light"] .group-node {
+  --group-border: rgba(20,25,55,0.28);
+  --group-bg: rgba(20,25,55,0.015);
+}
 .group-label {
   position: absolute;
   top: 8px; left: 12px;
@@ -7101,6 +7106,14 @@ function buildSavedHTML(name, dataStr, svgMarkup) {
   .potato-view svg text.arrow-label { fill: var(--arrow-label); }
   .potato-arrow[data-arrow-color="default"] { stroke: var(--arrow-default); }
   [data-theme="light"] .potato-arrow[data-arrow-color="default"] { marker-end: url(#ah-light); }
+  /* The group rect's fill is hardcoded to white-tinted in the SVG markup
+     (so it renders correctly in standalone dark-bg viewers), but on a
+     light canvas the rect's white fill + 0.7 opacity makes the dashed
+     stroke fade out. Boost both in light mode. */
+  [data-theme="light"] .potato-view svg rect.potato-group-rect {
+    fill: rgba(20,25,55,0.02);
+    opacity: 1;
+  }
 
   .potato-node { transition: filter 0.2s; }
   .potato-node:hover { filter: drop-shadow(0 0 12px var(--node-hover-glow)); }
