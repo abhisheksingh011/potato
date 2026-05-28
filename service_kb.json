@@ -10,6 +10,7 @@
   "lambda": {
     "name": "AWS Lambda",
     "matches": ["AWS Lambda", "Lambda", "Amazon Lambda"],
+    "sla": "Single AZ: N/A | Single Region (Multi-AZ): 99.95% | Multi-Region: 99.999975% (calculated)",
     "limits": "Max execution: 15 min timeout | Memory: 128 MB–10 GB | Payload: 6 MB sync / 256 KB async | Cold start: 100ms–1s | Concurrency: 1,000 default (soft limit) | Deployment pkg: 50 MB zipped / 250 MB unzipped | /tmp storage: 512 MB–10 GB",
     "whenToUse": "Best for short-lived, event-driven tasks. Scales to zero — no idle cost. Ideal for API handlers, S3 triggers, scheduled jobs under 15 min.",
     "cost": "$0.20 per 1M requests + $0.0000166 per GB-second. Free tier: 1M requests + 400k GB-s/mo forever. ARM (Graviton) is ~20% cheaper than x86. (as of Q2 2026)",
@@ -24,6 +25,7 @@
   "ec2": {
     "name": "Amazon EC2",
     "matches": ["Amazon EC2", "AWS EC2", "EC2"],
+    "sla": "Single AZ (single instance): 99.5% | Single Region (Multi-AZ): 99.99% | Multi-Region: 99.9999% (calculated)",
     "limits": "No execution timeout (runs indefinitely) | Requires manual scaling or ASG | EBS I/O depends on instance type | Instance startup: 30–90s | No built-in HA without ALB + ASG",
     "whenToUse": "Best for long-running workloads, stateful apps, or when you need full OS control. Use when Lambda timeout or memory limits are a constraint.",
     "cost": "On-demand t3.medium ~$30/mo. Reserved 1yr saves ~40%, 3yr saves ~62%. Spot saves 70-90% but can be interrupted. Data egress: $0.09/GB to internet. (as of Q2 2026)",
@@ -38,6 +40,7 @@
   "ecs": {
     "name": "Amazon ECS",
     "matches": ["AWS ECS", "Amazon ECS", "Amazon Elastic Container Service", "ECS"],
+    "sla": "Single AZ (single task): 99.0% | Single Region (Multi-AZ): 99.99% | Multi-Region: 99.9999% (calculated)",
     "limits": "Task CPU: 0.25–16 vCPU | Task memory: 512 MB–120 GB | Max containers per task: 10 | Service startup: ~30–60s | No automatic rollback without CodeDeploy",
     "whenToUse": "Best for containerised microservices needing persistent processes. Easier ops than raw EC2, more flexible than Lambda for long-running workloads.",
     "cost": "EC2 launch type: pay for EC2 instances + EBS (no ECS premium). Fargate launch type: $0.04048/vCPU-hour + $0.004445/GB-hour. ARM Fargate ~20% cheaper. (as of Q2 2026)",
@@ -52,6 +55,7 @@
   "eks": {
     "name": "Amazon EKS",
     "matches": ["AWS EKS", "Amazon EKS", "Amazon Elastic Kubernetes Service", "EKS"],
+    "sla": "Single AZ: N/A | Standard Control Plane: 99.95% | Provisioned Control Plane: 99.99% | Multi-Region: 99.999975% (calculated)",
     "limits": "Max pods per node: 110 (t3.medium) to 750 (large) | Max nodes per cluster: 5,000 | Control plane SLA: 99.95% | Add-on updates require manual intervention | Higher ops overhead than ECS",
     "whenToUse": "Best when you need full Kubernetes compatibility, multi-cloud portability, or advanced scheduling. Higher complexity than ECS — justify with scale or K8s-specific tooling.",
     "cost": "Control plane: $0.10/hour per cluster (~$73/mo). Plus EC2/Fargate for nodes. EKS Auto Mode adds $0.0029/vCPU-hr for AWS-managed nodes. (as of Q2 2026)",
@@ -66,6 +70,7 @@
   "fargate": {
     "name": "AWS Fargate",
     "matches": ["AWS Fargate", "Fargate"],
+    "sla": "Single AZ (single task): 99.0% | Single Region (Multi-AZ): 99.99% | Multi-Region: 99.9999% (calculated)",
     "limits": "Max CPU: 16 vCPU | Max memory: 120 GB | No persistent local storage (use EFS) | Cold start: 30–60s | Cannot access EC2 instance metadata",
     "whenToUse": "Serverless containers — no EC2 management. Pay per task second. Best for unpredictable or bursty container workloads.",
     "cost": "$0.04048/vCPU-hour + $0.004445/GB-hour (x86). ARM ~20% cheaper. Spot ~70% off. Billed per second, 1-min minimum. (as of Q2 2026)",
@@ -93,6 +98,7 @@
   "s3": {
     "name": "Amazon S3",
     "matches": ["AWS S3", "Amazon S3", "Amazon Simple Storage Service", "S3"],
+    "sla": "Single AZ: N/A (S3 is regional) | Single Region: 99.9% | Multi-Region: 99.9999% (calculated)",
     "limits": "Max object size: 5 TB | Single PUT: 5 GB (use multipart above 100 MB) | Max bucket count: 100 per account (soft) | No native query — use Athena/S3 Select | S3 Select: 128 MB max | Lifecycle rules: 1,000 per bucket | Eventual consistency: READ-after-DELETE may return old data",
     "whenToUse": "Industry-standard object store. 11 nines durability. Best for files, backups, static assets, data lake landing zone. Not suitable for transactional or low-latency random access.",
     "cost": "Standard: $0.023/GB/mo for first 50 TB. PUT: $0.005/1k requests. GET: $0.0004/1k. Data egress: $0.09/GB to internet. Intelligent-Tiering auto-saves 70%+ on cold data. (as of Q2 2026)",
@@ -107,6 +113,7 @@
   "ebs": {
     "name": "Amazon EBS",
     "matches": ["AWS EBS", "Amazon EBS", "Amazon Elastic Block Store", "EBS"],
+    "sla": "Single AZ: 99.999% (durability, not uptime SLA) | Multi-AZ: N/A (AZ-bound) | Multi-Region: no official SLA",
     "limits": "Max volume size: 64 TB (io2) | Max IOPS: 256,000 (io2 Block Express) | Single-AZ only — not HA across AZs | Attach to one EC2 at a time (except io1/io2 Multi-Attach, max 16) | Snapshots are eventually consistent",
     "whenToUse": "Block storage for EC2. Best for databases, OS volumes, high-IOPS workloads needing persistence. Tied to one AZ — design failover accordingly.",
     "cost": "gp3: $0.08/GB/mo (3,000 IOPS + 125 MB/s included). io2 Block Express: $0.125/GB + $0.065/IOPS. Snapshots: $0.05/GB/mo. (as of Q2 2026)",
@@ -120,6 +127,7 @@
   "efs": {
     "name": "Amazon EFS",
     "matches": ["AWS EFS", "Amazon EFS", "Amazon Elastic File System", "EFS"],
+    "sla": "Single AZ: no formal SLA | Single Region (Multi-AZ): 99.9% | Multi-Region: 99.9999% (calculated)",
     "limits": "Throughput: Bursting (baseline 1 MB/s per GB) or Provisioned | Latency: ~1–3ms (higher than EBS) | Max file size: 52 TB | Max files per filesystem: unlimited | Costs ~3x EBS for same storage",
     "whenToUse": "Shared NFS file system — multiple EC2/ECS/Lambda can mount simultaneously. Best for shared config, media processing pipelines, CMS workloads.",
     "cost": "Standard storage: $0.30/GB/mo. Infrequent Access: $0.025/GB + $0.01/GB per read. One Zone tier: 47% cheaper but single-AZ. (as of Q2 2026)",
@@ -132,6 +140,7 @@
   "glacier": {
     "name": "Amazon S3 Glacier",
     "matches": ["AWS Glacier", "Amazon Glacier", "S3 Glacier", "Glacier"],
+    "sla": "Single AZ: N/A (S3 is regional) | Single Region: 99.9% | Multi-Region: 99.9999% (calculated)",
     "limits": "Retrieval time: Expedited 1–5 min ($$$), Standard 3–5 hrs, Bulk 5–12 hrs | Min storage duration: 90 days (Glacier), 180 days (Deep Archive) | Max archive size: 40 TB | Not suitable for real-time access",
     "whenToUse": "Lowest-cost AWS storage. Best for compliance archiving, long-term backups, regulatory data retention. Plan retrieval times into your recovery objectives.",
     "cost": "Glacier Flexible: $0.0036/GB/mo. Glacier Deep Archive: $0.00099/GB/mo (cheapest cloud storage). Retrieval fees: $0.01-$0.10/GB depending on speed. (as of Q2 2026)",
@@ -145,6 +154,7 @@
   "rds": {
     "name": "Amazon RDS",
     "matches": ["AWS RDS", "Amazon RDS", "Amazon Relational Database Service", "RDS"],
+    "sla": "Single AZ (single instance): 99.5% | Single Region (Multi-AZ): 99.95% | Multi-Region: 99.999975% (calculated)",
     "limits": "Max DB size: 64 TB (Aurora) / 16–32 TB (others) | Max connections: depends on instance RAM (e.g. db.t3.medium ≈ 60 connections) | Read replicas: max 15 (Aurora) / 5 (MySQL/Postgres) | Failover time: 60–120s | No horizontal write scaling — single primary writer",
     "whenToUse": "Best for relational, ACID-compliant workloads. Managed patching, backups, Multi-AZ HA. Use Aurora for better performance and auto-scaling storage.",
     "cost": "On-demand db.t3.medium MySQL: ~$60/mo + storage. Multi-AZ doubles compute cost. Reserved 1yr saves ~40%. Backups: free up to allocated storage size. (as of Q2 2026)",
@@ -159,6 +169,7 @@
   "dynamo": {
     "name": "Amazon DynamoDB",
     "matches": ["AWS DynamoDB", "Amazon DynamoDB", "DynamoDB"],
+    "sla": "Single AZ: N/A (always multi-AZ within region) | Single Region: 99.99% | Multi-Region (Global Tables): 99.999% (AWS-committed)",
     "limits": "Max item size: 400 KB | Max partition key throughput: 3,000 RCU / 1,000 WCU per partition | Query must use partition key — cannot do full table scans efficiently | GSI propagation: eventual consistency | Max GSIs: 20 per table | BatchWriteItem: max 25 items | Transactions: max 100 items / 4 MB",
     "whenToUse": "Best for high-throughput key-value or document access at any scale. Sub-millisecond latency. Avoid for complex queries, joins, or aggregations — use Athena or Aurora instead.",
     "cost": "On-demand: $1.25/M write requests + $0.25/M read requests + $0.25/GB/mo storage. Provisioned: $0.00065/WCU-hr + $0.00013/RCU-hr. Standard-IA tier saves ~60% on rarely-read data. (as of Q2 2026)",
@@ -174,6 +185,7 @@
   "elasticache": {
     "name": "Amazon ElastiCache",
     "matches": ["AWS ElastiCache", "Amazon ElastiCache", "ElastiCache"],
+    "sla": "Single AZ: no formal SLA | Single Region (Multi-AZ or Serverless): 99.99% | Multi-Region: 99.9999% (calculated)",
     "limits": "Redis max memory: node-type dependent (e.g. r6g.large = 13 GB) | Redis Cluster max nodes: 500 | Memcached max nodes: 300 | No persistence in Memcached | Redis AOF persistence adds latency | Max key size: 512 MB | Max value: 512 MB",
     "whenToUse": "In-memory cache for sub-millisecond reads. Best for session storage, leaderboards, rate limiting, DB query caching. Use Redis for persistence/pub-sub, Memcached for pure caching.",
     "cost": "cache.t4g.micro Redis: ~$12/mo. cache.r6g.large: ~$185/mo. Reserved 1yr saves ~40%. Serverless: $0.125/GB-hr storage + $0.0034/ECU. (as of Q2 2026)",
@@ -188,6 +200,7 @@
   "aurora": {
     "name": "Amazon Aurora",
     "matches": ["AWS Aurora", "Amazon Aurora", "Aurora"],
+    "sla": "Single AZ: 99.9% | Single Region (Multi-AZ): 99.99% | Multi-Region (Global Database): 99.99%+ (no separate AWS-committed global SLA)",
     "limits": "Max storage: 128 TB (auto-scales) | Max read replicas: 15 | Failover: ~30s | Aurora Serverless v2 min: 0.5 ACU | Max connections: instance-dependent | Writer endpoint is single — no multi-writer by default (except Aurora Global)",
     "whenToUse": "MySQL/Postgres compatible with up to 5x performance. Auto-scaling storage, 6-way replication, fast failover. Best when RDS limits are hit or high availability is critical.",
     "cost": "db.r6g.large: ~$210/mo. Storage: $0.10/GB/mo. I/O: $0.20/M requests. Aurora Serverless v2: $0.12/ACU-hr (~$87/mo for 1 ACU 24/7). (as of Q2 2026)",
@@ -202,6 +215,7 @@
   "redshift": {
     "name": "Amazon Redshift",
     "matches": ["AWS Redshift", "Amazon Redshift", "Redshift"],
+    "sla": "Single AZ single-node: 99.5% | Single AZ multi-node / Serverless: 99.9% | Multi-AZ cluster: 99.99% | Multi-Region: 99.9999% (calculated)",
     "limits": "Max table size: no hard limit but query perf degrades past billions of rows without tuning | Sort keys required for range queries | Max columns per table: 1,600 | COPY is fastest load method — INSERT row-by-row is very slow | Concurrency: max 50 WLM queries | VACUUM needed after large deletes",
     "whenToUse": "Columnar analytical database for petabyte-scale OLAP queries. Best for BI dashboards, data warehousing. Not for OLTP — use RDS/Aurora for transactional workloads.",
     "cost": "ra3.xlplus: ~$1.09/hr (~$795/mo). Storage (RMS): $0.024/GB/mo. Reserved 1yr saves ~25%, 3yr saves ~75%. Serverless: $0.36/RPU-hour, 60s minimum. (as of Q2 2026)",
@@ -216,6 +230,7 @@
   "vpc": {
     "name": "Amazon VPC",
     "matches": ["AWS VPC", "Amazon VPC", "Amazon Virtual Private Cloud", "VPC"],
+    "sla": "Single AZ: no SLA | Single Region: 99.9% | Multi-Region: 99.9999% (calculated)",
     "limits": "Max VPCs per region: 5 (soft) | Max subnets per VPC: 200 | Max security groups per ENI: 5 | Max rules per SG: 60 inbound + 60 outbound | VPC peering: non-transitive — A↔B, B↔C does not mean A↔C | Max route table entries: 1,000",
     "whenToUse": "Isolated network boundary for your AWS resources. Use private subnets for databases/Lambda, public subnets for ALB/NAT. Design CIDR ranges for future peering needs.",
     "cost": "VPC itself: free. NAT Gateway: ~$32/mo + $0.045/GB processed. VPC Endpoints (Interface): $0.01/hr + $0.01/GB. PrivateLink: $0.01/hr + data. (as of Q2 2026)",
@@ -230,6 +245,7 @@
   "alb": {
     "name": "Application Load Balancer",
     "matches": ["AWS ALB", "Amazon ALB", "ALB", "Application Load Balancer", "Elastic Load Balancing"],
+    "sla": "Single AZ (single LB): 99.5% | Single Region (Multi-AZ): 99.99% | Multi-Region: 99.9999% (calculated)",
     "limits": "Max target groups: 100 | Max rules per listener: 100 | Max targets per group: 1,000 | SSL cert limit: 25 per ALB | WebSocket support: yes | gRPC: yes | Sticky sessions: yes (cookie-based) | Not suitable for TCP/UDP — use NLB",
     "whenToUse": "Layer 7 HTTP/HTTPS load balancer. Routes by path, host, headers. Best for web apps, microservices, API routing. Pair with ECS/EKS/EC2 target groups.",
     "cost": "$0.0225/hr (~$16/mo) + $0.008/LCU-hr. Free SSL via ACM. NLB is similar pricing structure for L4. (as of Q2 2026)",
@@ -243,6 +259,7 @@
   "cloudfront": {
     "name": "Amazon CloudFront",
     "matches": ["AWS CloudFront", "Amazon CloudFront", "CloudFront"],
+    "sla": "Single AZ: N/A (global edge service) | Global: 99.9% | Multi-Region: N/A (already global by design)",
     "limits": "Max distributions: 200 per account | Cache TTL: 0–31,536,000s | Max object size: 20 GB | Custom origin timeout: max 60s | Functions max execution: 2ms (CloudFront Functions) / 30s (Lambda@Edge) | Lambda@Edge cold start adds 100–500ms",
     "whenToUse": "Global CDN with 400+ edge locations. Reduces latency for static/dynamic content. Best for S3 static sites, API caching, WAF integration. Configure cache policies carefully to avoid stale data.",
     "cost": "Data out to internet: $0.085/GB (US/EU), tiered down to $0.02/GB at PB scale. HTTPS requests: $0.0075-$0.0120/10k. Free tier: 1 TB out + 10M requests/mo forever. (as of Q2 2026)",
@@ -257,6 +274,7 @@
   "route53": {
     "name": "Amazon Route 53",
     "matches": ["AWS Route 53", "Amazon Route 53", "Route 53", "Route53"],
+    "sla": "Single AZ: N/A | Global: 100% (AWS-committed) | Multi-Region: N/A (already global)",
     "limits": "Max hosted zones: 500 per account | Max records per zone: 10,000 | Health check interval: min 10s (standard) / 30s (basic) | DNS TTL affects failover speed — low TTL = faster failover but more queries | Max routing policies: Latency, Weighted, Geolocation, Failover, Multi-value",
     "whenToUse": "AWS-native DNS with health checks, routing policies, and domain management. Best for multi-region failover, blue/green deployments, and latency-based routing.",
     "cost": "$0.50/mo per hosted zone (first 25) + $0.40 per 1M queries. Health checks: $0.50/mo per check. Domain registration varies. (as of Q2 2026)",
@@ -269,6 +287,7 @@
   "apigateway": {
     "name": "Amazon API Gateway",
     "matches": ["AWS API Gateway", "Amazon API Gateway", "API Gateway"],
+    "sla": "Single AZ: N/A (regional service) | Single Region: 99.95% | Multi-Region: 99.999975% (calculated)",
     "limits": "Max timeout: 29s (REST) / 29s (HTTP) / no limit (WebSocket) | Max payload: 10 MB (REST) / 10 MB (HTTP) | Throttling: 10,000 RPS default (account-wide soft limit) | Max stages: 10 per API | Caching: 0.5 GB–237 GB, adds latency on misses | Max integrations per API: 300",
     "whenToUse": "Managed API front door for Lambda, HTTP backends, AWS services. Best for REST/WebSocket APIs with auth, throttling, caching built-in. Use HTTP API for lower cost/latency, REST API for full features.",
     "cost": "REST API: $3.50/M calls. HTTP API: $1.00/M calls (much cheaper for simple Lambda proxy). WebSocket: $1.00/M messages + $0.25/M connection-min. Cache: $0.02/hr per GB. (as of Q2 2026)",
@@ -423,6 +442,7 @@
   "sqs": {
     "name": "Amazon SQS",
     "matches": ["AWS SQS", "Amazon SQS", "Amazon Simple Queue Service", "SQS"],
+    "sla": "Single AZ: N/A (regional service) | Single Region: 99.9% | Multi-Region: 99.9999% (calculated)",
     "limits": "Max message size: 256 KB (use S3 Extended Client for larger) | Max retention: 14 days | Visibility timeout: max 12hrs | Standard: at-least-once delivery, out-of-order | FIFO: exactly-once, ordered, max 3,000 msg/s (batching) | Max in-flight messages: 120,000 (Standard) / 20,000 (FIFO) | DLQ redrive: max 1,000 messages/s",
     "whenToUse": "Decouples producers from consumers. Use Standard for high throughput, FIFO for ordered processing. Best for async workloads, retry logic, load levelling. Pair with Lambda or ECS consumers.",
     "cost": "Standard: $0.40 per 1M requests (free tier: 1M/mo forever). FIFO: $0.50 per 1M. Long polling reduces empty receives. Each batch of 10 = 1 request. (as of Q2 2026)",
@@ -437,6 +457,7 @@
   "sns": {
     "name": "Amazon SNS",
     "matches": ["AWS SNS", "Amazon SNS", "Amazon Simple Notification Service", "SNS"],
+    "sla": "Single AZ: N/A (regional service) | Single Region: 99.9% | Multi-Region: 99.9999% (calculated)",
     "limits": "Max message size: 256 KB | Max subscriptions per topic: 12,500,000 | Max topics: 100,000 | FIFO topic: max 300 msg/s | Email delivery: not guaranteed (spam filters) | No message retention — fire and forget | SMS costs vary by country",
     "whenToUse": "Fan-out pub/sub — one message to many subscribers (SQS, Lambda, HTTP, email, SMS). Best for event broadcasting, alerts, decoupled notification systems.",
     "cost": "$0.50 per 1M publishes. Delivery: $0.50/M to SQS, $0.60/M to Lambda, $1.00/M to email, SMS varies by country (often $0.01-$0.075 per message). (as of Q2 2026)",
@@ -450,6 +471,7 @@
   "eventbridge": {
     "name": "Amazon EventBridge",
     "matches": ["AWS EventBridge", "Amazon EventBridge", "EventBridge"],
+    "sla": "Single AZ: N/A | Single Region: 99.99% | Multi-Region: 99.9999% (calculated)",
     "limits": "Max rules per bus: 300 | Max targets per rule: 5 | Event size: max 256 KB | Invocation rate: 18,750/s per region | Event replay: max 24hr retention for replay | Schema registry: max 100 schemas | Cross-account: requires resource policy",
     "whenToUse": "Serverless event bus — routes events from AWS services, SaaS, custom apps. Best for event-driven architectures, replacing cron jobs (Scheduler), and cross-service decoupling.",
     "cost": "$1.00 per 1M custom events. AWS service events are free. Schema discovery: $0.10 per 1M events processed. EventBridge Scheduler: $1.00 per 1M invocations. (as of Q2 2026)",
@@ -475,6 +497,7 @@
   "kinesis": {
     "name": "Amazon Kinesis Data Streams",
     "matches": ["AWS Kinesis", "Amazon Kinesis", "Kinesis", "Amazon Kinesis Data Streams"],
+    "sla": "Single AZ: N/A | Single Region: 99.9% | Multi-Region: 99.9999% (calculated)",
     "limits": "Shard throughput: 1 MB/s write / 2 MB/s read per shard | Max record size: 1 MB | Retention: 24hrs default, max 365 days (extended) | GetRecords: max 10,000 records / 10 MB per call | Shard splitting takes ~30s | Consumer limit: 5 GetRecords calls/s per shard (use Enhanced Fan-Out for more)",
     "whenToUse": "Real-time data streaming. Best for clickstreams, IoT telemetry, log aggregation, real-time analytics. Scale shards based on throughput. Use Enhanced Fan-Out for multiple low-latency consumers.",
     "cost": "Provisioned: $0.015/shard-hour (~$11/shard-mo) + $0.014/M PUT units. On-demand: $0.040 per GB ingested + $0.040 per GB retrieved. Enhanced Fan-Out: $0.015/shard-hour-consumer. (as of Q2 2026)",
@@ -488,6 +511,7 @@
   "cloudwatch": {
     "name": "Amazon CloudWatch",
     "matches": ["AWS CloudWatch", "Amazon CloudWatch", "CloudWatch"],
+    "sla": "Single AZ: N/A | Single Region: 99.9% | Multi-Region: 99.9999% (calculated)",
     "limits": "Metric resolution: 1s (high-res, extra cost) / 60s standard | Log retention: 1 day–10 years (set per log group!) | Dashboard widgets: max 500 | Alarms: max 10 dimensions per metric | Logs Insights: max 20 log groups per query / 15 min query timeout | GetMetricData: max 500 metrics per request",
     "whenToUse": "AWS-native monitoring. Set log retention explicitly — default is never expire (costly). Use metric filters to turn logs into metrics. Alarm on p99 latency, error rate, not just average.",
     "cost": "Metrics: $0.30/metric/mo (first 10k). Logs ingestion: $0.50/GB. Logs storage: $0.03/GB/mo. Insights queries: $0.005/GB scanned. Alarms: $0.10/mo each. Dashboards: $3/mo each. (as of Q2 2026)",
