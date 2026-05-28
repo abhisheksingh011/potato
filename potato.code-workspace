@@ -1,18 +1,13 @@
 {
   "folders": [
     {
-      "name": "🥔 Potato — Main Editor",
+      "name": "🥔 Potato",
       "path": "."
-    },
-    {
-      "name": "🧩 Potato — VS Code Extension",
-      "path": "../potato-vscode"
     }
   ],
   "settings": {
     "github.copilot.chat.codeGeneration.instructions": [
-      { "file": ".github/copilot-instructions.md" },
-      { "file": "COPILOT_CONTEXT.md" }
+      { "file": ".github/copilot-instructions.md" }
     ],
     "editor.tabSize": 2,
     "files.associations": {

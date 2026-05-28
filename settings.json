@@ -2,9 +2,6 @@
   "github.copilot.chat.codeGeneration.instructions": [
     {
       "file": ".github/copilot-instructions.md"
-    },
-    {
-      "file": "COPILOT_CONTEXT.md"
     }
   ],
   "github.copilot.chat.testGeneration.instructions": [

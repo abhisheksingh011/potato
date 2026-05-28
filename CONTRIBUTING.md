@@ -13,7 +13,7 @@ Thanks for your interest! Potato is intentionally simple — one HTML file you c
 ## File layout
 
 ```
-index.html                — the editor (single file, ~5800 lines)
+index.html                — the editor (single file, ~8700 lines including inlined SVG icons)
 service_kb.json           — source of truth for tooltips + Cost Estimator
 _generate_kb.js           — splices service_kb.json into index.html
 _generate_components.js   — splices the icons/ tree into COMPONENTS[] in index.html
@@ -64,7 +64,7 @@ There is no automated test suite (yet). Manually verify the path your change aff
 6. **SVG export** includes the real icons (not the emoji fallback) when the source diagram uses cloud nodes.
 7. **Cost Estimator** opens, switches between Small/Medium/Large, shows a per-service breakdown and a total.
 
-For UI changes, open `index.html` in Chrome, Firefox, and Safari. The VS Code extension also needs testing separately via F5.
+For UI changes, open `index.html` in Chrome, Firefox, and Safari. The VS Code extension needs testing separately: open the repo in VS Code → press `F5` to launch the Extension Development Host → double-click a `*.potato.html` file in the host window.
 
 ## PR checklist
 
