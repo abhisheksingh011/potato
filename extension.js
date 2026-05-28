@@ -49,6 +49,8 @@ async function getPotatoHTML(context, existingData = null) {
   // and delegates the fully-rendered HTML to the host instead of triggering
   // a browser download. Host writes it atomically and posts {type:'saved'};
   // the editor's _potatoAfterSave then runs (markClean + recents + notify).
+  // __POTATO_VSCODE_SAVE_AS__ is the same but always pops a save dialog,
+  // for explicit Save As (Ctrl+Shift+S / toolbar button).
   const bridge = `
 <script>
 (function() {
@@ -58,6 +60,13 @@ async function getPotatoHTML(context, existingData = null) {
   window.__POTATO_VSCODE_SAVE__ = function(payload) {
     vscode.postMessage({
       type: 'save',
+      html: payload && payload.html,
+      name: payload && payload.name
+    });
+  };
+  window.__POTATO_VSCODE_SAVE_AS__ = function(payload) {
+    vscode.postMessage({
+      type: 'saveAs',
       html: payload && payload.html,
       name: payload && payload.name
     });
@@ -105,6 +114,34 @@ async function atomicWriteFile(filePath, contents) {
   }
 }
 
+// Match the editor's normalizeDiagramName(): strip extensions, sanitize,
+// then append `.potato.html` so every Save-As suggestion lands on the
+// same canonical form regardless of what the user typed.
+function normalizeDiagramFilename(name) {
+  const safe = String(name == null ? 'diagram' : name)
+    .replace(/\.(potato\.)?(html|png|svg)$/i, '')
+    .replace(/\.potato$/i, '')
+    .replace(/[^a-zA-Z0-9_-]/g, '_')
+    .replace(/_+/g, '_')
+    .replace(/^_+|_+$/g, '')
+    || 'diagram';
+  return safe + '.potato.html';
+}
+
+// Prompt for a destination and write HTML atomically. Returns the URI of
+// the written file, or null if the user cancelled.
+async function promptAndWrite(html, suggestedName, defaultDir) {
+  const filename = normalizeDiagramFilename(suggestedName);
+  const defaultUri = vscode.Uri.file(path.join(defaultDir || '', filename));
+  const uri = await vscode.window.showSaveDialog({
+    defaultUri,
+    filters: { 'Potato Diagram': ['html'] }
+  });
+  if (!uri) return null;
+  await atomicWriteFile(uri.fsPath, html);
+  return uri;
+}
+
 // ── Custom editor provider for *.potato.html ─────────────────────────────────
 
 class PotatoEditorProvider {
@@ -133,6 +170,19 @@ class PotatoEditorProvider {
           vscode.window.setStatusBarMessage(`🥔 Saved: ${path.basename(document.uri.fsPath)}`, 3000);
         } catch (e) {
           vscode.window.showErrorMessage(`🥔 Save failed: ${e.message}`);
+        }
+        return;
+      }
+      if (msg.type === 'saveAs' && typeof msg.html === 'string') {
+        try {
+          const uri = await promptAndWrite(msg.html, msg.name, path.dirname(document.uri.fsPath));
+          if (!uri) return; // user cancelled — leave dirty
+          vscode.window.showInformationMessage(`🥔 Saved: ${path.basename(uri.fsPath)}`);
+          // Close this editor and open the new file in our custom editor.
+          await vscode.commands.executeCommand('workbench.action.closeActiveEditor');
+          await vscode.commands.executeCommand('vscode.openWith', uri, PotatoEditorProvider.viewType);
+        } catch (e) {
+          vscode.window.showErrorMessage(`🥔 Save As failed: ${e.message}`);
         }
       }
     });
@@ -179,17 +229,14 @@ function openNewDiagramPanel(context) {
       vscode.window.setStatusBarMessage('🥔 Potato ready', 3000);
       return;
     }
-    if (msg.type === 'save' && typeof msg.html === 'string') {
-      const name = msg.name || 'diagram';
+    // For an untitled diagram, Save and Save As are the same — both have
+    // to prompt because there's no anchored path yet.
+    if ((msg.type === 'save' || msg.type === 'saveAs') && typeof msg.html === 'string') {
       const workspaceRoot = (vscode.workspace.workspaceFolders && vscode.workspace.workspaceFolders[0])
         ? vscode.workspace.workspaceFolders[0].uri.fsPath : '';
-      const uri = await vscode.window.showSaveDialog({
-        defaultUri: vscode.Uri.file(path.join(workspaceRoot, name + '.potato.html')),
-        filters: { 'Potato Diagram': ['html'] }
-      });
-      if (!uri) return; // user cancelled — leave the diagram dirty
       try {
-        await atomicWriteFile(uri.fsPath, msg.html);
+        const uri = await promptAndWrite(msg.html, msg.name || 'diagram', workspaceRoot);
+        if (!uri) return; // user cancelled — leave dirty
         vscode.window.showInformationMessage(`🥔 Saved: ${path.basename(uri.fsPath)}`);
         panel.dispose();
         await vscode.commands.executeCommand('vscode.openWith', uri, PotatoEditorProvider.viewType);
