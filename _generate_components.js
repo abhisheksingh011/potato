@@ -108,24 +108,81 @@ out += '  shapes: ' + shapesBlock + ',\n';
 out += '  aws: ' + jsValue(COMPONENTS.aws, '  ') + ',\n';
 out += '  azure: ' + jsValue(COMPONENTS.azure, '  ') + ',\n';
 out += '  gcp: ' + jsValue(COMPONENTS.gcp, '  ') + ',\n';
-out += '};';
+out += '};\n';
+
+// Also inline raw SVG text for every icon, keyed by iconUrl.
+// Why: under file:// Chrome the editor can't read these from disk at save
+// time (canvas-taint + XHR-to-file blocked), so save would silently produce
+// icon-less files. With the SVG text inlined here, the save path can grab
+// only the icons the diagram actually uses, base64-encode them, and embed
+// them straight into the saved .potato.html — same selective-by-diagram
+// behaviour, but it actually works under file://. Adds ~2.7 MB to index.html.
+function escSvgForJsString(s) {
+  // The SVG text becomes a single-quoted JS string. We need to escape
+  // backslashes, single quotes, and any </script sequence (so the inline
+  // <script> block can't be terminated by an icon's content). Newlines are
+  // turned into spaces — the SVG is whitespace-tolerant and this halves size.
+  return String(s)
+    .replace(/\\/g, '\\\\')
+    .replace(/'/g, "\\'")
+    .replace(/<\/(script)/gi, '<\\/$1')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+const allIcons = [];
+function gatherSvgs(provider) {
+  const provDir = path.join(ROOT, provider);
+  if (!fs.existsSync(provDir)) return;
+  for (const cat of fs.readdirSync(provDir).sort()) {
+    const sub = path.join(provDir, cat);
+    if (!fs.statSync(sub).isDirectory()) continue;
+    for (const f of fs.readdirSync(sub).sort()) {
+      if (!f.endsWith('.svg')) continue;
+      const url = `icons/${provider}/${cat}/${f}`;
+      const text = fs.readFileSync(path.join(sub, f), 'utf8');
+      allIcons.push([url, text]);
+    }
+  }
+}
+['aws','azure','gcp'].forEach(gatherSvgs);
+out += 'const ICON_SVG_TEXT = {\n';
+out += allIcons.map(([url, text]) => `  ${JSON.stringify(url)}: '${escSvgForJsString(text)}'`).join(',\n');
+out += '\n};';
 
 const startToken = '// ===== COMPONENT LIBRARY =====';
 const startIdx = html.indexOf(startToken);
 if (startIdx < 0) { console.error('No COMPONENT LIBRARY marker.'); process.exit(1); }
 const startConst = html.indexOf('const COMPONENTS = {', startIdx);
 if (startConst < 0) { console.error('No COMPONENTS declaration.'); process.exit(1); }
-let depth = 0, i = startConst, end = -1;
-while (i < html.length) {
-  const ch = html[i];
-  if (ch === '{') depth++;
-  else if (ch === '}') {
-    depth--;
-    if (depth === 0) { while (i < html.length && html[i] !== ';') i++; end = i + 1; break; }
+
+// Find the end of COMPONENTS (matching closing }; ).
+function findBlockEnd(src, startAt) {
+  let depth = 0, i = startAt;
+  while (i < src.length) {
+    const ch = src[i];
+    if (ch === '{') depth++;
+    else if (ch === '}') {
+      depth--;
+      if (depth === 0) {
+        while (i < src.length && src[i] !== ';') i++;
+        return i + 1;
+      }
+    }
+    i++;
   }
-  i++;
+  return -1;
 }
+let end = findBlockEnd(html, startConst);
 if (end < 0) { console.error('No end of COMPONENTS.'); process.exit(1); }
+
+// If a previous run already inlined ICON_SVG_TEXT right after COMPONENTS,
+// extend the replacement range so we don't leave a stale duplicate behind.
+const trailing = html.slice(end).match(/^\s*const\s+ICON_SVG_TEXT\s*=\s*\{/);
+if (trailing) {
+  const iconStart = end + trailing[0].length - 1; // position of the opening `{`
+  const iconEnd = findBlockEnd(html, iconStart);
+  if (iconEnd > 0) end = iconEnd;
+}
 
 fs.writeFileSync(HTML, html.slice(0, startConst) + out + html.slice(end), 'utf8');
 
