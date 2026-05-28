@@ -558,6 +558,22 @@ body {
 .arrow-path:hover { opacity: 1; stroke-width: 2.5; }
 .arrow-path.selected { stroke-width: 2.5; opacity: 1; }
 
+/* Draggable endpoint handles — visible only when the arrow is selected.
+   Lets the user reroute an arrow by grabbing its head/tail and dropping on
+   a different port, without losing the arrow's label/color/style. */
+.arrow-endpoint-handle {
+  fill: var(--teal, #1abc9c);
+  stroke: #fff;
+  stroke-width: 1.5;
+  opacity: 0;
+  pointer-events: none;
+  cursor: grab;
+  transition: opacity 0.15s, r 0.15s;
+}
+g.arrow-selected .arrow-endpoint-handle { opacity: 1; pointer-events: all; }
+.arrow-endpoint-handle:hover { fill: var(--purple, #7B2FBE); }
+.arrow-endpoint-handle:active { cursor: grabbing; }
+
 .arrow-label {
   font-family: var(--font-mono);
   font-size: 10px;
@@ -4936,6 +4952,7 @@ function clearSelection() {
   selectedArrow = null;
   // deselect arrows
   arrowsSvg.querySelectorAll('.arrow-path').forEach(a => a.classList.remove('selected'));
+  arrowsSvg.querySelectorAll('g.arrow-selected').forEach(g => g.classList.remove('arrow-selected'));
   updatePropsPanel();
 }
 
@@ -5002,6 +5019,71 @@ function startConnecting(fromId, fromPort, e) {
     isConnecting = false;
     connectFromId = null;
     connectFromPort = null;
+    window.removeEventListener('pointermove', onMove);
+    window.removeEventListener('pointerup', onUp);
+    window.removeEventListener('pointercancel', onUp);
+  };
+
+  window.addEventListener('pointermove', onMove);
+  window.addEventListener('pointerup', onUp);
+  window.addEventListener('pointercancel', onUp);
+}
+
+// Reroute an existing arrow by dragging its head ('to') or tail ('from')
+// onto a different port. Preserves label / color / style / animated — only
+// the endpoint changes. Mirrors startConnecting's preview/drop UX.
+function startArrowEndpointDrag(arrowId, end, e) {
+  const arrow = arrows.find(a => a.id === arrowId);
+  if (!arrow) return;
+  const fixedSide = end === 'from' ? 'to' : 'from';
+  const fixedNodeId = arrow[fixedSide];
+  const fixedPort   = arrow[fixedSide + 'Port'] || (fixedSide === 'to' ? 'left' : 'right');
+  const fixedPt = getPortCenter(fixedNodeId, fixedPort);
+
+  const preview = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+  preview.setAttribute('stroke', 'rgba(123,47,190,0.7)');
+  preview.setAttribute('stroke-width', '1.5');
+  preview.setAttribute('stroke-dasharray', '6,4');
+  preview.setAttribute('marker-end', 'url(#ah-purple)');
+  preview.setAttribute('x1', fixedPt.x);
+  preview.setAttribute('y1', fixedPt.y);
+  preview.setAttribute('x2', fixedPt.x);
+  preview.setAttribute('y2', fixedPt.y);
+  arrowsSvg.appendChild(preview);
+
+  // Dim the original while dragging so the user sees the preview clearly.
+  const g = document.getElementById('arrow-' + arrowId);
+  if (g) g.style.opacity = '0.25';
+
+  document.getElementById('canvas-area').classList.add('connecting');
+
+  const onMove = (e2) => {
+    const rect = canvasArea.getBoundingClientRect();
+    const mx = (e2.clientX - rect.left - panX) / zoom;
+    const my = (e2.clientY - rect.top - panY) / zoom;
+    preview.setAttribute('x2', mx);
+    preview.setAttribute('y2', my);
+  };
+
+  const onUp = (e2) => {
+    if (preview.parentNode) preview.parentNode.removeChild(preview);
+    if (g) g.style.opacity = '';
+    document.getElementById('canvas-area').classList.remove('connecting');
+
+    let target = e2.target && e2.target.closest ? e2.target.closest('.port') : null;
+    if ((!target || !target.dataset.node) && typeof e2.clientX === 'number') {
+      const under = document.elementFromPoint(e2.clientX, e2.clientY);
+      if (under) target = under.closest('.port');
+    }
+    if (target && target.dataset.node && target.dataset.node !== fixedNodeId) {
+      pushHistory();
+      arrow[end]            = target.dataset.node;
+      arrow[end + 'Port']   = target.dataset.port;
+      drawArrow(arrow);
+      markDirty();
+      updateStatusBar();
+    }
+
     window.removeEventListener('pointermove', onMove);
     window.removeEventListener('pointerup', onUp);
     window.removeEventListener('pointercancel', onUp);
@@ -5086,6 +5168,20 @@ function drawArrow(arrow) {
     path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
     g.appendChild(path);
 
+    // Endpoint handles for reroute (only visible when the arrow is selected).
+    // Appended after the path so they paint on top and are clickable.
+    ['from', 'to'].forEach(end => {
+      const h = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+      h.setAttribute('class', 'arrow-endpoint-handle');
+      h.setAttribute('data-end', end);
+      h.setAttribute('r', '6');
+      h.addEventListener('pointerdown', (e) => {
+        e.stopPropagation(); e.preventDefault();
+        startArrowEndpointDrag(arrow.id, end, e);
+      });
+      g.appendChild(h);
+    });
+
     arrowsSvg.appendChild(g);
   } else {
     hit  = g.querySelector('.arrow-hit-area');
@@ -5095,6 +5191,13 @@ function drawArrow(arrow) {
   hit.setAttribute('d', dStr);
   path.setAttribute('class', `arrow-path arrow-${arrow.style || 'solid'}${arrow.animated ? ' animated' : ''}${selectedArrow === arrow.id ? ' selected' : ''}`);
   path.setAttribute('d', dStr);
+  // Position the endpoint handles at the actual port centers and toggle the
+  // group's selected class so CSS reveals them.
+  const fromH = g.querySelector('.arrow-endpoint-handle[data-end="from"]');
+  const toH   = g.querySelector('.arrow-endpoint-handle[data-end="to"]');
+  if (fromH) { fromH.setAttribute('cx', from.x); fromH.setAttribute('cy', from.y); }
+  if (toH)   { toH.setAttribute('cx', to.x);     toH.setAttribute('cy', to.y); }
+  g.classList.toggle('arrow-selected', selectedArrow === arrow.id);
   // Use inline style.stroke (not setAttribute) so CSS vars in colorConf.stroke
   // — used by the theme-aware default arrow colour — actually resolve.
   path.style.stroke = colorConf.stroke;
@@ -5310,6 +5413,10 @@ function selectArrow(id) {
   selectedArrow = id;
   arrowsSvg.querySelectorAll('.arrow-path').forEach(p => {
     p.classList.toggle('selected', p.closest('g') && p.closest('g').id === 'arrow-' + id);
+  });
+  // Reveal endpoint handles only on the selected arrow's group.
+  arrowsSvg.querySelectorAll('g[id^="arrow-"]').forEach(g => {
+    g.classList.toggle('arrow-selected', g.id === 'arrow-' + id);
   });
   updatePropsPanel();
 }
@@ -5911,6 +6018,7 @@ function renderArrowProps(arrow) {
   content.innerHTML = `
     <div class="prop-group">
       <div class="prop-group-title">Connection</div>
+      <div style="font-size:10px;color:var(--text-dim);margin-bottom:8px;font-family:var(--font-mono);">💡 Drag the teal dots at either end to reroute this arrow.</div>
       <div class="prop-row">
         <span class="prop-label">Label</span>
         <input class="prop-input" value="${escHtml(arrow.label||'')}" oninput="updateArrowProp('${arrow.id}','label',this.value)" placeholder="connection label">
