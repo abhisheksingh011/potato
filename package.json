@@ -10,7 +10,7 @@
   "keywords": ["diagram", "architecture", "aws", "flowchart", "potato"],
   "repository": { "type": "git", "url": "https://github.com/abhisheksingh011/potato" },
   "activationEvents": [],
-  "main": "./src/extension.js",
+  "main": "./extension.js",
   "contributes": {
     "commands": [
       {

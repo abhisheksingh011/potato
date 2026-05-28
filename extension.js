@@ -157,6 +157,19 @@ class PotatoEditorProvider {
     try { existingData = extractDiagramData(document.getText()); } catch (_) { /* malformed file */ }
     webviewPanel.webview.html = await getPotatoHTML(this.context, existingData);
 
+    // Set true while we're applying our own save edit so the change listener
+    // doesn't bounce the same content back into the webview (which would
+    // re-fit the camera and feel like a glitch after every save).
+    let suppressNextChange = false;
+
+    const changeSub = vscode.workspace.onDidChangeTextDocument(e => {
+      if (e.document.uri.toString() !== document.uri.toString()) return;
+      if (suppressNextChange) { suppressNextChange = false; return; }
+      let data = null;
+      try { data = extractDiagramData(e.document.getText()); } catch (_) {}
+      if (data) webviewPanel.webview.postMessage({ type: 'load', data });
+    });
+
     const sub = webviewPanel.webview.onDidReceiveMessage(async msg => {
       if (!msg) return;
       if (msg.type === 'ready') {
@@ -165,10 +178,23 @@ class PotatoEditorProvider {
       }
       if (msg.type === 'save' && typeof msg.html === 'string') {
         try {
-          await atomicWriteFile(document.uri.fsPath, msg.html);
+          // Replace the document through VS Code's edit pipeline so the text
+          // model stays in sync with disk (split editors / Revert / git
+          // diffs all rely on this). document.save() then writes atomically.
+          const edit = new vscode.WorkspaceEdit();
+          const fullRange = new vscode.Range(
+            document.positionAt(0),
+            document.positionAt(document.getText().length)
+          );
+          edit.replace(document.uri, fullRange, msg.html);
+          suppressNextChange = true;
+          const applied = await vscode.workspace.applyEdit(edit);
+          if (!applied) { suppressNextChange = false; throw new Error('applyEdit returned false'); }
+          await document.save();
           webviewPanel.webview.postMessage({ type: 'saved', name: msg.name });
           vscode.window.setStatusBarMessage(`🥔 Saved: ${path.basename(document.uri.fsPath)}`, 3000);
         } catch (e) {
+          suppressNextChange = false;
           vscode.window.showErrorMessage(`🥔 Save failed: ${e.message}`);
         }
         return;
@@ -187,7 +213,7 @@ class PotatoEditorProvider {
       }
     });
 
-    webviewPanel.onDidDispose(() => sub.dispose());
+    webviewPanel.onDidDispose(() => { sub.dispose(); changeSub.dispose(); });
   }
 }
 PotatoEditorProvider.viewType = 'potato.diagramEditor';
