@@ -6871,8 +6871,24 @@ function updateStatusBar() {
   if (es) es.classList.toggle('hidden', nodes.length > 0);
 }
 
+// First-save timestamp for the diagram currently in memory. Set on load
+// (carrying through the persisted meta.created), cleared on newDiagram, and
+// lazily initialised on first save. Without this, `created` would silently
+// reset to "now" on every save — the field would be meaningless.
+let _diagramCreatedAt = null;
+
 function getDiagramData() {
-  return { nodes, arrows, groups, playFlow, meta: { version: '1.0', created: new Date().toISOString(), name: document.getElementById('filename-input').value } };
+  const now = new Date().toISOString();
+  if (!_diagramCreatedAt) _diagramCreatedAt = now;
+  return {
+    nodes, arrows, groups, playFlow,
+    meta: {
+      version: '1.0',
+      created: _diagramCreatedAt,
+      updated: now,
+      name: document.getElementById('filename-input').value
+    }
+  };
 }
 
 // Duplicate the current diagram on disk. Bumps the filename with -copy (or
@@ -6884,7 +6900,11 @@ async function duplicateDiagram() {
   // Strip trailing `-copy[-N]` so successive duplicates increment cleanly.
   base = base.replace(/[-_](copy)([-_]\d+)?$/i, '');
   // Find the next free `-copy[-N]` suffix by checking recent saves.
-  const recent = (typeof getRecentFiles === 'function' ? getRecentFiles() : []).map(r => r.name || '');
+  // Recent entries mix full filenames (FS Access path → "x.potato.html")
+  // and bare base names (VS Code bridge). Strip the canonical suffix so
+  // the comparison below sees a single normalised form.
+  const recent = (typeof getRecentFiles === 'function' ? getRecentFiles() : [])
+    .map(r => _baseNameOf(r.name || ''));
   let candidate = base + '-copy';
   let n = 2;
   while (recent.includes(candidate)) {
@@ -6953,7 +6973,8 @@ async function _clearPersistedHandle() {
     const db = await _openHandleDb();
     const tx = db.transaction(_HANDLE_STORE, 'readwrite');
     tx.objectStore(_HANDLE_STORE).delete(_potatoTabId || 'default');
-  } catch (_) {}
+    await new Promise((r, e) => { tx.oncomplete = r; tx.onerror = () => e(tx.error); });
+  } catch (_) { /* private mode / quota — best-effort */ }
 }
 async function _restoreHandleIfAvailable() {
   if (!SUPPORTS_FS_ACCESS) return;
@@ -7613,6 +7634,9 @@ function loadDiagramFile(e) {
 
 function loadDiagramData(data) {
   pushHistory();
+  // Carry the original creation timestamp through so future saves don't
+  // overwrite it. Falls back to null → first save sets it to "now".
+  _diagramCreatedAt = (data && data.meta && data.meta.created) || null;
   nodes = data.nodes || [];
   arrows = data.arrows || [];
   groups = data.groups || [];
@@ -7643,6 +7667,7 @@ function newDiagram() {
   nodes = []; arrows = []; groups = []; playFlow = [];
   selectedIds.clear(); selectedArrow = null;
   historyStack = []; redoStack = [];
+  _diagramCreatedAt = null;
   canvasViewport.querySelectorAll('.node').forEach(el => el.remove());
   canvasViewport.querySelectorAll('.group-node').forEach(el => el.remove());
   arrowsSvg.querySelectorAll('g').forEach(el => el.remove());
@@ -7900,7 +7925,7 @@ document.getElementById('modal-overlay').addEventListener('click', (e) => { if (
 
 // ===== HELPERS =====
 function getNode(id) { return nodes.find(n => n.id === id); }
-function escHtml(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+function escHtml(s) { return String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;'); }
 
 // Build a download filename in the form `<safe-name>.potato.<ext>`.
 // Strips any trailing `.potato` the user already typed so we never double-up
