@@ -13,12 +13,17 @@
 }
 </style>
 <style>
-/* ===== CSS VARIABLES ===== */
+/* ===== CSS VARIABLES =====
+   Dark theme is the default. Light theme overrides come below under
+   [data-theme="light"] — applied by setting data-theme on <html>. The
+   brand accent colours (green/orange/blue/purple/red/teal/pink/yellow/
+   cyan) stay identical in both themes; only neutrals flip. */
 :root {
   --bg: #0d0f1a;
   --bg2: #12152a;
   --bg3: #1a1e35;
   --bg4: #0a0c16;
+  --bg-overlay: rgba(10,12,22,0.95);
   --text: #e8eaf6;
   --text-muted: #7986cb;
   --text-dim: #4a5568;
@@ -34,9 +39,28 @@
   --cyan: #00BCD4;
   --border: rgba(255,255,255,0.07);
   --border-hover: rgba(255,255,255,0.18);
+  --shadow-strong: var(--shadow-strong);
+  --shadow-soft: var(--shadow-soft);
   --sidebar-w: 240px;
   --toolbar-h: 86px;
   --props-w: 280px;
+}
+
+[data-theme="light"] {
+  --bg: #f5f6fa;
+  --bg2: #ffffff;
+  --bg3: #eef0f6;
+  --bg4: #fafbff;
+  --bg-overlay: rgba(255,255,255,0.96);
+  --text: #1a1e35;
+  --text-muted: #5a6280;
+  --text-dim: #9099b0;
+  --border: rgba(20,25,55,0.10);
+  --border-hover: rgba(20,25,55,0.22);
+  --shadow-strong: rgba(20,25,55,0.18);
+  --shadow-soft: rgba(20,25,55,0.08);
+  --grid-dot: rgba(20,25,55,0.06);
+  --arrow-default: rgba(20,25,55,0.45);
 }
 
 * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -54,7 +78,7 @@ body {
 /* ===== TOOLBAR ===== */
 #toolbar {
   min-height: var(--toolbar-h);
-  background: rgba(10,12,22,0.98);
+  background: var(--bg-overlay);
   border-bottom: 1px solid var(--border);
   display: flex;
   flex-direction: column;
@@ -321,7 +345,7 @@ body {
   overflow: hidden;
   background: var(--bg);
   background-image:
-    radial-gradient(circle at 1px 1px, rgba(255,255,255,0.04) 1px, transparent 0);
+    radial-gradient(circle at 1px 1px, var(--grid-dot, rgba(255,255,255,0.04)) 1px, transparent 0);
   background-size: 24px 24px;
   /* Prevent the browser from intercepting touch drags as scroll/zoom gestures. */
   touch-action: none;
@@ -376,7 +400,7 @@ body {
 .node:hover { border-color: rgba(255,255,255,0.22); z-index: 20; }
 .node.selected {
   border-color: var(--purple) !important;
-  box-shadow: 0 0 0 2px rgba(123,47,190,0.4), 0 4px 24px rgba(0,0,0,0.5) !important;
+  box-shadow: 0 0 0 2px rgba(123,47,190,0.4), 0 4px 24px var(--shadow-strong) !important;
   z-index: 30;
 }
 .node.dragging { opacity: 0.85; z-index: 50; transform: scale(1.02); }
@@ -577,7 +601,8 @@ body {
   font-size: 11px;
   font-weight: 700;
   font-family: var(--font-mono);
-  color: rgba(255,255,255,0.35);
+  color: var(--text-muted);
+  opacity: 0.75;
   text-transform: uppercase;
   letter-spacing: 1px;
   cursor: grab;
@@ -585,7 +610,7 @@ body {
   padding: 2px 6px;
   border-radius: 4px;
 }
-.group-label:hover { background: rgba(123,47,190,0.15); color: rgba(255,255,255,0.7); }
+.group-label:hover { background: rgba(123,47,190,0.15); color: var(--text); opacity: 1; }
 .group-label[contenteditable="true"] { outline: none; background: rgba(123,47,190,0.15); border-radius: 3px; padding: 1px 4px; color: var(--text); cursor: text; }
 .group-resize {
   position: absolute;
@@ -625,7 +650,7 @@ body {
   max-width: 560px;
   text-align: center;
   backdrop-filter: blur(12px);
-  box-shadow: 0 12px 40px rgba(0,0,0,0.4);
+  box-shadow: 0 12px 40px var(--shadow-strong);
 }
 #empty-state .es-title { font-size: 19px; font-weight: 800; background: linear-gradient(135deg, #7986cb, #e91e63, #1abc9c); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
 #empty-state .es-subtitle { font-size: 12px; color: var(--text-muted); font-family: var(--font-mono); margin-top: 4px; }
@@ -818,7 +843,7 @@ body {
 /* ===== TOOLTIP ===== */
 #tooltip {
   position: fixed;
-  background: rgba(10,12,22,0.97);
+  background: var(--bg-overlay);
   border: 1px solid var(--border);
   border-radius: 7px;
   padding: 7px 11px;
@@ -831,7 +856,7 @@ body {
   color: rgba(232,234,246,0.9);
   font-family: var(--font-mono);
   backdrop-filter: blur(10px);
-  box-shadow: 0 8px 32px rgba(0,0,0,0.6);
+  box-shadow: 0 8px 32px var(--shadow-strong);
 }
 
 /* ===== CONTEXT MENU ===== */
@@ -845,7 +870,7 @@ body {
   display: none;
   min-width: 160px;
   backdrop-filter: blur(20px);
-  box-shadow: 0 12px 40px rgba(0,0,0,0.7);
+  box-shadow: 0 12px 40px var(--shadow-strong);
 }
 .ctx-item {
   padding: 7px 12px;
@@ -870,7 +895,7 @@ body {
   right: calc(var(--props-w) + 12px);
   width: 160px;
   height: 100px;
-  background: rgba(10,12,22,0.92);
+  background: var(--bg-overlay);
   border: 1px solid var(--border);
   border-radius: 8px;
   overflow: hidden;
@@ -926,7 +951,7 @@ body {
   max-width: 280px;
   backdrop-filter: blur(12px);
   animation: notif-in 0.3s ease, notif-out 0.3s ease 2.5s forwards;
-  box-shadow: 0 8px 24px rgba(0,0,0,0.5);
+  box-shadow: 0 8px 24px var(--shadow-strong);
 }
 .notif.error { border-left-color: var(--red); }
 .notif.warning { border-left-color: var(--orange); }
@@ -937,7 +962,7 @@ body {
 #modal-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(0,0,0,0.7);
+  background: var(--shadow-strong);
   z-index: 8000;
   display: none;
   align-items: center;
@@ -955,7 +980,7 @@ body {
   max-width: 90vw;
   max-height: 80vh;
   overflow-y: auto;
-  box-shadow: 0 24px 80px rgba(0,0,0,0.8);
+  box-shadow: 0 24px 80px var(--shadow-strong);
 }
 #modal h2 { font-size: 18px; font-weight: 800; margin-bottom: 16px; }
 #modal p { font-size: 13px; line-height: 1.7; color: rgba(232,234,246,0.8); }
@@ -968,7 +993,7 @@ body {
   bottom: 36px;
   left: 50%;
   transform: translateX(-50%);
-  background: rgba(10,12,22,0.95);
+  background: var(--bg-overlay);
   border: 1px solid var(--border);
   border-radius: 8px;
   padding: 8px 16px;
@@ -1000,7 +1025,7 @@ body {
   backdrop-filter: blur(10px);
   max-width: 90vw;
   text-align: center;
-  box-shadow: 0 8px 32px rgba(0,0,0,0.5), 0 0 24px rgba(26,188,156,0.3);
+  box-shadow: 0 8px 32px var(--shadow-strong), 0 0 24px rgba(26,188,156,0.3);
   pointer-events: none;
 }
 #play-indicator.show { display: block; }
@@ -1139,6 +1164,7 @@ kbd {
     <div style="flex:1;"></div>
 
     <input type="text" id="filename-input" value="my-diagram" placeholder="diagram name" aria-label="Diagram name">
+    <button class="tb-btn" id="theme-toggle-btn" onclick="toggleTheme()" title="Switch theme (dark / light)" aria-label="Toggle theme">🌙</button>
     <button class="tb-btn" onclick="showHelp()" title="Help & Shortcuts" aria-label="Help and shortcuts">?</button>
   </div>
 
@@ -1214,7 +1240,7 @@ kbd {
       <svg id="arrows-svg" xmlns="http://www.w3.org/2000/svg">
         <defs>
           <marker id="ah-default" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto">
-            <path d="M0,0 L0,6 L8,3 z" fill="rgba(255,255,255,0.45)"/>
+            <path d="M0,0 L0,6 L8,3 z" style="fill: var(--arrow-default, rgba(255,255,255,0.45))"/>
           </marker>
           <marker id="ah-green" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto">
             <path d="M0,0 L0,6 L8,3 z" fill="#4caf50"/>
@@ -1350,8 +1376,8 @@ kbd {
 
 
 <!-- MERMAID / JSON IMPORT MODAL -->
-<div id="mermaid-modal-overlay" style="position:fixed;inset:0;background:rgba(0,0,0,0.75);z-index:8500;display:none;align-items:center;justify-content:center;backdrop-filter:blur(4px)">
-  <div style="background:var(--bg2);border:1px solid var(--border);border-radius:14px;padding:24px;width:660px;max-width:95vw;max-height:85vh;display:flex;flex-direction:column;box-shadow:0 24px 80px rgba(0,0,0,0.8)">
+<div id="mermaid-modal-overlay" style="position:fixed;inset:0;background:var(--shadow-strong);z-index:8500;display:none;align-items:center;justify-content:center;backdrop-filter:blur(4px)">
+  <div style="background:var(--bg2);border:1px solid var(--border);border-radius:14px;padding:24px;width:660px;max-width:95vw;max-height:85vh;display:flex;flex-direction:column;box-shadow:0 24px 80px var(--shadow-strong)">
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
       <div>
         <h2 style="font-size:17px;font-weight:800">🌊 Import — Mermaid / JSON</h2>
@@ -1417,8 +1443,8 @@ flowchart LR
 </div>
 
 <!-- RECENT FILES MODAL -->
-<div id="recent-modal-overlay" role="dialog" aria-modal="true" aria-labelledby="recent-modal-title" style="position:fixed;inset:0;background:rgba(0,0,0,0.75);z-index:8500;display:none;align-items:center;justify-content:center;backdrop-filter:blur(4px)">
-  <div style="background:var(--bg2);border:1px solid var(--border);border-radius:14px;padding:24px;width:600px;max-width:95vw;max-height:80vh;display:flex;flex-direction:column;box-shadow:0 24px 80px rgba(0,0,0,0.8)">
+<div id="recent-modal-overlay" role="dialog" aria-modal="true" aria-labelledby="recent-modal-title" style="position:fixed;inset:0;background:var(--shadow-strong);z-index:8500;display:none;align-items:center;justify-content:center;backdrop-filter:blur(4px)">
+  <div style="background:var(--bg2);border:1px solid var(--border);border-radius:14px;padding:24px;width:600px;max-width:95vw;max-height:80vh;display:flex;flex-direction:column;box-shadow:0 24px 80px var(--shadow-strong)">
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
       <div>
         <h2 id="recent-modal-title" style="font-size:17px;font-weight:800">🕘 Recent diagrams</h2>
@@ -1431,8 +1457,8 @@ flowchart LR
 </div>
 
 <!-- TEMPLATES MODAL -->
-<div id="templates-modal-overlay" style="position:fixed;inset:0;background:rgba(0,0,0,0.75);z-index:8500;display:none;align-items:center;justify-content:center;backdrop-filter:blur(4px)">
-  <div style="background:var(--bg2);border:1px solid var(--border);border-radius:14px;padding:24px;width:760px;max-width:95vw;max-height:85vh;display:flex;flex-direction:column;box-shadow:0 24px 80px rgba(0,0,0,0.8)">
+<div id="templates-modal-overlay" style="position:fixed;inset:0;background:var(--shadow-strong);z-index:8500;display:none;align-items:center;justify-content:center;backdrop-filter:blur(4px)">
+  <div style="background:var(--bg2);border:1px solid var(--border);border-radius:14px;padding:24px;width:760px;max-width:95vw;max-height:85vh;display:flex;flex-direction:column;box-shadow:0 24px 80px var(--shadow-strong)">
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
       <div>
         <h2 style="font-size:17px;font-weight:800">✨ Start from a template</h2>
@@ -1445,8 +1471,8 @@ flowchart LR
 </div>
 
 <!-- COST ESTIMATOR MODAL -->
-<div id="cost-modal-overlay" role="dialog" aria-modal="true" aria-labelledby="cost-modal-title" style="position:fixed;inset:0;background:rgba(0,0,0,0.75);z-index:8500;display:none;align-items:center;justify-content:center;backdrop-filter:blur(4px)">
-  <div style="background:var(--bg2);border:1px solid var(--border);border-radius:14px;padding:24px;width:780px;max-width:96vw;max-height:90vh;display:flex;flex-direction:column;box-shadow:0 24px 80px rgba(0,0,0,0.8)">
+<div id="cost-modal-overlay" role="dialog" aria-modal="true" aria-labelledby="cost-modal-title" style="position:fixed;inset:0;background:var(--shadow-strong);z-index:8500;display:none;align-items:center;justify-content:center;backdrop-filter:blur(4px)">
+  <div style="background:var(--bg2);border:1px solid var(--border);border-radius:14px;padding:24px;width:780px;max-width:96vw;max-height:90vh;display:flex;flex-direction:column;box-shadow:0 24px 80px var(--shadow-strong)">
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
       <div>
         <h2 id="cost-modal-title" style="font-size:17px;font-weight:800">💰 Cost Estimator</h2>
@@ -1483,8 +1509,8 @@ flowchart LR
 </div>
 
 <!-- FLOW SEQUENCE EDITOR MODAL -->
-<div id="flow-editor-overlay" role="dialog" aria-modal="true" aria-labelledby="flow-editor-title" style="position:fixed;inset:0;background:rgba(0,0,0,0.75);z-index:8500;display:none;align-items:center;justify-content:center;backdrop-filter:blur(4px)">
-  <div style="background:var(--bg2);border:1px solid var(--border);border-radius:14px;padding:24px;width:720px;max-width:95vw;max-height:88vh;display:flex;flex-direction:column;box-shadow:0 24px 80px rgba(0,0,0,0.8)">
+<div id="flow-editor-overlay" role="dialog" aria-modal="true" aria-labelledby="flow-editor-title" style="position:fixed;inset:0;background:var(--shadow-strong);z-index:8500;display:none;align-items:center;justify-content:center;backdrop-filter:blur(4px)">
+  <div style="background:var(--bg2);border:1px solid var(--border);border-radius:14px;padding:24px;width:720px;max-width:95vw;max-height:88vh;display:flex;flex-direction:column;box-shadow:0 24px 80px var(--shadow-strong)">
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
       <div>
         <h2 id="flow-editor-title" style="font-size:17px;font-weight:800">📝 Play Sequence Editor</h2>
@@ -1506,8 +1532,8 @@ flowchart LR
 </div>
 
 <!-- AI IMPORT MODAL -->
-<div id="ai-modal-overlay" role="dialog" aria-modal="true" aria-labelledby="ai-modal-title" style="position:fixed;inset:0;background:rgba(0,0,0,0.75);z-index:8500;display:none;align-items:center;justify-content:center;backdrop-filter:blur(4px)">
-  <div style="background:var(--bg2);border:1px solid var(--border);border-radius:14px;padding:24px;width:680px;max-width:95vw;max-height:90vh;display:flex;flex-direction:column;box-shadow:0 24px 80px rgba(0,0,0,0.8);overflow-y:auto">
+<div id="ai-modal-overlay" role="dialog" aria-modal="true" aria-labelledby="ai-modal-title" style="position:fixed;inset:0;background:var(--shadow-strong);z-index:8500;display:none;align-items:center;justify-content:center;backdrop-filter:blur(4px)">
+  <div style="background:var(--bg2);border:1px solid var(--border);border-radius:14px;padding:24px;width:680px;max-width:95vw;max-height:90vh;display:flex;flex-direction:column;box-shadow:0 24px 80px var(--shadow-strong);overflow-y:auto">
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
       <div>
         <h2 id="ai-modal-title" style="font-size:17px;font-weight:800">🤖 AI Import — generate a diagram with any LLM</h2>
@@ -3956,8 +3982,11 @@ const ICON_SVG_TEXT = {
 };
 
 // ===== ARROW COLORS =====
+// 'default' uses a CSS var so it reacts to theme changes (light/dark) without
+// re-rendering existing arrows. Named colours are brand colours that stay
+// the same across themes.
 const ARROW_COLORS = {
-  default: { stroke: 'rgba(255,255,255,0.4)', marker: 'ah-default' },
+  default: { stroke: 'var(--arrow-default, rgba(255,255,255,0.4))', marker: 'ah-default' },
   green:   { stroke: '#4caf50', marker: 'ah-green' },
   blue:    { stroke: '#2E86C1', marker: 'ah-blue' },
   purple:  { stroke: '#9B59B6', marker: 'ah-purple' },
@@ -5066,7 +5095,10 @@ function drawArrow(arrow) {
   hit.setAttribute('d', dStr);
   path.setAttribute('class', `arrow-path arrow-${arrow.style || 'solid'}${arrow.animated ? ' animated' : ''}${selectedArrow === arrow.id ? ' selected' : ''}`);
   path.setAttribute('d', dStr);
-  path.setAttribute('stroke', colorConf.stroke);
+  // Use inline style.stroke (not setAttribute) so CSS vars in colorConf.stroke
+  // — used by the theme-aware default arrow colour — actually resolve.
+  path.style.stroke = colorConf.stroke;
+  path.removeAttribute('stroke');
   path.setAttribute('stroke-opacity', '0.7');
   path.setAttribute('marker-end', `url(#${colorConf.marker})`);
   if (arrow.style === 'dashed')      path.setAttribute('stroke-dasharray', '6,4');
@@ -7695,6 +7727,33 @@ function notify(msg, type = 'info') {
 function togglePanel(panel) {
   if (panel === 'props') propsPanel.classList.toggle('hidden');
 }
+
+// ===== THEME (dark / light) =====
+// Theme is stored in localStorage so it persists across sessions.
+// Applied via [data-theme="light"] on <html>; absence = dark.
+const THEME_KEY = 'potato.theme';
+function applyTheme(theme) {
+  const isLight = theme === 'light';
+  document.documentElement.setAttribute('data-theme', isLight ? 'light' : 'dark');
+  const btn = document.getElementById('theme-toggle-btn');
+  if (btn) {
+    btn.textContent = isLight ? '☀️' : '🌙';
+    btn.setAttribute('title', isLight ? 'Switch to dark theme' : 'Switch to light theme');
+  }
+}
+function toggleTheme() {
+  const current = document.documentElement.getAttribute('data-theme') === 'light' ? 'light' : 'dark';
+  const next = current === 'light' ? 'dark' : 'light';
+  applyTheme(next);
+  try { localStorage.setItem(THEME_KEY, next); } catch (e) {}
+}
+// Read saved choice as early as possible to avoid a flash of the wrong theme.
+(function loadSavedTheme() {
+  try {
+    const saved = localStorage.getItem(THEME_KEY);
+    if (saved === 'light' || saved === 'dark') applyTheme(saved);
+  } catch (e) {}
+})();
 
 // ===== HELP MODAL =====
 function showHelp() {
