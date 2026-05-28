@@ -1166,6 +1166,7 @@ kbd {
     <button class="tb-btn" onclick="showTemplatesModal()" title="Start from a template" aria-label="Templates"><span class="tb-icon" aria-hidden="true">✨</span><span class="tb-label">Templates</span></button>
     <button class="tb-btn" onclick="showPasteModal()" title="Paste LLM output (JSON or HTML)" aria-label="AI Import"><span class="tb-icon" aria-hidden="true">🤖</span><span class="tb-label">AI Import</span></button>
     <button class="tb-btn primary" onclick="saveDiagram()" title="Save diagram (Ctrl+S)" aria-label="Save diagram"><span class="tb-icon" aria-hidden="true">💾</span><span class="tb-label">Save</span></button>
+    <button class="tb-btn" onclick="saveAsDiagram()" title="Save As… — choose a new file location (Ctrl+Shift+S)" aria-label="Save diagram as"><span class="tb-icon" aria-hidden="true">📁</span><span class="tb-label">Save As</span></button>
 
     <div class="toolbar-sep"></div>
 
@@ -5649,14 +5650,20 @@ function setupEventListeners() {
   document.addEventListener('keydown', (e) => {
     const tag = e.target.tagName;
     const isTypingField = tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || e.target.isContentEditable;
-    // Allow Escape always; allow Ctrl+S in any field for save.
+    // Allow Escape always; allow Ctrl+S / Ctrl+Shift+S in any field for save.
     if (isTypingField) {
-      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') { e.preventDefault(); saveDiagram(); }
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') {
+        e.preventDefault();
+        if (e.shiftKey) saveAsDiagram(); else saveDiagram();
+      }
       if (e.key === 'Escape' && tag !== 'TEXTAREA') e.target.blur();
       return;
     }
 
-    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') { e.preventDefault(); saveDiagram(); }
+    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') {
+      e.preventDefault();
+      if (e.shiftKey) saveAsDiagram(); else saveDiagram();
+    }
     if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') { e.preventDefault(); undo(); }
     if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'y') { e.preventDefault(); redo(); }
     if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'c') { e.preventDefault(); copySelected(); }
@@ -6955,12 +6962,86 @@ async function duplicateDiagram() {
   }
   input.value = candidate;
   notify(`Duplicating as ${candidate}…`);
-  await saveDiagram();
+  // Force Save As — never silently overwrite the original. Drop the
+  // current handle first so saveAsDiagram doesn't re-target the same file
+  // even if the user denies the picker.
+  _currentFileHandle = null;
+  await _clearPersistedHandle();
+  await saveAsDiagram();
+}
+
+// Single source of truth for naming. Strips any user-typed extension
+// (.html / .potato / .potato.html), sanitizes unsafe chars, then appends
+// the canonical .potato.html suffix. Same rule everywhere: Save As
+// suggestion, fallback download, VS Code, recents.
+function normalizeDiagramName(name) {
+  const safe = String(name == null ? 'diagram' : name)
+    .replace(/\.(potato\.)?(html|png|svg)$/i, '')   // strip existing extension
+    .replace(/\.potato$/i, '')                      // strip bare .potato suffix
+    .replace(/[^a-zA-Z0-9_-]/g, '_')                // sanitize remaining chars
+    .replace(/_+/g, '_')                            // collapse repeated underscores
+    .replace(/^_+|_+$/g, '')                        // trim leading/trailing
+    || 'diagram';
+  return safe + '.potato.html';
+}
+function _baseNameOf(filename) {
+  return String(filename || '').replace(/\.potato\.html$/i, '');
+}
+
+// On Chromium browsers we keep a handle to the chosen file so Ctrl+S
+// silently overwrites the same path. Firefox/Safari can't do this and
+// fall back to the Downloads-folder Blob path on every save.
+const SUPPORTS_FS_ACCESS = (typeof window !== 'undefined' && typeof window.showSaveFilePicker === 'function');
+let _currentFileHandle = null;
+
+// IndexedDB persistence: FileSystemFileHandle is structured-cloneable, so
+// we can stash it across reloads. After reload we restore the handle but
+// don't request permission until the user actually saves (requires a
+// user gesture). queryPermission tells us if we can skip the prompt.
+const _HANDLE_DB = 'potato-handles';
+const _HANDLE_STORE = 'handles';
+function _openHandleDb() {
+  return new Promise((resolve, reject) => {
+    if (typeof indexedDB === 'undefined') return reject(new Error('no IDB'));
+    const req = indexedDB.open(_HANDLE_DB, 1);
+    req.onupgradeneeded = () => req.result.createObjectStore(_HANDLE_STORE);
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(req.error);
+  });
+}
+async function _persistHandle(handle) {
+  try {
+    const db = await _openHandleDb();
+    const tx = db.transaction(_HANDLE_STORE, 'readwrite');
+    tx.objectStore(_HANDLE_STORE).put(handle, _potatoTabId || 'default');
+    await new Promise((r, e) => { tx.oncomplete = r; tx.onerror = () => e(tx.error); });
+  } catch (_) { /* private mode / quota — best-effort */ }
+}
+async function _clearPersistedHandle() {
+  try {
+    const db = await _openHandleDb();
+    const tx = db.transaction(_HANDLE_STORE, 'readwrite');
+    tx.objectStore(_HANDLE_STORE).delete(_potatoTabId || 'default');
+  } catch (_) {}
+}
+async function _restoreHandleIfAvailable() {
+  if (!SUPPORTS_FS_ACCESS) return;
+  try {
+    const db = await _openHandleDb();
+    const tx = db.transaction(_HANDLE_STORE, 'readonly');
+    const req = tx.objectStore(_HANDLE_STORE).get(_potatoTabId || 'default');
+    const handle = await new Promise((r, e) => { req.onsuccess = () => r(req.result); req.onerror = () => e(req.error); });
+    if (!handle) return;
+    _currentFileHandle = handle;
+    // Sync toolbar input to the file's actual base name.
+    const input = document.getElementById('filename-input');
+    if (input) input.value = _baseNameOf(handle.name);
+  } catch (_) { /* ignore */ }
 }
 
 // Post-save bookkeeping. Runs in standalone mode immediately after the
-// browser download, and in VS Code mode from a {type:'saved'} message
-// posted back by the extension once the file has actually been written.
+// write (FS Access) or download (Blob), and in VS Code mode from a
+// {type:'saved'} message posted back by the extension.
 function _potatoAfterSave(name) {
   markClean();
   try { localStorage.removeItem(autosaveKey()); } catch(e) {}
@@ -6970,38 +7051,129 @@ function _potatoAfterSave(name) {
 }
 window._potatoAfterSave = _potatoAfterSave;
 
-async function saveDiagram() {
-  const name = document.getElementById('filename-input').value || 'diagram';
+// Shared HTML builder for both Save and Save As paths.
+async function _buildSavedHtml() {
+  const name = (document.getElementById('filename-input').value || 'diagram').trim();
   const data = getDiagramData();
-  // Escape closing-script tags so user content can't break out of the JSON island.
   const dataStr = JSON.stringify(data, null, 2).replace(/<\/scr(ipt)/gi, '<\\/scr$1');
-
-  // Build the saved HTML (self-contained SVG viewer + re-openable in editor)
   const svgMarkup = await buildDiagramSVG();
-  const savedHtml = buildSavedHTML(name, dataStr, svgMarkup);
+  return { name, html: buildSavedHTML(name, dataStr, svgMarkup) };
+}
 
-  // VS Code host: hand the rendered HTML to the extension. The extension
-  // writes it to disk and posts {type:'saved'} → _potatoAfterSave fires.
-  // Critically, we do NOT also trigger a browser download here — the
-  // webview cannot prompt the user, and a phantom Downloads/<file> copy
-  // would diverge from the workspace file.
+// Write through a FileSystemFileHandle, requesting permission if needed.
+// Returns true on success, false if the user denied / the handle is dead.
+async function _writeToHandle(handle, html) {
+  try {
+    if (typeof handle.queryPermission === 'function') {
+      let perm = await handle.queryPermission({ mode: 'readwrite' });
+      if (perm !== 'granted' && typeof handle.requestPermission === 'function') {
+        perm = await handle.requestPermission({ mode: 'readwrite' });
+      }
+      if (perm !== 'granted') return false;
+    }
+    const writer = await handle.createWritable();
+    await writer.write(html);
+    await writer.close();
+    return true;
+  } catch (e) {
+    console.warn('Write to handle failed:', e);
+    return false;
+  }
+}
+
+// Save: write to the remembered location silently. If no location yet,
+// fall through to Save As. VS Code mode goes straight to the host.
+async function saveDiagram() {
+  const { name, html } = await _buildSavedHtml();
+
+  // VS Code: hand the rendered HTML to the extension. Host writes it and
+  // posts {type:'saved'} → _potatoAfterSave runs then. Critically, we do
+  // NOT also trigger a browser download — that would put a phantom copy
+  // in the user's Downloads folder.
   if (typeof window.__POTATO_VSCODE_SAVE__ === 'function') {
-    window.__POTATO_VSCODE_SAVE__({ html: savedHtml, name });
+    window.__POTATO_VSCODE_SAVE__({ html, name });
     return;
   }
 
-  const blob = new Blob([savedHtml], { type: 'text/html' });
+  // FS Access browser: silent overwrite of the remembered file.
+  if (SUPPORTS_FS_ACCESS && _currentFileHandle) {
+    const ok = await _writeToHandle(_currentFileHandle, html);
+    if (ok) {
+      const filename = _currentFileHandle.name;
+      const input = document.getElementById('filename-input');
+      if (input) input.value = _baseNameOf(filename);
+      _potatoAfterSave(filename);
+      return;
+    }
+    // Permission revoked / file moved → drop handle and ask for a new location.
+    _currentFileHandle = null;
+    await _clearPersistedHandle();
+  }
+
+  // No remembered location yet → Save As.
+  return saveAsDiagram();
+}
+
+// Save As: always prompt for a new location. The picker's suggested name
+// is the normalized .potato.html form, regardless of what the user
+// typed in the toolbar.
+async function saveAsDiagram() {
+  const { name, html } = await _buildSavedHtml();
+  const suggested = normalizeDiagramName(name);
+
+  // VS Code: explicit "save as" → host pops a fresh save dialog.
+  if (typeof window.__POTATO_VSCODE_SAVE_AS__ === 'function') {
+    window.__POTATO_VSCODE_SAVE_AS__({ html, name });
+    return;
+  }
+  // VS Code without the new hook (older extension): falls back to the
+  // regular save, which in the new-diagram panel still prompts.
+  if (typeof window.__POTATO_VSCODE_SAVE__ === 'function') {
+    window.__POTATO_VSCODE_SAVE__({ html, name });
+    return;
+  }
+
+  // Chromium browsers: real native save picker, folder + name.
+  if (SUPPORTS_FS_ACCESS) {
+    let handle;
+    try {
+      handle = await window.showSaveFilePicker({
+        suggestedName: suggested,
+        types: [{
+          description: 'Potato Diagram',
+          accept: { 'text/html': ['.potato.html', '.html'] }
+        }]
+      });
+    } catch (e) {
+      if (e && e.name === 'AbortError') return; // user cancelled — leave dirty
+      notify('Save cancelled: ' + (e.message || e), 'error');
+      return;
+    }
+    const ok = await _writeToHandle(handle, html);
+    if (!ok) {
+      notify('Could not write file (permission denied).', 'error');
+      return;
+    }
+    _currentFileHandle = handle;
+    await _persistHandle(handle);
+    const input = document.getElementById('filename-input');
+    if (input) input.value = _baseNameOf(handle.name);
+    _potatoAfterSave(handle.name);
+    return;
+  }
+
+  // Firefox/Safari: no path picker available — fall back to the Blob
+  // download. The browser drops it in Downloads with the suggested name.
+  const blob = new Blob([html], { type: 'text/html' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
-  a.download = potatoDownloadName(name, 'html');
+  a.download = suggested;
   a.click();
   URL.revokeObjectURL(url);
-
-  // Pass the user-facing name (not the sanitized download filename) so the
-  // recents list and VS Code path agree on a single key per diagram.
-  _potatoAfterSave(name);
+  _potatoAfterSave(suggested);
 }
+window.saveAsDiagram = saveAsDiagram;
 
 // Pre-resolve KB lookups for every node so the saved viewer can show
 // limits / cost / pitfalls / whenToUse without re-implementing the matching
@@ -8867,6 +9039,9 @@ window.addEventListener('load', () => {
   init();
   // Try to restore autosaved diagram (after init, so the canvas is ready).
   tryRestoreAutosave();
+  // Re-attach to the last-saved file if its FileSystemFileHandle is still
+  // around (Chromium only). Permission is checked lazily on first save.
+  _restoreHandleIfAvailable();
   setTimeout(updateMinimap, 300);
 });
 </script>
