@@ -8601,6 +8601,88 @@ const TEMPLATES = {
         { id:'g_1', x:520, y:90, w:460, h:340, label:'Cluster', color:'purple' }
       ]
     }
+  },
+  'multi-region-aa': {
+    name: 'Multi-Region Active-Active (AWS)',
+    desc: 'Two regions live + serving. ECS on Spot, DDB Global Tables, S3 CRR, KMS multi-region keys, ECR replicated.',
+    icon: '🌍',
+    data: {
+      meta:{ version:'1.0', name:'Multi-Region Active-Active (AWS)' },
+      nodes:[
+        { id:'n_1',  x:60,   y:640,  w:160, type:'User',                      label:'Clients',     sublabel:'global',            category:'Frontend',   icon:'👤', theme:'gray',   description:'End users distributed globally.', zIndex:10 },
+        { id:'n_2',  x:280,  y:560,  w:160, type:'Amazon CloudFront',         label:'CloudFront',  sublabel:'global CDN',        category:'Networking', icon:'🌐', iconUrl:'icons/aws/Networking-Content-Delivery/Amazon-CloudFront.svg',          theme:'purple', description:'Global CDN — caches at edge, fronts WAF + Route 53.', zIndex:11 },
+        { id:'n_3',  x:280,  y:720,  w:160, type:'AWS WAF',                   label:'AWS WAF',     sublabel:'web ACL',           category:'Security',   icon:'🛡️', iconUrl:'icons/aws/Security-Identity/AWS-WAF.svg',                              theme:'red',    description:'Blocks OWASP top-10, bot traffic, geo rules.', zIndex:12 },
+        { id:'n_4',  x:500,  y:640,  w:160, type:'Amazon Route 53',           label:'Route 53',    sublabel:'latency policy',    category:'Networking', icon:'🛣️', iconUrl:'icons/aws/Networking-Content-Delivery/Amazon-Route-53.svg',            theme:'purple', description:'Latency-based routing + health checks for regional failover.', zIndex:13 },
+        { id:'n_5',  x:720,  y:320,  w:160, type:'Application Load Balancer', label:'ALB',         sublabel:'us-east-1',         category:'Networking', icon:'⚖️', iconUrl:'icons/aws/Networking-Content-Delivery/Elastic-Load-Balancing.svg',     theme:'purple', description:'ALB in us-east-1 — distributes traffic across 3 AZs.', zIndex:14 },
+        { id:'n_6',  x:940,  y:160,  w:160, type:'Amazon ECS',                label:'ECS Service', sublabel:'us-east-1a / Spot', category:'Compute',    icon:'🐳', iconUrl:'icons/aws/Containers/Amazon-Elastic-Container-Service.svg',            theme:'orange', description:'ECS Service on Spot capacity in us-east-1a.', zIndex:15 },
+        { id:'n_7',  x:940,  y:320,  w:160, type:'Amazon ECS',                label:'ECS Service', sublabel:'us-east-1b / Spot', category:'Compute',    icon:'🐳', iconUrl:'icons/aws/Containers/Amazon-Elastic-Container-Service.svg',            theme:'orange', description:'ECS Service on Spot capacity in us-east-1b.', zIndex:16 },
+        { id:'n_8',  x:940,  y:480,  w:160, type:'Amazon ECS',                label:'ECS Service', sublabel:'us-east-1c / Spot', category:'Compute',    icon:'🐳', iconUrl:'icons/aws/Containers/Amazon-Elastic-Container-Service.svg',            theme:'orange', description:'ECS Service on Spot capacity in us-east-1c.', zIndex:17 },
+        { id:'n_9',  x:1160, y:240,  w:160, type:'VPC Endpoint',              label:'VPC Endpoint',sublabel:'DynamoDB',          category:'Networking', icon:'🔌', iconUrl:'icons/aws/Networking-Content-Delivery/Amazon-Virtual-Private-Cloud.svg', theme:'purple', description:'Gateway VPC endpoint to DynamoDB — traffic stays on AWS backbone.', zIndex:18 },
+        { id:'n_10', x:1160, y:400,  w:160, type:'VPC Endpoint',              label:'VPC Endpoint',sublabel:'S3',                category:'Networking', icon:'🔌', iconUrl:'icons/aws/Networking-Content-Delivery/Amazon-Virtual-Private-Cloud.svg', theme:'purple', description:'Gateway VPC endpoint to S3 — no NAT, no public IPs.', zIndex:19 },
+        { id:'n_11', x:1380, y:240,  w:160, type:'Amazon DynamoDB',           label:'DynamoDB',    sublabel:'Global Table',      category:'Database',   icon:'🔷', iconUrl:'icons/aws/Databases/Amazon-DynamoDB.svg',                              theme:'blue',   description:'DynamoDB Global Table replica in us-east-1.', zIndex:20 },
+        { id:'n_12', x:1380, y:400,  w:160, type:'Amazon S3',                 label:'S3 Bucket',   sublabel:'us-east-1',         category:'Storage',    icon:'🪣', iconUrl:'icons/aws/Storage/Amazon-Simple-Storage-Service.svg',                  theme:'green',  description:'S3 bucket in us-east-1 with CRR to eu-west-1.', zIndex:21 },
+        { id:'n_13', x:720,  y:950,  w:160, type:'Application Load Balancer', label:'ALB',         sublabel:'eu-west-1',         category:'Networking', icon:'⚖️', iconUrl:'icons/aws/Networking-Content-Delivery/Elastic-Load-Balancing.svg',     theme:'purple', description:'ALB in eu-west-1 — takes over on failover.', zIndex:22 },
+        { id:'n_14', x:940,  y:790,  w:160, type:'Amazon ECS',                label:'ECS Service', sublabel:'eu-west-1a / Spot', category:'Compute',    icon:'🐳', iconUrl:'icons/aws/Containers/Amazon-Elastic-Container-Service.svg',            theme:'orange', description:'ECS Service on Spot capacity in eu-west-1a.', zIndex:23 },
+        { id:'n_15', x:940,  y:950,  w:160, type:'Amazon ECS',                label:'ECS Service', sublabel:'eu-west-1b / Spot', category:'Compute',    icon:'🐳', iconUrl:'icons/aws/Containers/Amazon-Elastic-Container-Service.svg',            theme:'orange', description:'ECS Service on Spot capacity in eu-west-1b.', zIndex:24 },
+        { id:'n_16', x:940,  y:1110, w:160, type:'Amazon ECS',                label:'ECS Service', sublabel:'eu-west-1c / Spot', category:'Compute',    icon:'🐳', iconUrl:'icons/aws/Containers/Amazon-Elastic-Container-Service.svg',            theme:'orange', description:'ECS Service on Spot capacity in eu-west-1c.', zIndex:25 },
+        { id:'n_17', x:1160, y:870,  w:160, type:'VPC Endpoint',              label:'VPC Endpoint',sublabel:'DynamoDB',          category:'Networking', icon:'🔌', iconUrl:'icons/aws/Networking-Content-Delivery/Amazon-Virtual-Private-Cloud.svg', theme:'purple', description:'Gateway VPC endpoint to DynamoDB in eu-west-1.', zIndex:26 },
+        { id:'n_18', x:1160, y:1030, w:160, type:'VPC Endpoint',              label:'VPC Endpoint',sublabel:'S3',                category:'Networking', icon:'🔌', iconUrl:'icons/aws/Networking-Content-Delivery/Amazon-Virtual-Private-Cloud.svg', theme:'purple', description:'Gateway VPC endpoint to S3 in eu-west-1.', zIndex:27 },
+        { id:'n_19', x:1380, y:870,  w:160, type:'Amazon DynamoDB',           label:'DynamoDB',    sublabel:'Global Table',      category:'Database',   icon:'🔷', iconUrl:'icons/aws/Databases/Amazon-DynamoDB.svg',                              theme:'blue',   description:'DynamoDB Global Table replica in eu-west-1.', zIndex:28 },
+        { id:'n_20', x:1380, y:1030, w:160, type:'Amazon S3',                 label:'S3 Bucket',   sublabel:'eu-west-1',         category:'Storage',    icon:'🪣', iconUrl:'icons/aws/Storage/Amazon-Simple-Storage-Service.svg',                  theme:'green',  description:'S3 bucket in eu-west-1 — CRR target.', zIndex:29 },
+        { id:'n_21', x:1600, y:320,  w:160, type:'AWS KMS',                   label:'KMS',         sublabel:'us-east-1 replica', category:'Security',   icon:'🗝️', iconUrl:'icons/aws/Security-Identity/AWS-Key-Management-Service.svg',           theme:'red',    description:'KMS multi-region key primary in us-east-1.', zIndex:30 },
+        { id:'n_22', x:1820, y:320,  w:160, type:'Amazon ECR',                label:'ECR',         sublabel:'us-east-1',         category:'Containers', icon:'📦', iconUrl:'icons/aws/Containers/Amazon-Elastic-Container-Registry.svg',           theme:'orange', description:'ECR registry in us-east-1 — cross-region replicated.', zIndex:31 },
+        { id:'n_23', x:1600, y:950,  w:160, type:'AWS KMS',                   label:'KMS',         sublabel:'eu-west-1 replica', category:'Security',   icon:'🗝️', iconUrl:'icons/aws/Security-Identity/AWS-Key-Management-Service.svg',           theme:'red',    description:'KMS multi-region replica in eu-west-1 — decrypts replicated data without re-wrap.', zIndex:32 },
+        { id:'n_24', x:1820, y:950,  w:160, type:'Amazon ECR',                label:'ECR',         sublabel:'eu-west-1',         category:'Containers', icon:'📦', iconUrl:'icons/aws/Containers/Amazon-Elastic-Container-Registry.svg',           theme:'orange', description:'ECR registry in eu-west-1 — replica of us-east-1.', zIndex:33 }
+      ],
+      arrows:[
+        { id:'a_1',  from:'n_1',  to:'n_2',  fromPort:'right',  toPort:'left', color:'default', style:'solid',  label:'HTTPS' },
+        { id:'a_2',  from:'n_2',  to:'n_3',  fromPort:'bottom', toPort:'top',  color:'red',     style:'dotted', label:'inspect' },
+        { id:'a_3',  from:'n_2',  to:'n_4',  fromPort:'right',  toPort:'left', color:'purple',  style:'solid',  label:'DNS' },
+        { id:'a_4',  from:'n_4',  to:'n_5',  fromPort:'right',  toPort:'left', color:'purple',  style:'solid',  label:'latency route' },
+        { id:'a_5',  from:'n_4',  to:'n_13', fromPort:'right',  toPort:'left', color:'purple',  style:'solid',  label:'latency route' },
+        { id:'a_6',  from:'n_5',  to:'n_6',  fromPort:'right',  toPort:'left', color:'teal',    style:'solid',  label:'' },
+        { id:'a_7',  from:'n_5',  to:'n_7',  fromPort:'right',  toPort:'left', color:'teal',    style:'solid',  label:'' },
+        { id:'a_8',  from:'n_5',  to:'n_8',  fromPort:'right',  toPort:'left', color:'teal',    style:'solid',  label:'' },
+        { id:'a_9',  from:'n_7',  to:'n_9',  fromPort:'right',  toPort:'left', color:'blue',    style:'solid',  label:'' },
+        { id:'a_10', from:'n_7',  to:'n_10', fromPort:'right',  toPort:'left', color:'green',   style:'solid',  label:'' },
+        { id:'a_11', from:'n_9',  to:'n_11', fromPort:'right',  toPort:'left', color:'blue',    style:'solid',  label:'read/write' },
+        { id:'a_12', from:'n_10', to:'n_12', fromPort:'right',  toPort:'left', color:'green',   style:'solid',  label:'get/put' },
+        { id:'a_13', from:'n_13', to:'n_14', fromPort:'right',  toPort:'left', color:'teal',    style:'solid',  label:'' },
+        { id:'a_14', from:'n_13', to:'n_15', fromPort:'right',  toPort:'left', color:'teal',    style:'solid',  label:'' },
+        { id:'a_15', from:'n_13', to:'n_16', fromPort:'right',  toPort:'left', color:'teal',    style:'solid',  label:'' },
+        { id:'a_16', from:'n_15', to:'n_17', fromPort:'right',  toPort:'left', color:'blue',    style:'solid',  label:'' },
+        { id:'a_17', from:'n_15', to:'n_18', fromPort:'right',  toPort:'left', color:'green',   style:'solid',  label:'' },
+        { id:'a_18', from:'n_17', to:'n_19', fromPort:'right',  toPort:'left', color:'blue',    style:'solid',  label:'read/write' },
+        { id:'a_19', from:'n_18', to:'n_20', fromPort:'right',  toPort:'left', color:'green',   style:'solid',  label:'get/put' },
+        { id:'a_20', from:'n_11', to:'n_19', fromPort:'bottom', toPort:'top',  color:'blue',    style:'dashed', label:'Global Table Replication', animated:true },
+        { id:'a_21', from:'n_12', to:'n_20', fromPort:'bottom', toPort:'top',  color:'green',   style:'dashed', label:'S3 CRR', animated:true },
+        { id:'a_22', from:'n_21', to:'n_23', fromPort:'bottom', toPort:'top',  color:'red',     style:'dashed', label:'Multi-region Replica Key' },
+        { id:'a_23', from:'n_22', to:'n_24', fromPort:'bottom', toPort:'top',  color:'orange',  style:'dashed', label:'ECR CRR', animated:true }
+      ],
+      groups: [
+        { id:'g_1', x:700, y:130, w:870, h:460, label:'us-east-1',            color:'purple' },
+        { id:'g_2', x:920, y:140, w:640, h:440, label:'VPC',                  color:'green'  },
+        { id:'g_3', x:920, y:140, w:200, h:440, label:'Multi-AZ ECS cluster', color:'orange' },
+        { id:'g_4', x:700, y:760, w:870, h:460, label:'eu-west-1',            color:'purple' },
+        { id:'g_5', x:920, y:770, w:640, h:440, label:'VPC',                  color:'green'  },
+        { id:'g_6', x:920, y:770, w:200, h:440, label:'Multi-AZ ECS cluster', color:'orange' }
+      ],
+      playFlow: [
+        { arrow:'a_1',  text:'User makes an HTTPS request — it hits the CloudFront edge POP closest to them.' },
+        { arrow:'a_2',  text:'AWS WAF inspects the request and blocks anything matching the OWASP / bot / geo rules.' },
+        { arrow:'a_3',  text:'Cache miss — CloudFront forwards the dynamic request to Route 53 for region selection.' },
+        { arrow:'a_4',  text:'Route 53 latency-routes to us-east-1 (closest region for North American users).' },
+        { arrow:'a_7',  text:'The regional ALB picks a healthy ECS task in one of the 3 Availability Zones.' },
+        { arrow:'a_9',  text:'The ECS task reaches DynamoDB through a private VPC endpoint — no NAT, no public internet.' },
+        { arrow:'a_11', text:'DynamoDB Global Table serves the request from the regional replica in us-east-1.' },
+        { arrow:'a_10', text:'Same task pulls static assets through the S3 VPC endpoint.' },
+        { arrow:'a_12', text:'S3 returns the object from the regional bucket.' },
+        { arrow:'a_20', text:'DynamoDB Global Tables replicate the write to eu-west-1 within ~1 second.' },
+        { arrow:'a_21', text:'S3 Cross-Region Replication copies the new object asynchronously to the eu-west-1 bucket.' },
+        { arrow:'a_22', text:'KMS multi-region replica key lets eu-west-1 decrypt the replicated data without re-wrapping.' },
+        { arrow:'a_5',  text:'On us-east-1 health-check failure, Route 53 fails over to eu-west-1 — same data, same key, no data-plane downtime.' }
+      ]
+    }
   }
 };
 

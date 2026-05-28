@@ -103,6 +103,7 @@ Open `✨ Templates` in the toolbar and pick:
 | **ML Training Pipeline** | S3 → SageMaker → Model Registry → real-time + batch inference |
 | **Data Pipeline** | S3 → Lambda → Kinesis → Redshift + monitoring |
 | **Kubernetes App** | Ingress → 2 deployments → Redis + Postgres statefulsets |
+| **Multi-Region Active-Active (AWS)** | Two regions live + serving. ECS on Spot, DDB Global Tables, S3 CRR, KMS multi-region keys, ECR replicated. Includes Play Flow narration of one request + failover. |
 | **+ your own** | Save any diagram and it shows up under "Recent" |
 
 ---
