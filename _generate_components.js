@@ -87,7 +87,9 @@ const COMPONENTS = {
 
 const html = fs.readFileSync(HTML, 'utf8');
 // Preserve the shapes: block — it's hand-curated decorative geometry.
-const shapesMatch = html.match(/shapes:\s*\[([\s\S]*?)\n\s*\],\n\s*(aws|cloud|azure):/);
+// Anchor only against actual provider keys; "cloud" is a legacy alias we
+// never wrote and matching it silently would mask a real corruption.
+const shapesMatch = html.match(/shapes:\s*\[([\s\S]*?)\n\s*\],\n\s*(aws|azure|gcp):/);
 if (!shapesMatch) { console.error('Could not find existing shapes: block to preserve.'); process.exit(1); }
 const shapesBlock = '[' + shapesMatch[1] + '\n  ]';
 
@@ -164,8 +166,16 @@ function findBlockEnd(src, startAt) {
     else if (ch === '}') {
       depth--;
       if (depth === 0) {
-        while (i < src.length && src[i] !== ';') i++;
-        return i + 1;
+        // Look for the trailing `;` within a few characters of the closing
+        // brace. If a future edit drops the semicolon, scanning to EOF would
+        // silently swallow the rest of the file — bail out instead.
+        const limit = Math.min(src.length, i + 8);
+        let j = i + 1;
+        while (j < limit && src[j] !== ';') {
+          if (src[j] !== ' ' && src[j] !== '\t') return i + 1; // hit non-trivial content
+          j++;
+        }
+        return (j < limit && src[j] === ';') ? j + 1 : i + 1;
       }
     }
     i++;

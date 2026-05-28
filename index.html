@@ -4728,9 +4728,12 @@ function renderNode(node) {
   // rewrite — only the position/class needs to change.
   if (el.querySelector('[contenteditable="true"]')) return;
 
+  // Fallback emoji is stashed in data-fallback so the onerror handler can
+  // read it without inlining a JS string into the attribute value (which
+  // would break the attribute quoting whenever JSON.stringify emits a `"`).
   const iconMarkup = isText ? ''
     : node.iconUrl
-      ? `<span class="node-icon" aria-hidden="true"><img src="${escHtml(node.iconUrl)}" alt="" draggable="false" style="width:28px;height:28px;object-fit:contain;display:block;pointer-events:none;-webkit-user-drag:none" onerror="this.replaceWith(Object.assign(document.createElement('span'),{textContent:${JSON.stringify(node.icon || '⬜')},style:'font-size:24px'}))"></span>`
+      ? `<span class="node-icon" aria-hidden="true"><img src="${escHtml(node.iconUrl)}" alt="" draggable="false" data-fallback="${escHtml(node.icon || '⬜')}" style="width:28px;height:28px;object-fit:contain;display:block;pointer-events:none;-webkit-user-drag:none" onerror="this.replaceWith(Object.assign(document.createElement('span'),{textContent:this.dataset.fallback||'⬜',style:'font-size:24px'}))"></span>`
       : `<span class="node-icon" aria-hidden="true">${escHtml(node.icon || '')}</span>`;
   el.innerHTML = `
     ${iconMarkup}
@@ -4842,27 +4845,37 @@ function selectAllText(el) {
 }
 
 function startInlineEdit(el, node) {
-  pushHistory();
+  const field = el.dataset.field;
+  const original = el.textContent;
+  let cancelled = false;
+
   el.contentEditable = 'true';
   el.focus();
   selectAllText(el);
 
+  function onKeydown(e) {
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); el.blur(); }
+    else if (e.key === 'Escape')          { e.preventDefault(); cancelled = true; el.blur(); }
+  }
+
   function finish() {
+    el.removeEventListener('keydown', onKeydown);
     el.contentEditable = 'false';
-    const field = el.dataset.field;
-    const txt = el.textContent;
-    if (field === 'label')    node.label = txt;
-    if (field === 'sublabel') node.sublabel = txt;
-    if (field === 'category') node.category = txt;
-    markDirty();
+    const txt = cancelled ? original : el.textContent;
+    if (cancelled) el.textContent = original;
+    // Only spend a history slot if the value actually changed.
+    if (txt !== original) {
+      pushHistory();
+      if (field === 'label')    node.label = txt;
+      if (field === 'sublabel') node.sublabel = txt;
+      if (field === 'category') node.category = txt;
+      markDirty();
+    }
     updatePropsPanel();
   }
 
   el.addEventListener('blur', finish, { once: true });
-  el.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); el.blur(); }
-    if (e.key === 'Escape') { e.preventDefault(); el.blur(); }
-  });
+  el.addEventListener('keydown', onKeydown);
 }
 
 // ===== NODE DRAG =====
@@ -6084,6 +6097,9 @@ function showPropsEmpty() {
 function updateNodeProp(id, key, val) {
   const n = getNode(id);
   if (!n) return;
+  // Property-panel inputs fire on every keystroke; debounce so a burst of
+  // edits collapses into one history entry (snapshotted before the burst).
+  pushHistoryDebounced();
   n[key] = val;
   renderNode(n);
   redrawArrows();
@@ -6098,6 +6114,7 @@ function updateNodeTheme(id, theme) {
 function updateArrowProp(id, key, val) {
   const a = arrows.find(a => a.id === id);
   if (!a) return;
+  pushHistoryDebounced();
   a[key] = val;
   drawArrow(a);
   markDirty();
@@ -6242,6 +6259,22 @@ function pushHistory() {
   if (historyStack.length > HISTORY_CAP) historyStack.shift();
 }
 
+// Coalesces rapid-fire calls (each keystroke in a property input) into a
+// single history entry: snapshots immediately on the first call, then
+// suppresses follow-ups for ~600ms. The first call captures the pre-edit
+// state, so the undo target after a burst of edits is the value before
+// the user started typing.
+let _historyDebounceTimer = null;
+function pushHistoryDebounced() {
+  if (_historyDebounceTimer) {
+    clearTimeout(_historyDebounceTimer);
+    _historyDebounceTimer = setTimeout(() => { _historyDebounceTimer = null; }, 600);
+    return;
+  }
+  pushHistory();
+  _historyDebounceTimer = setTimeout(() => { _historyDebounceTimer = null; }, 600);
+}
+
 function undo() {
   if (!historyStack.length) return;
   redoStack.push(snapshotState());
@@ -6275,7 +6308,10 @@ function restoreState(state) {
   groups.forEach(g => renderGroup(g));
   nodes.forEach(n => renderNode(n));
   arrows.forEach(a => drawArrow(a));
-  markDirty();
+  // Reflect the restored state's relationship to the last saved snapshot
+  // rather than forcing the dirty bit on — undoing back to the saved state
+  // should clear "unsaved changes".
+  if (snapshotState() === lastSavedSnapshot) markClean(); else markDirty();
   updateStatusBar();
   updateMinimap();
   showPropsEmpty();
@@ -6826,6 +6862,11 @@ function renderCostTable() {
 
 // ===== SAVE / LOAD =====
 let autosaveTimer = null;
+// Snapshot of the state at the most recent successful save / load. After
+// undo/redo we compare the restored state to this snapshot so the "Saved"
+// indicator reflects reality (undoing back to the saved state should clear
+// the dirty bit; undoing past it should re-mark dirty).
+let lastSavedSnapshot = snapshotState();
 
 function markDirty() {
   isDirty = true;
@@ -6838,6 +6879,7 @@ function markClean() {
   isDirty = false;
   document.getElementById('status-dot').classList.remove('unsaved');
   document.getElementById('status-text').textContent = 'Saved';
+  lastSavedSnapshot = snapshotState();
 }
 
 function scheduleAutosave() {
@@ -6911,6 +6953,18 @@ async function duplicateDiagram() {
   await saveDiagram();
 }
 
+// Post-save bookkeeping. Runs in standalone mode immediately after the
+// browser download, and in VS Code mode from a {type:'saved'} message
+// posted back by the extension once the file has actually been written.
+function _potatoAfterSave(name) {
+  markClean();
+  try { localStorage.removeItem(autosaveKey()); } catch(e) {}
+  addRecentFile({ name, ts: Date.now(), summary: nodes.length + ' nodes · ' + arrows.length + ' connections', data: getDiagramData() });
+  if (_broadcastCh) try { _broadcastCh.postMessage({ type:'saved', tabId:_potatoTabId, name }); } catch(e) {}
+  notify(`Saved as ${name} ✅`);
+}
+window._potatoAfterSave = _potatoAfterSave;
+
 async function saveDiagram() {
   const name = document.getElementById('filename-input').value || 'diagram';
   const data = getDiagramData();
@@ -6921,6 +6975,16 @@ async function saveDiagram() {
   const svgMarkup = await buildDiagramSVG();
   const savedHtml = buildSavedHTML(name, dataStr, svgMarkup);
 
+  // VS Code host: hand the rendered HTML to the extension. The extension
+  // writes it to disk and posts {type:'saved'} → _potatoAfterSave fires.
+  // Critically, we do NOT also trigger a browser download here — the
+  // webview cannot prompt the user, and a phantom Downloads/<file> copy
+  // would diverge from the workspace file.
+  if (typeof window.__POTATO_VSCODE_SAVE__ === 'function') {
+    window.__POTATO_VSCODE_SAVE__({ html: savedHtml, name });
+    return;
+  }
+
   const blob = new Blob([savedHtml], { type: 'text/html' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
@@ -6929,11 +6993,9 @@ async function saveDiagram() {
   a.click();
   URL.revokeObjectURL(url);
 
-  markClean();
-  try { localStorage.removeItem(autosaveKey()); } catch(e) {}
-  addRecentFile({ name, ts: Date.now(), summary: nodes.length + ' nodes · ' + arrows.length + ' connections', data: getDiagramData() });
-  if (_broadcastCh) try { _broadcastCh.postMessage({ type:'saved', tabId:_potatoTabId, name }); } catch(e) {}
-  notify(`Saved as ${a.download} ✅`);
+  // Pass the user-facing name (not the sanitized download filename) so the
+  // recents list and VS Code path agree on a single key per diagram.
+  _potatoAfterSave(name);
 }
 
 // Pre-resolve KB lookups for every node so the saved viewer can show
@@ -7487,8 +7549,14 @@ function newDiagram() {
 function svgTextToDataUrl(svgText) {
   if (!svgText) return '';
   try {
-    // unescape(encodeURIComponent(...)) is the bulletproof UTF-8-safe path for btoa.
-    return 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(svgText)));
+    // TextEncoder is the modern UTF-8-safe replacement for unescape(encodeURIComponent(...)).
+    // Chunk through String.fromCharCode to dodge the call-stack limit on big SVGs.
+    const bytes = new TextEncoder().encode(svgText);
+    let bin = '';
+    for (let i = 0; i < bytes.length; i += 0x8000) {
+      bin += String.fromCharCode.apply(null, bytes.subarray(i, i + 0x8000));
+    }
+    return 'data:image/svg+xml;base64,' + btoa(bin);
   } catch (e) { return ''; }
 }
 function buildIconDataUrlsForNodes(nodeList) {
