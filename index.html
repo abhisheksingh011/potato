@@ -643,7 +643,7 @@ body {
 #empty-state.hidden { display: none; }
 #empty-state .es-card {
   pointer-events: auto;
-  background: rgba(18,21,42,0.85);
+  background: var(--bg-overlay);
   border: 1px solid var(--border);
   border-radius: 14px;
   padding: 28px 30px;
@@ -853,7 +853,7 @@ body {
   pointer-events: none;
   display: none;
   line-height: 1.5;
-  color: rgba(232,234,246,0.9);
+  color: var(--text);
   font-family: var(--font-mono);
   backdrop-filter: blur(10px);
   box-shadow: 0 8px 32px var(--shadow-strong);
@@ -862,7 +862,7 @@ body {
 /* ===== CONTEXT MENU ===== */
 #context-menu {
   position: fixed;
-  background: rgba(18,21,42,0.98);
+  background: var(--bg-overlay);
   border: 1px solid var(--border);
   border-radius: 9px;
   padding: 5px;
@@ -942,7 +942,7 @@ body {
   pointer-events: none;
 }
 .notif {
-  background: rgba(18,21,42,0.97);
+  background: var(--bg-overlay);
   border: 1px solid var(--border);
   border-left: 3px solid var(--teal);
   border-radius: 8px;
@@ -983,7 +983,7 @@ body {
   box-shadow: 0 24px 80px var(--shadow-strong);
 }
 #modal h2 { font-size: 18px; font-weight: 800; margin-bottom: 16px; }
-#modal p { font-size: 13px; line-height: 1.7; color: rgba(232,234,246,0.8); }
+#modal p { font-size: 13px; line-height: 1.7; color: var(--text); opacity: 0.85; }
 
 .modal-actions { display: flex; gap: 8px; margin-top: 20px; justify-content: flex-end; }
 
@@ -1013,7 +1013,7 @@ body {
   bottom: 36px;
   left: 50%;
   transform: translateX(-50%);
-  background: rgba(18,21,42,0.97);
+  background: var(--bg-overlay);
   border: 1px solid var(--teal);
   border-radius: 10px;
   padding: 10px 20px;
