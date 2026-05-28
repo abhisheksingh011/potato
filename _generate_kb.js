@@ -28,6 +28,7 @@ function renderEntry(key, entry) {
   let out = `  '${key.replace(/'/g, "\\'")}': {\n`;
   if (entry.name)         out += `    name: ${jsString(entry.name)},\n`;
   if (entry.matches)      out += `    matches: ${JSON.stringify(entry.matches)},\n`;
+  if (entry.sla)          out += `    sla: ${jsString(entry.sla)},\n`;
   if (entry.limits)       out += `    limits: ${jsString(entry.limits)},\n`;
   if (entry.whenToUse)    out += `    whenToUse: ${jsString(entry.whenToUse)},\n`;
   if (entry.cost)         out += `    cost: ${jsString(entry.cost)},\n`;
