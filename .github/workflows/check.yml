@@ -64,3 +64,12 @@ jobs:
       # 4. extension.js (VS Code wrapper) must parse with Node.
       - name: Syntax-check extension.js
         run: node --check extension.js
+
+      # 5. The inline <script> embedded into saved .potato.html files must
+      #    also parse. The buildSavedHTML function lives inside a template
+      #    literal, so a stray `\n` in the editor source can collapse into a
+      #    real newline inside the saved JS, breaking the entire viewer
+      #    (play flow, tooltips, all of it). This check evaluates the
+      #    template the same way the browser would and parses the result.
+      - name: Saved-viewer script smoke test
+        run: node _test_saved_viewer.js

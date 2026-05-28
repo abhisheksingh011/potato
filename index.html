@@ -6950,16 +6950,28 @@ ${svgMarkup}
     tipEl.style.left = Math.min(x, maxX) + 'px';
     tipEl.style.top  = Math.min(y, maxY) + 'px';
   }
-  function hideTooltip() { tipEl.style.display = 'none'; }
+  function hideTooltip() { if (!_pinned) tipEl.style.display = 'none'; }
 
+  // Tooltip can be pinned by clicking a node — useful on touchscreens and
+  // when you want to read it without the mouse hovering. Clicking the same
+  // node toggles it off; clicking another node moves the pin; clicking
+  // outside any node unpins.
+  let _pinned = null;
   document.querySelectorAll('.potato-node').forEach(g => {
     const id = g.getAttribute('data-node-id');
     const node = nodeById.get(id);
     if (!node) return;
-    g.addEventListener('mouseenter', e => showTooltip(node, e));
-    g.addEventListener('mousemove',  moveTooltip);
+    g.addEventListener('mouseenter', e => { if (!_pinned) showTooltip(node, e); });
+    g.addEventListener('mousemove',  e => { if (!_pinned) moveTooltip(e); });
     g.addEventListener('mouseleave', hideTooltip);
+    g.addEventListener('click', e => {
+      e.stopPropagation();
+      if (_pinned === id) { _pinned = null; tipEl.style.display = 'none'; return; }
+      _pinned = id;
+      showTooltip(node, e);
+    });
   });
+  document.addEventListener('click', () => { _pinned = null; tipEl.style.display = 'none'; });
 
   // -------------------- PLAY FLOW --------------------
   let _timer = null, _idx = 0, _stepMs = 1400;
@@ -7039,11 +7051,11 @@ ${svgMarkup}
     const url = decodeURIComponent(window.location.href);
     if (navigator.clipboard && navigator.clipboard.writeText) {
       navigator.clipboard.writeText(url).then(
-        () => { alert('Copied:\n' + url + '\n\nNow open Potato and use File → Open.'); },
-        () => { alert('Could not copy automatically. Path:\n\n' + url); }
+        () => { alert('Copied:\\n' + url + '\\n\\nNow open Potato and use File → Open.'); },
+        () => { alert('Could not copy automatically. Path:\\n\\n' + url); }
       );
     } else {
-      alert('Path:\n\n' + url);
+      alert('Path:\\n\\n' + url);
     }
   };
 
