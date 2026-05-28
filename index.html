@@ -6949,7 +6949,38 @@ function buildSavedHTML(name, dataStr, svgMarkup) {
     --text: #e8eaf6; --muted: #7986cb; --dim: #4a5568;
     --teal: #1abc9c; --purple: #7B2FBE; --pink: #E91E63; --orange: #FF9900;
     --border: rgba(255,255,255,0.07);
+    --hover-border: rgba(255,255,255,0.2);
+    --tip-bg: rgba(13,15,26,0.98);
+    --tip-body: rgba(232,234,246,0.85);
+    --step-bg: rgba(18,21,42,0.97);
+    --shadow-strong: rgba(0,0,0,0.5);
+    --node-fill: #12152a;
+    --node-text: #e8eaf6;
+    --node-sub: #7986cb;
+    --node-label: rgba(255,255,255,0.35);
+    --arrow-default: rgba(255,255,255,0.45);
+    --arrow-label: #7986cb;
+    --node-hover-glow: rgba(232,234,246,0.4);
+    --svg-bg: #0d0f1a;
     --font-mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  }
+  [data-theme="light"] {
+    --bg: #f7f8fc; --bg2: #ffffff; --bg3: #eef1f7;
+    --text: #1a1f36; --muted: #5b6478; --dim: #94a3b8;
+    --border: rgba(20,30,60,0.12);
+    --hover-border: rgba(20,30,60,0.35);
+    --tip-bg: rgba(255,255,255,0.98);
+    --tip-body: rgba(26,31,54,0.85);
+    --step-bg: rgba(255,255,255,0.97);
+    --shadow-strong: rgba(20,30,60,0.18);
+    --node-fill: #ffffff;
+    --node-text: #1a1f36;
+    --node-sub: #5b6478;
+    --node-label: rgba(20,30,60,0.45);
+    --arrow-default: rgba(30,40,80,0.55);
+    --arrow-label: #5b6478;
+    --node-hover-glow: rgba(20,30,60,0.18);
+    --svg-bg: #f7f8fc;
   }
   * { box-sizing: border-box; }
   body { margin: 0; background: var(--bg); color: var(--text); font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif; min-height: 100vh; }
@@ -6960,39 +6991,60 @@ function buildSavedHTML(name, dataStr, svgMarkup) {
   .header-spacer { flex: 1; }
 
   .ctrl { padding: 7px 14px; border-radius: 6px; border: 1px solid var(--border); background: var(--bg3); color: var(--text); font-size: 12px; font-weight: 600; cursor: pointer; font-family: inherit; }
-  .ctrl:hover { border-color: rgba(255,255,255,0.2); }
-  .ctrl.primary { background: linear-gradient(135deg, var(--teal), #2e86c1); border-color: transparent; }
+  .ctrl:hover { border-color: var(--hover-border); }
+  .ctrl.primary { background: linear-gradient(135deg, var(--teal), #2e86c1); border-color: transparent; color: #fff; }
   .ctrl.primary:hover { opacity: 0.9; }
-  .ctrl.playing { background: linear-gradient(135deg, #e91e63, #dd344c); border-color: transparent; }
+  .ctrl.playing { background: linear-gradient(135deg, #e91e63, #dd344c); border-color: transparent; color: #fff; }
   .ctrl select { background: var(--bg3); border: 1px solid var(--border); color: var(--text); padding: 6px 8px; border-radius: 6px; font-size: 11px; font-family: inherit; }
   .step-counter { font-family: var(--font-mono); font-size: 11px; color: var(--muted); min-width: 100px; }
 
   .potato-view { padding: 24px; overflow: auto; }
   .potato-view svg { max-width: 100%; height: auto; display: block; margin: 0 auto; }
 
+  /* SVG theme overrides — CSS beats SVG presentation attributes */
+  .svg-bg { fill: var(--svg-bg); }
+  .potato-node-rect { fill: var(--node-fill); }
+  [data-theme="light"] .potato-view svg text { fill: var(--node-text); }
+  .potato-view svg text.node-name { fill: var(--node-text); }
+  .potato-view svg text.node-sub  { fill: var(--node-sub); }
+  .potato-view svg text.node-label { fill: var(--node-label); }
+  .potato-view svg text.grp-label  { fill: var(--node-label); }
+  .potato-view svg text.arrow-label { fill: var(--arrow-label); }
+  .potato-arrow[data-arrow-color="default"] { stroke: var(--arrow-default); }
+  [data-theme="light"] .potato-arrow[data-arrow-color="default"] { marker-end: url(#ah-light); }
+
   .potato-node { transition: filter 0.2s; }
-  .potato-node:hover { filter: drop-shadow(0 0 12px rgba(232,234,246,0.4)); }
+  .potato-node:hover { filter: drop-shadow(0 0 12px var(--node-hover-glow)); }
   .potato-node.playing-flow rect { stroke: var(--teal) !important; stroke-width: 2.5 !important; filter: drop-shadow(0 0 12px rgba(26,188,156,0.7)); }
   .potato-arrow { transition: stroke-width 0.2s, opacity 0.2s; }
   .potato-arrow.playing-flow { stroke-width: 3 !important; opacity: 1 !important; stroke-dasharray: 8, 6; animation: potato-dash 0.6s linear infinite; }
   @keyframes potato-dash { to { stroke-dashoffset: -28; } }
 
   /* Step narration overlay (bottom of screen during play) */
-  #potato-step-text { position: fixed; bottom: 28px; left: 50%; transform: translateX(-50%); background: rgba(18,21,42,0.97); border: 1px solid var(--teal); border-radius: 10px; padding: 12px 22px; max-width: 80vw; z-index: 200; box-shadow: 0 8px 32px rgba(0,0,0,0.5), 0 0 24px rgba(26,188,156,0.3); display: none; }
+  #potato-step-text { position: fixed; bottom: 28px; left: 50%; transform: translateX(-50%); background: var(--step-bg); border: 1px solid var(--teal); border-radius: 10px; padding: 12px 22px; max-width: 80vw; z-index: 200; box-shadow: 0 8px 32px var(--shadow-strong), 0 0 24px rgba(26,188,156,0.3); display: none; }
   #potato-step-text.show { display: block; }
   #potato-step-text .counter { font-family: var(--font-mono); font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px; }
   #potato-step-text .narration { font-size: 13px; color: var(--text); margin-top: 4px; line-height: 1.5; }
 
   /* Service tooltip (hover) */
-  #potato-tooltip { position: fixed; background: rgba(13,15,26,0.98); border: 1px solid var(--border); border-radius: 10px; padding: 14px 16px; max-width: 360px; z-index: 300; display: none; pointer-events: none; backdrop-filter: blur(10px); box-shadow: 0 12px 40px rgba(0,0,0,0.6); }
-  #potato-tooltip h3 { margin: 0 0 8px; font-size: 14px; }
+  #potato-tooltip { position: fixed; background: var(--tip-bg); border: 1px solid var(--border); border-radius: 10px; padding: 14px 16px; max-width: 360px; z-index: 300; display: none; pointer-events: none; backdrop-filter: blur(10px); box-shadow: 0 12px 40px var(--shadow-strong); color: var(--text); }
+  #potato-tooltip h3 { margin: 0 0 8px; font-size: 14px; color: var(--text); }
   #potato-tooltip .tt-section { margin-top: 8px; }
   #potato-tooltip .tt-title { font-family: var(--font-mono); font-size: 9px; letter-spacing: 1px; text-transform: uppercase; color: var(--muted); margin-bottom: 3px; }
-  #potato-tooltip .tt-body { font-family: var(--font-mono); font-size: 11px; color: rgba(232,234,246,0.85); line-height: 1.55; white-space: pre-wrap; }
-  #potato-tooltip ul.tt-list { margin: 4px 0 0; padding-left: 18px; font-family: var(--font-mono); font-size: 11px; color: rgba(232,234,246,0.85); line-height: 1.6; }
+  #potato-tooltip .tt-body { font-family: var(--font-mono); font-size: 11px; color: var(--tip-body); line-height: 1.55; white-space: pre-wrap; }
+  #potato-tooltip ul.tt-list { margin: 4px 0 0; padding-left: 18px; font-family: var(--font-mono); font-size: 11px; color: var(--tip-body); line-height: 1.6; }
 
   .potato-footer { padding: 14px 28px; border-top: 1px solid var(--border); font-size: 11px; color: var(--muted); font-family: var(--font-mono); }
 </style>
+<script>
+  /* Apply saved theme before body renders to avoid a flash of the wrong palette. */
+  (function () {
+    try {
+      var t = localStorage.getItem('potato.theme');
+      if (t === 'light' || t === 'dark') document.documentElement.setAttribute('data-theme', t);
+    } catch (e) {}
+  })();
+<\/script>
 </head>
 <body>
 <!-- Potato Saved Diagram -->
@@ -7008,6 +7060,7 @@ ${viewerPayload}
   <h1>🥔 ${escHtml(name)}</h1>
   <small>Potato Diagram · hover any service for limits + cost · click Play to walk the flow</small>
   <div class="header-spacer"></div>
+  <button class="ctrl" id="potato-theme-btn" onclick="potatoToggleTheme()" title="Switch theme (dark / light)" aria-label="Toggle theme">🌙</button>
   <button class="ctrl" onclick="potatoShowEditHint()" title="How to edit this diagram">✏️ Edit</button>
   <button class="ctrl primary" id="potato-play-btn" onclick="potatoTogglePlay()">▶ Play Flow</button>
   <select class="ctrl" id="potato-speed" onchange="potatoSetSpeed(this.value)" title="Animation speed">
@@ -7025,16 +7078,16 @@ ${svgMarkup}
 <div id="potato-tooltip" role="tooltip"></div>
 
 <!-- Edit-instructions modal — shown when the viewer's ✏️ Edit button is clicked. -->
-<div id="potato-edit-modal" role="dialog" aria-modal="true" style="position:fixed;inset:0;background:rgba(0,0,0,0.78);z-index:9000;display:none;align-items:center;justify-content:center;backdrop-filter:blur(6px)" onclick="if(event.target===this)potatoHideEditHint()">
-  <div style="background:var(--bg2,#12152a);border:1px solid var(--border);border-radius:14px;padding:24px 28px;width:520px;max-width:92vw;box-shadow:0 24px 80px rgba(0,0,0,0.7)">
-    <h2 style="font-size:17px;font-weight:800;margin:0 0 4px">✏️ Edit this diagram</h2>
-    <p style="font-size:11px;color:var(--muted,#7986cb);font-family:var(--font-mono);margin:0 0 16px">This is the read-only viewer. To edit, open the file in Potato:</p>
-    <ol style="font-size:13px;line-height:1.8;color:var(--text,#e8eaf6);padding-left:22px;margin:0 0 16px">
-      <li>Open <strong>Potato</strong> — clone <a href="https://github.com/abhisheksingh011/potato" target="_blank" style="color:#1abc9c">github.com/abhisheksingh011/potato</a> and double-click <code style="font-family:var(--font-mono);background:rgba(255,255,255,0.06);padding:1px 5px;border-radius:3px">index.html</code>, or use the VS Code extension.</li>
+<div id="potato-edit-modal" role="dialog" aria-modal="true" style="position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:9000;display:none;align-items:center;justify-content:center;backdrop-filter:blur(6px)" onclick="if(event.target===this)potatoHideEditHint()">
+  <div style="background:var(--bg2);color:var(--text);border:1px solid var(--border);border-radius:14px;padding:24px 28px;width:520px;max-width:92vw;box-shadow:0 24px 80px var(--shadow-strong)">
+    <h2 style="font-size:17px;font-weight:800;margin:0 0 4px;color:var(--text)">✏️ Edit this diagram</h2>
+    <p style="font-size:11px;color:var(--muted);font-family:var(--font-mono);margin:0 0 16px">This is the read-only viewer. To edit, open the file in Potato:</p>
+    <ol style="font-size:13px;line-height:1.8;color:var(--text);padding-left:22px;margin:0 0 16px">
+      <li>Open <strong>Potato</strong> — clone <a href="https://github.com/abhisheksingh011/potato" target="_blank" style="color:#1abc9c">github.com/abhisheksingh011/potato</a> and double-click <code style="font-family:var(--font-mono);background:var(--bg3);padding:1px 5px;border-radius:3px">index.html</code>, or use the VS Code extension.</li>
       <li>Click <strong>📂 Open</strong> in the toolbar.</li>
-      <li>Select this <code style="font-family:var(--font-mono);background:rgba(255,255,255,0.06);padding:1px 5px;border-radius:3px">.potato.html</code> file.</li>
+      <li>Select this <code style="font-family:var(--font-mono);background:var(--bg3);padding:1px 5px;border-radius:3px">.potato.html</code> file.</li>
     </ol>
-    <p style="font-size:11px;color:var(--muted,#7986cb);font-family:var(--font-mono);margin:0 0 18px">The diagram loads with all your nodes, connections, narration, and cost data ready to edit. Save again to overwrite this file or pick a new name.</p>
+    <p style="font-size:11px;color:var(--muted);font-family:var(--font-mono);margin:0 0 18px">The diagram loads with all your nodes, connections, narration, and cost data ready to edit. Save again to overwrite this file or pick a new name.</p>
     <div style="display:flex;gap:8px;justify-content:flex-end">
       <button class="ctrl" onclick="potatoCopyFilePath()" title="Copy this file's path to clipboard">📋 Copy file path</button>
       <button class="ctrl primary" onclick="potatoHideEditHint()">Got it</button>
@@ -7185,6 +7238,25 @@ ${svgMarkup}
   };
   window.potatoShowEditHint = function () { document.getElementById('potato-edit-modal').style.display = 'flex'; };
   window.potatoHideEditHint = function () { document.getElementById('potato-edit-modal').style.display = 'none'; };
+
+  // Shares the storage key with the main editor so a user's preference carries
+  // over between editing and viewing on the same browser.
+  function syncThemeBtn() {
+    var isLight = document.documentElement.getAttribute('data-theme') === 'light';
+    var btn = document.getElementById('potato-theme-btn');
+    if (btn) {
+      btn.textContent = isLight ? '☀️' : '🌙';
+      btn.setAttribute('title', isLight ? 'Switch to dark theme' : 'Switch to light theme');
+    }
+  }
+  window.potatoToggleTheme = function () {
+    var cur = document.documentElement.getAttribute('data-theme') === 'light' ? 'light' : 'dark';
+    var next = cur === 'light' ? 'dark' : 'light';
+    document.documentElement.setAttribute('data-theme', next);
+    try { localStorage.setItem('potato.theme', next); } catch (e) {}
+    syncThemeBtn();
+  };
+  syncThemeBtn();
   window.potatoCopyFilePath = function () {
     // Best-effort: copy the current file's URL / path to clipboard so the user
     // can paste it into Potato's File → Open dialog.
@@ -7246,14 +7318,15 @@ async function buildDiagramSVG() {
       .grp-label  { font-size: 11px; fill: rgba(255,255,255,0.35); font-weight: bold; }
     </style>
     <marker id="ah" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><path d="M0,0 L0,6 L8,3 z" fill="rgba(255,255,255,0.45)"/></marker>
+    <marker id="ah-light" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><path d="M0,0 L0,6 L8,3 z" fill="rgba(30,40,80,0.55)"/></marker>
     ${Object.entries(themeColors).map(([k,v])=>`<marker id="ah-${k}" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><path d="M0,0 L0,6 L8,3 z" fill="${v}"/></marker>`).join('')}
   </defs>
-  <rect width="${W}" height="${H}" fill="#0d0f1a"/>
+  <rect class="svg-bg" width="${W}" height="${H}" fill="#0d0f1a"/>
 `;
 
   groups.forEach(g => {
     const col = themeColors[g.color] || '#7B2FBE';
-    svg += `  <rect x="${g.x+ox}" y="${g.y+oy}" width="${g.w}" height="${g.h}" rx="12" fill="rgba(255,255,255,0.015)" stroke="${col}" stroke-width="1.5" stroke-dasharray="6,4" opacity="0.7"/>
+    svg += `  <rect class="potato-group-rect" x="${g.x+ox}" y="${g.y+oy}" width="${g.w}" height="${g.h}" rx="12" fill="rgba(255,255,255,0.015)" stroke="${col}" stroke-width="1.5" stroke-dasharray="6,4" opacity="0.7"/>
   <text x="${g.x+ox+12}" y="${g.y+oy+22}" class="grp-label">${escHtml((g.label||'').toUpperCase())}</text>
 `;
   });
@@ -7275,11 +7348,12 @@ async function buildDiagramSVG() {
     const stroke=colorMap[a.color]||colorMap.default;
     const dashArr=a.style==='dashed'?'stroke-dasharray="6 4"':a.style==='dotted'?'stroke-dasharray="2 4"':'';
     const markerId=a.color&&a.color!=='default'?`ah-${a.color}`:'ah';
-    svg += `  <path class="potato-arrow" data-arrow-id="${escHtml(a.id)}" d="${dStr}" fill="none" stroke="${stroke}" stroke-width="1.5" ${dashArr} marker-end="url(#${markerId})" opacity="0.75"/>
+    const arrColor=a.color||'default';
+    svg += `  <path class="potato-arrow" data-arrow-id="${escHtml(a.id)}" data-arrow-color="${arrColor}" d="${dStr}" fill="none" stroke="${stroke}" stroke-width="1.5" ${dashArr} marker-end="url(#${markerId})" opacity="0.75"/>
 `;
     if (a.label) {
       const mid = midpointOfPolyline(routePts);
-      svg += `  <text x="${mid.x}" y="${mid.y-4}" text-anchor="middle" font-size="9" fill="#7986cb">${escHtml(a.label)}</text>
+      svg += `  <text class="arrow-label" x="${mid.x}" y="${mid.y-4}" text-anchor="middle" font-size="9" fill="#7986cb">${escHtml(a.label)}</text>
 `;
     }
   });
@@ -7294,7 +7368,7 @@ async function buildDiagramSVG() {
       ? `    <image href="${iconData}" x="${nx+8}" y="${ny+8}" width="24" height="24"/>`
       : `    <text x="${nx+12}" y="${ny+24}" font-size="18">${escHtml(n.icon||'⬜')}</text>`;
     svg += `  <g class="potato-node" data-node-id="${escHtml(n.id)}" style="cursor:pointer">
-    <rect x="${nx}" y="${ny}" width="${nw}" height="${nh}" rx="10" fill="#12152a" stroke="${col}" stroke-width="1" opacity="0.95"/>
+    <rect class="potato-node-rect" x="${nx}" y="${ny}" width="${nw}" height="${nh}" rx="10" fill="#12152a" stroke="${col}" stroke-width="1" opacity="0.95"/>
 ${iconMarkup}
     <text x="${nx+12}" y="${ny+39}" class="node-label">${escHtml((n.category||n.type||'').toUpperCase().slice(0,22))}</text>
     <text x="${nx+12}" y="${ny+55}" class="node-name">${escHtml((n.label||'').slice(0,20))}</text>
