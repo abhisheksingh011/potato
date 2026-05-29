@@ -2,12 +2,15 @@
 
 # 🥔 Potato
 
-**Architecture diagrams that live in your git repo.**
+### The Cloud Architecture Studio.
 
-*Drag-and-drop AWS / Azure / GCP icons, or describe the system to any LLM and paste the reply. Share as a single self-contained HTML file. No account, no subscription, no internet.*
+**Design AWS / Azure / GCP systems, understand them, price them, and ship a self-contained interactive doc — all in one HTML file.**
+
+*Not a drawing app. Describe your system to any LLM, watch the flow ▶ Play itself, read each service's SLA · limits · pitfalls on hover, total the monthly cost, and ⬇ download the whole workflow as a runbook. No account, no server, no internet.*
 
 [![MIT License](https://img.shields.io/badge/license-MIT-1abc9c)](LICENSE)
 [![Single file](https://img.shields.io/badge/runtime-1%20html%20file-7B2FBE)](index.html)
+[![Knowledge built-in](https://img.shields.io/badge/SLA%20%C2%B7%20limits%20%C2%B7%20cost%20%C2%B7%20pitfalls-52%20services-1abc9c)](#-service-knowledge-base)
 [![Real icons](https://img.shields.io/badge/icons-1067%20AWS%20%2F%20Azure%20%2F%20GCP-FF9900)](icons/)
 [![Zero deps](https://img.shields.io/badge/dependencies-zero-2E86C1)](#tech-stack)
 
@@ -32,16 +35,27 @@ That's the whole install. One file, no build, runs from `file://`.
 
 ---
 
-## 🎯 What Potato does that nothing else does
+## 🧠 Why this isn't a diagram tool
 
-| | Potato |
+A diagram tool stops at the picture. **Potato keeps going** — it's where you *design, understand, price, and document* a cloud system, not just draw one.
+
+> **The picture is the cheap part.** The value is everything Potato wraps around it: the operational knowledge baked into every node, the animated walkthrough, the downloadable runbook, and the monthly cost. A box labelled "Lambda" is a drawing. A Lambda node that tells you its 15-minute ceiling, its cold-start pitfall, its SLA, and its monthly cost — and narrates how a request flows through it — is architecture intelligence.
+
+If you're choosing Potato, you're not choosing it *over* draw.io. You're choosing a different category.
+
+---
+
+## 🎯 What you get beyond the diagram
+
+| | |
 |---|---|
-| 🤖 **Plain-English → diagram** | Paste the [Potato LLM prompt](POTATO_LLM_PROMPT.md) into ChatGPT / Claude / Gemini / Copilot Chat. Describe your system. Paste the reply into 🤖 AI Import. Get a real, editable architecture. |
-| 💰 **Cost estimator built in** | Hover any AWS / Azure / GCP node to see real pricing formulas. Click `💰 Cost` to total the diagram at Small / Medium / Large workloads. |
-| 📋 **Service knowledge in tooltips** | Lambda's 15-min cap, DynamoDB's 400 KB item limit, RDS connection ceilings — every cloud node carries SLA, limits, when-to-use guidance, and common pitfalls one hover away. |
-| ▶ **Play the flow** | Click ▶ Play and watch your architecture explain itself, step-by-step, with the LLM-written narration that ships inside the file. |
-| 🪣 **1067 official icons** | AWS / Azure / GCP, searchable, drag-and-drop. The real artwork the cloud vendors ship — not stylised reproductions. |
-| 📤 **Shareable as a single file** | Save → email → recipient double-clicks → interactive viewer in any browser. Hovers icons. Plays the flow. Sees costs. No Potato install needed. |
+| 📋 **Architecture knowledge, built in** | Every AWS / Azure / GCP node carries real **SLA, limits, when-to-use guidance, and common pitfalls** — Lambda's 15-min cap, DynamoDB's 400 KB item limit, RDS connection ceilings — one hover away. 52 services documented. |
+| 💰 **Monthly cost estimator** | Hover for pricing formulas; click `💰 Cost` to total the whole design at Small / Medium / Large workloads, with a per-service breakdown and a coverage indicator. |
+| ▶ **Play-the-flow sequences** | Hit ▶ Play and the architecture **explains itself** step-by-step, with detailed narration that ships inside the file — request lifecycle, failure branches, scheduled jobs, end to end. |
+| ⬇ **Downloadable workflow runbook** | Export the play-flow as a numbered **Markdown runbook** — drop it straight into your docs, a PR description, or an onboarding wiki. The diagram becomes documentation. |
+| 🤖 **Plain-English → architecture** | Paste the [Potato prompt](POTATO_LLM_PROMPT.md) into any LLM (ChatGPT / Claude / Gemini / Copilot), describe your system, paste the reply back. Get a real, editable, *knowledge-enriched* design — not just shapes. |
+| 📤 **A file that explains itself** | Save → email → recipient double-clicks → interactive viewer in any browser. They hover tooltips, ▶ Play the flow, see the costs. No Potato, no account, no install. |
+| 🪣 **1067 official cloud icons** | AWS / Azure / GCP, searchable, drag-and-drop — the real artwork the vendors ship, not stylised reproductions. |
 
 > No account. No telemetry. No subscription. No internet after the initial download.
 
@@ -50,38 +64,43 @@ That's the whole install. One file, no build, runs from `file://`.
 ## 🎬 The headline workflow
 
 ```text
-┌─────────────────────────────────────────────────────────────────┐
-│  1. Click 🤖 AI Import                                          │
-│  2. Copy the Potato prompt → paste into ChatGPT / Claude / etc. │
-│  3. Describe your architecture in plain English                 │
-│  4. Paste the LLM's HTML reply back                             │
-│  5. Edit visually, hit ▶ Play, click 💰 Cost                    │
-│  6. Ctrl+S → committed as architecture.potato.html              │
-└─────────────────────────────────────────────────────────────────┘
+┌──────────────────────────────────────────────────────────────────────┐
+│  1. Describe your system to any LLM (paste the Potato prompt)         │
+│  2. Paste the reply into 🤖 AI Import → a real architecture appears   │
+│  3. Hover nodes → SLA · limits · pitfalls.  Click 💰 → monthly cost   │
+│  4. Hit ▶ Play → the flow narrates itself, step by step               │
+│  5. ⬇ Download the workflow as a Markdown runbook for your docs/PR    │
+│  6. 💾 Save → a self-contained .potato.html that explains itself      │
+└──────────────────────────────────────────────────────────────────────┘
 ```
 
 **A real prompt that works**:
 
 > *"Show a RAG chatbot on AWS: S3 docs → embedding Lambda → OpenSearch vector index → API Gateway → Bedrock with Claude. Add CloudWatch on each Lambda."*
 
-Result: 7 real AWS-iconed nodes, color-themed by service family, a `playFlow` narration that walks the request lifecycle end-to-end, and a cost panel ready to inspect.
+What comes back isn't just a picture: real AWS-iconed nodes color-themed by service family, each carrying its SLA / limits / pitfalls, a `playFlow` narration that walks the request lifecycle end-to-end, a cost panel ready to total, and a runbook one click from export.
 
 ---
 
-## 🆚 vs. the alternatives
+## 🆚 Drawing tools draw. Potato does the other 80%.
+
+Everyone can draw a box. The table below is deliberately *not* about drawing — it's about what happens **after** the boxes are on the canvas. That's the gap Potato fills, and it's why a head-to-head "which diagram tool" comparison misses the point.
 
 | | **Potato** | draw.io | Excalidraw | Mermaid | Lucidchart |
 |---|---|---|---|---|---|
-| Single offline HTML file | ✅ | ❌ | ❌ | ❌ | ❌ |
+| **Service knowledge** (SLA · limits · pitfalls) on every node | ✅ | ❌ | ❌ | ❌ | ❌ |
+| **Monthly cost estimator** | ✅ | ❌ | ❌ | ❌ | ❌ |
+| **Play-the-flow** animated walkthrough with narration | ✅ | ❌ | ❌ | ❌ | ❌ |
+| **Downloadable Markdown runbook** from the flow | ✅ | ❌ | ❌ | ❌ | ❌ |
+| **LLM-native** — describe it in English, any model | ✅ | ❌ | ❌ | ⚠️ syntax | ❌ |
+| **Self-explaining shareable file** (recipient interacts) | ✅ | ❌ | ❌ | ❌ | ❌ |
 | 1067 official AWS/Azure/GCP icons built-in | ✅ | ⚠️ download | ❌ | ❌ | ✅ paid |
-| Cost estimator | ✅ | ❌ | ❌ | ❌ | ❌ |
-| Service-limit / SLA tooltips | ✅ | ❌ | ❌ | ❌ | ❌ |
-| LLM-native import (any model) | ✅ | ❌ | ❌ | ⚠️ syntax | ❌ |
-| Animated play-the-flow with narration | ✅ | ❌ | ❌ | ❌ | ❌ |
-| Save → recipient interacts in browser | ✅ | ❌ | ❌ | ❌ | ❌ |
+| Single offline HTML file | ✅ | ❌ | ❌ | ❌ | ❌ |
 | Lives in `git diff` next to your code | ✅ HTML | ⚠️ XML | ⚠️ JSON | ✅ MD | ❌ |
 | Account / login required | ❌ | ❌ | ❌ | ❌ | ✅ |
 | Pricing | **Free** | Free | Free | Free | $$$ |
+
+The first six rows are the product. The drawing is table stakes.
 
 ---
 
@@ -321,7 +340,7 @@ No telemetry. No tracking. No strings.
 
 <div align="center">
 
-**Built for engineers who want to design and document cloud architectures without paying $40/seat/month or fighting a SaaS login.**
+**A Cloud Architecture Studio for engineers who want to design, cost, and document systems — not just draw them — without paying $40/seat/month or fighting a SaaS login.**
 
 If Potato saves you time, star the repo ⭐ — it's the only "metric" we collect.
 

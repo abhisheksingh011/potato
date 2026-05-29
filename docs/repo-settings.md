@@ -11,7 +11,7 @@ Click the **⚙️ gear** next to "About" on the repo home page, then paste:
 ### Description
 
 ```
-AI-native architecture diagrams with live AWS/Azure/GCP service tooltips, cost estimator, and Play-the-flow narration. Single HTML file, no server, no account.
+The Cloud Architecture Studio — design AWS/Azure/GCP systems, then get SLA/limits/pitfalls on every node, a monthly cost estimate, Play-the-flow narration, and a downloadable runbook. Single HTML file, no server, no account.
 ```
 
 ### Website
