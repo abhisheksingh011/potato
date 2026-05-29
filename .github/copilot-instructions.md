@@ -116,7 +116,7 @@ The KB lives in [`service_kb.json`](../service_kb.json) and is spliced into
 }
 ```
 
-Currently 52 services documented, 18 priced. After editing the JSON, run:
+Currently 52 services documented, 39 priced (the 13 unpriced are Azure / GCP / generic shapes). After editing the JSON, run:
 
 ```bash
 node _generate_kb.js

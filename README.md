@@ -321,7 +321,7 @@ The bundled extension (in [`extension.js`](extension.js)) registers a custom edi
 PRs welcome — see [CONTRIBUTING.md](CONTRIBUTING.md).
 
 Especially wanted:
-- More services in `service_kb.json` with `costEstimate` fields (we have 18 priced out of 52 covered out of 1067 icons)
+- More services in `service_kb.json` with `costEstimate` fields (39 priced of 52 covered — the 13 unpriced are mostly Azure/GCP/generic shapes)
 - Quarterly pricing-refresh PRs
 - More templates in the gallery
 - Mermaid export (we import; closing the loop is a small lift)
