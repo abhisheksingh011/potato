@@ -17,7 +17,7 @@
 
 ## ⚡ Try it in 10 seconds
 
-**Live demo** — open the editor in your browser, no install: **https://abhisheksingh011.github.io/potato/**
+**Live demo** — open the editor in your browser, no install: *coming soon (enable GitHub Pages once the repo is public — see [docs/repo-settings.md](docs/repo-settings.md))*
 
 **Local** — download or clone, then double-click `index.html`:
 
