@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 680" width="1200" height="680" role="img" aria-label="Potato hero demo placeholder">
+  <rect width="1200" height="680" fill="#0f1419"/>
+  <rect x="14" y="14" width="1172" height="652" rx="18" fill="#151b26" stroke="#1abc9c" stroke-width="2.5" stroke-dasharray="12 9"/>
+  <text x="600" y="250" font-family="Segoe UI, system-ui, -apple-system, sans-serif" font-size="74" font-weight="800" fill="#e6edf3" text-anchor="middle">🥔  ▶  Hero demo GIF</text>
+  <text x="600" y="320" font-family="Segoe UI, system-ui, sans-serif" font-size="30" fill="#9aa7b4" text-anchor="middle">The money workflow in one loop: AI Import → diagram → ▶ Play → 💰 Cost</text>
+  <text x="600" y="430" font-family="ui-monospace, Consolas, monospace" font-size="24" fill="#7B2FBE" text-anchor="middle">replace with → assets/hero.gif</text>
+  <text x="600" y="475" font-family="ui-monospace, Consolas, monospace" font-size="20" fill="#5b6675" text-anchor="middle">~1200px wide · &lt; 5 MB · 6–10 s loop · record with ScreenToGif</text>
+</svg>

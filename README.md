@@ -14,6 +14,10 @@
 [![Real icons](https://img.shields.io/badge/icons-1067%20AWS%20%2F%20Azure%20%2F%20GCP-FF9900)](icons/)
 [![Zero deps](https://img.shields.io/badge/dependencies-zero-2E86C1)](#tech-stack)
 
+<br>
+
+<img src="assets/hero.svg" alt="Potato in action: describe a system, get a diagram, Play the flow, see the cost" width="820">
+
 </div>
 
 ---
@@ -101,6 +105,35 @@ Everyone can draw a box. The table below is deliberately *not* about drawing —
 | Pricing | **Free** | Free | Free | Free | $$$ |
 
 The first six rows are the product. The drawing is table stakes.
+
+---
+
+## 📸 See it in action
+
+<table>
+<tr>
+<td width="50%" align="center">
+<img src="assets/service-tooltip.svg" alt="Service knowledge tooltip showing SLA, limits, and pitfalls" width="100%"><br>
+<b>📋 Knowledge on every node</b><br><sub>SLA · limits · when-to-use · pitfalls, one hover away</sub>
+</td>
+<td width="50%" align="center">
+<img src="assets/cost-estimator.svg" alt="Cost estimator panel with per-service breakdown" width="100%"><br>
+<b>💰 Monthly cost, totalled</b><br><sub>Per-service breakdown at Small / Medium / Large</sub>
+</td>
+</tr>
+<tr>
+<td width="50%" align="center">
+<img src="assets/saved-viewer.svg" alt="Saved interactive viewer mid Play" width="100%"><br>
+<b>📤 A file that explains itself</b><br><sub>Recipient double-clicks → hovers, ▶ Plays, sees cost</sub>
+</td>
+<td width="50%" align="center">
+<img src="assets/hero.svg" alt="The end-to-end Potato workflow" width="100%"><br>
+<b>🤖 → ▶ → 💰 → ⬇</b><br><sub>Describe it, Play it, price it, download the runbook</sub>
+</td>
+</tr>
+</table>
+
+> Screenshots are placeholders right now — see [`assets/README.md`](assets/README.md) to drop in real captures (the layout updates automatically).
 
 ---
 
@@ -283,6 +316,7 @@ potato/
 ├── _generate_components.js    ← Splices the icons/ tree into the COMPONENTS manifest
 ├── _test_saved_viewer.js      ← Smoke test for the saved-viewer inline script
 ├── icons/                     ← 1067 SVGs across aws/azure/gcp by category
+├── assets/                    ← README screenshots + capture guide
 ├── POTATO_LLM_PROMPT.md       ← Long-form prompt you can copy into any LLM
 ├── .github/
 │   ├── copilot-instructions.md  ← Auto-loaded by Copilot Chat in this repo

@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 620" width="1000" height="620" role="img" aria-label="Saved interactive viewer placeholder">
+  <rect width="1000" height="620" fill="#0f1419"/>
+  <rect x="12" y="12" width="976" height="596" rx="16" fill="#151b26" stroke="#7B2FBE" stroke-width="2.5" stroke-dasharray="12 9"/>
+  <text x="500" y="245" font-family="Segoe UI, system-ui, sans-serif" font-size="54" font-weight="800" fill="#e6edf3" text-anchor="middle">📤  A file that explains itself</text>
+  <text x="500" y="307" font-family="Segoe UI, system-ui, sans-serif" font-size="26" fill="#9aa7b4" text-anchor="middle">Saved .potato.html viewer mid ▶ Play — recipient just double-clicks</text>
+  <text x="500" y="408" font-family="ui-monospace, Consolas, monospace" font-size="22" fill="#7B2FBE" text-anchor="middle">replace with → assets/saved-viewer.png</text>
+  <text x="500" y="450" font-family="ui-monospace, Consolas, monospace" font-size="18" fill="#5b6675" text-anchor="middle">open a saved .potato.html, hit ▶ Play, screenshot mid-narration</text>
+</svg>
