@@ -8,8 +8,7 @@ actually on disk.
 
 **Potato** is a single-file architecture diagramming tool — `index.html` is
 the entire editor (~8700 lines, vanilla JS + HTML + CSS, zero dependencies,
-zero build step). It also ships a small VS Code extension (`extension.js`)
-that registers a custom editor for `*.potato.html` files.
+zero build step).
 
 Diagrams are saved as self-contained `.potato.html` files with the diagram
 JSON embedded in a `<script type="application/json" id="potato-data">` block,
@@ -82,7 +81,7 @@ getDiagramData()         // current snapshot, preserves meta.created
 pushHistory() / undo() / redo()   // 60-level history
 
 // Save / share
-saveDiagram()            // Ctrl+S — in VS Code: posts to extension which writes via WorkspaceEdit + document.save()
+saveDiagram()            // Ctrl+S — saves the current diagram (download / FileSystem handle)
 saveAsDiagram()          // Ctrl+Shift+S — prompts for new path
 buildSavedHTML(name, dataStr, svgMarkup)   // assembles the standalone viewer
 
@@ -135,24 +134,6 @@ node _generate_components.js
 
 CI fails if these generators would produce a diff against the committed
 `index.html` — see `.github/workflows/check.yml`.
-
-## VS Code extension ([extension.js](../extension.js))
-
-Single file at the repo root. Registers:
-
-- A **custom editor** for `*.potato.html` (double-click to open in Potato)
-- Commands: `potato.openEditor`, `potato.newDiagram`, `potato.openFile`
-- Keybinding `Ctrl+Alt+D` / `Cmd+Alt+D`
-- A status-bar button: 🥔 Potato
-
-Save flow: webview posts `{type:'save', html}` to the extension; extension
-applies a `WorkspaceEdit` covering the full document range, then calls
-`document.save()`. Keeps VS Code's text-document model in sync, so Revert,
-`git diff`, and split-editor views all reflect the canvas.
-
-External changes (Revert, `git checkout`, another tool) are caught by
-`vscode.workspace.onDidChangeTextDocument` and re-loaded into the webview
-via a `{type:'load', data}` message.
 
 ## Saved file format
 

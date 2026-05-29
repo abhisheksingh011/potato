@@ -19,7 +19,6 @@ _generate_kb.js           — splices service_kb.json into index.html
 _generate_components.js   — splices the icons/ tree into COMPONENTS[] in index.html
 icons/<provider>/<cat>/   — 1067 cloud SVGs (do not modify in-place; replace via the regen workflow)
 POTATO_LLM_PROMPT.md      — canonical LLM prompt (kept in sync with the inlined POTATO_LLM_PROMPT_TEXT in index.html)
-extension.js              — VS Code extension entry point
 ```
 
 ## Editing data (when to run which script)
@@ -64,11 +63,11 @@ There is no automated test suite (yet). Manually verify the path your change aff
 6. **SVG export** includes the real icons (not the emoji fallback) when the source diagram uses cloud nodes.
 7. **Cost Estimator** opens, switches between Small/Medium/Large, shows a per-service breakdown and a total.
 
-For UI changes, open `index.html` in Chrome, Firefox, and Safari. The VS Code extension needs testing separately: open the repo in VS Code → press `F5` to launch the Extension Development Host → double-click a `*.potato.html` file in the host window.
+For UI changes, open `index.html` in Chrome, Firefox, and Safari.
 
 ## PR checklist
 
-- [ ] Changes are confined to `index.html`, `service_kb.json`, `icons/`, the build scripts, or `extension.js`
+- [ ] Changes are confined to `index.html`, `service_kb.json`, `icons/`, or the build scripts
 - [ ] Generators have been re-run if their source files changed (CI will check)
 - [ ] User strings escaped with `escHtml()` everywhere they touch innerHTML / SVG attributes
 - [ ] `pushHistory()` called before destructive ops

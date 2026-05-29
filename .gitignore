@@ -11,8 +11,7 @@ desktop.ini
 *.swp
 *.swo
 
-# VS Code extension build artifacts
-*.vsix
+# Build artifacts
 node_modules/
 
 # Local autosaves / scratch files
