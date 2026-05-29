@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -8650,61 +8650,336 @@ document.addEventListener('DOMContentLoaded', () => {
 
 // ===== TEMPLATES =====
 const TEMPLATES = {
-  '3tier': {
-    name: '3-Tier Web App',
-    desc: 'User → CDN → Load Balancer → API → Database. Classic starting point.',
+  /* ── AWS Architecture Templates ─────────────────────────────────── */
+  'aws-3tier': {
+    name: 'AWS Three-Tier Web App',
+    desc: 'Route 53 → CloudFront → WAF → ALB → ECS Fargate (2 AZs) → Aurora + ElastiCache.',
     icon: '🌐',
     data: {
-      meta: { version:'1.0', name:'3-Tier Web App' },
+      meta: { version:'1.0', name:'AWS Three-Tier Web App' },
       nodes: [
-        { id:'n_1', x:60,  y:240, w:160, type:'User',         label:'End User',      sublabel:'Browser',         category:'Frontend',   icon:'👤', theme:'gray',   description:'End user', zIndex:10 },
-        { id:'n_2', x:300, y:240, w:160, type:'CloudFront',   label:'CDN',           sublabel:'cf-prod',         category:'Networking', icon:'🌐', theme:'purple', description:'CDN caches static assets globally', zIndex:11 },
-        { id:'n_3', x:540, y:240, w:160, type:'ALB',          label:'Load Balancer', sublabel:'alb-prod',        category:'Networking', icon:'⚖️', theme:'teal',   description:'Application load balancer', zIndex:12 },
-        { id:'n_4', x:780, y:140, w:160, type:'ECS',          label:'API Service',   sublabel:'api-ecs',         category:'Compute',    icon:'🐳', theme:'orange', description:'Containerised API on ECS Fargate', zIndex:13 },
-        { id:'n_5', x:780, y:340, w:160, type:'ECS',          label:'Worker',        sublabel:'worker-ecs',      category:'Compute',    icon:'🐳', theme:'orange', description:'Background job processor', zIndex:14 },
-        { id:'n_6', x:1020,y:140, w:160, type:'RDS',          label:'PostgreSQL',    sublabel:'rds-pg-prod',     category:'Database',   icon:'🗄️', theme:'blue',   description:'Primary relational DB. Multi-AZ.', zIndex:15 },
-        { id:'n_7', x:1020,y:340, w:160, type:'SQS',          label:'Job Queue',     sublabel:'jobs-queue',      category:'Integration',icon:'📬', theme:'orange', description:'SQS buffering async jobs', zIndex:16 }
+        { id:'n_1',  x:60,   y:280, w:160, type:'User',                         label:'End User',        sublabel:'Browser/Mobile',      category:'Frontend',   icon:'👤', theme:'gray',   description:'End users accessing the app globally.', zIndex:10 },
+        { id:'n_2',  x:280,  y:280, w:160, type:'Amazon Route 53',              label:'Route 53',        sublabel:'DNS + health checks',  category:'Networking', icon:'🛣️', iconUrl:'icons/aws/Networking-Content-Delivery/Amazon-Route-53.svg',        theme:'purple', description:'Latency-based DNS routing and health checks for failover.', zIndex:11 },
+        { id:'n_3',  x:500,  y:280, w:160, type:'Amazon CloudFront',            label:'CloudFront',      sublabel:'global CDN',           category:'Networking', icon:'🌐', iconUrl:'icons/aws/Networking-Content-Delivery/Amazon-CloudFront.svg',       theme:'purple', description:'Global CDN — caches static content at 400+ edge locations.', zIndex:12 },
+        { id:'n_4',  x:500,  y:440, w:160, type:'AWS WAF',                      label:'AWS WAF',         sublabel:'web ACL',              category:'Security',   icon:'🛡️', iconUrl:'icons/aws/Security-Identity/AWS-WAF.svg',                           theme:'red',    description:'Blocks OWASP Top-10, SQL injection, and bot traffic.', zIndex:13 },
+        { id:'n_5',  x:720,  y:280, w:160, type:'Application Load Balancer',    label:'ALB',             sublabel:'alb-prod.us-east-1',   category:'Networking', icon:'⚖️', iconUrl:'icons/aws/Networking-Content-Delivery/Elastic-Load-Balancing.svg',  theme:'purple', description:'Distributes HTTP/2 traffic across ECS tasks in multiple AZs.', zIndex:14 },
+        { id:'n_6',  x:940,  y:180, w:160, type:'Amazon ECS',                   label:'ECS Fargate',     sublabel:'api-svc / us-east-1a', category:'Compute',    icon:'🐳', iconUrl:'icons/aws/Containers/Amazon-Elastic-Container-Service.svg',         theme:'orange', description:'Serverless container task in AZ-a. Auto-scales with ALB target tracking.', zIndex:15 },
+        { id:'n_7',  x:940,  y:380, w:160, type:'Amazon ECS',                   label:'ECS Fargate',     sublabel:'api-svc / us-east-1b', category:'Compute',    icon:'🐳', iconUrl:'icons/aws/Containers/Amazon-Elastic-Container-Service.svg',         theme:'orange', description:'Serverless container task in AZ-b for high availability.', zIndex:16 },
+        { id:'n_8',  x:1160, y:280, w:160, type:'Amazon Aurora',                label:'Aurora MySQL',    sublabel:'aurora-prod / Multi-AZ',category:'Database',   icon:'🗄️', iconUrl:'icons/aws/Databases/Amazon-Aurora.svg',                             theme:'blue',   description:'Multi-AZ Aurora cluster with 1 writer + 2 read replicas. Failover ~30s.', zIndex:17 },
+        { id:'n_9',  x:1160, y:440, w:160, type:'Amazon ElastiCache',           label:'Redis Cache',     sublabel:'cache.r7g.large',      category:'Database',   icon:'⚡', iconUrl:'icons/aws/Databases/Amazon-ElastiCache.svg',                        theme:'red',    description:'Redis cluster for session store and API response caching.', zIndex:18 },
+        { id:'n_10', x:1380, y:280, w:160, type:'Amazon CloudWatch',            label:'CloudWatch',      sublabel:'dashboards + alarms',  category:'DevOps',     icon:'📡', iconUrl:'icons/aws/Management-Tools/Amazon-CloudWatch.svg',                  theme:'teal',   description:'ALB request metrics, ECS CPU/memory alarms, Aurora latency dashboards.', zIndex:19 }
       ],
       arrows: [
-        { id:'a_1', from:'n_1', to:'n_2', fromPort:'right', toPort:'left', color:'default', style:'solid', label:'HTTPS' },
-        { id:'a_2', from:'n_2', to:'n_3', fromPort:'right', toPort:'left', color:'purple',  style:'solid', label:'' },
-        { id:'a_3', from:'n_3', to:'n_4', fromPort:'right', toPort:'left', color:'teal',    style:'solid', label:'route' },
-        { id:'a_4', from:'n_4', to:'n_6', fromPort:'right', toPort:'left', color:'blue',    style:'solid', label:'SQL' },
-        { id:'a_5', from:'n_4', to:'n_7', fromPort:'bottom',toPort:'top',  color:'orange',  style:'dashed',label:'enqueue', animated:true },
-        { id:'a_6', from:'n_5', to:'n_7', fromPort:'right', toPort:'left', color:'orange',  style:'dashed',label:'poll' },
-        { id:'a_7', from:'n_5', to:'n_6', fromPort:'right', toPort:'left', color:'blue',    style:'solid', label:'write' }
+        { id:'a_1', from:'n_1', to:'n_2', fromPort:'right', toPort:'left',   color:'default', style:'solid',  label:'DNS',     animated:false },
+        { id:'a_2', from:'n_2', to:'n_3', fromPort:'right', toPort:'left',   color:'purple',  style:'solid',  label:'',        animated:false },
+        { id:'a_3', from:'n_3', to:'n_4', fromPort:'bottom',toPort:'top',    color:'red',     style:'dotted', label:'filter',  animated:false },
+        { id:'a_4', from:'n_3', to:'n_5', fromPort:'right', toPort:'left',   color:'purple',  style:'solid',  label:'HTTPS',   animated:false },
+        { id:'a_5', from:'n_5', to:'n_6', fromPort:'right', toPort:'left',   color:'teal',    style:'solid',  label:'AZ-a',    animated:false },
+        { id:'a_6', from:'n_5', to:'n_7', fromPort:'right', toPort:'left',   color:'teal',    style:'solid',  label:'AZ-b',    animated:false },
+        { id:'a_7', from:'n_6', to:'n_8', fromPort:'right', toPort:'left',   color:'blue',    style:'solid',  label:'SQL',     animated:false },
+        { id:'a_8', from:'n_7', to:'n_8', fromPort:'right', toPort:'left',   color:'blue',    style:'solid',  label:'SQL',     animated:false },
+        { id:'a_9', from:'n_6', to:'n_9', fromPort:'right', toPort:'left',   color:'red',     style:'solid',  label:'cache',   animated:false },
+        { id:'a_10',from:'n_8', to:'n_10',fromPort:'right', toPort:'left',   color:'teal',    style:'dotted', label:'metrics', animated:false }
       ],
       groups: [
-        { id:'g_1', x:760, y:100, w:440, h:300, label:'Private Subnet', color:'purple' }
+        { id:'g_1', x:700, y:130, w:700, h:430, label:'VPC — us-east-1 / Private Subnets', color:'purple' }
+      ],
+      playFlow: [
+        { arrow:'a_1', text:'User types the URL — browser resolves DNS via Route 53, which applies latency-based routing and health checks.' },
+        { arrow:'a_2', text:'Route 53 directs the request to the nearest CloudFront edge POP, which serves cached assets instantly.' },
+        { arrow:'a_4', text:'Cache miss for the API call — CloudFront forwards to the Application Load Balancer inside the VPC.' },
+        { arrow:'a_3', text:'AWS WAF evaluates every request against the web ACL before CloudFront forwards it.' },
+        { arrow:'a_5', text:'ALB picks a healthy ECS Fargate task in AZ-a using least-outstanding-requests routing.' },
+        { arrow:'a_7', text:'The API container reads from the Aurora cluster — reads go to a replica to spare the writer.' },
+        { arrow:'a_9', text:'Frequently-read responses are fetched from Redis, cutting Aurora load and sub-millisecond latency.' },
+        { arrow:'a_10',text:'Aurora publishes slow-query metrics to CloudWatch; an alarm fires if P99 latency exceeds the SLA.' }
       ]
     }
   },
-  'serverless': {
-    name: 'Serverless API',
-    desc: 'API Gateway → Lambda → DynamoDB. Event-driven, scales to zero.',
+
+  'aws-serverless': {
+    name: 'AWS Serverless API',
+    desc: 'API Gateway → Cognito auth → Lambda → DynamoDB + async SQS worker. Scales to zero.',
     icon: '⚡',
     data: {
-      meta:{ version:'1.0', name:'Serverless API' },
-      nodes:[
-        { id:'n_1', x:60,  y:240, w:160, type:'User',           label:'Client',       sublabel:'Mobile/Web',   category:'Frontend',   icon:'📱', theme:'gray',    description:'API consumer', zIndex:10 },
-        { id:'n_2', x:300, y:240, w:160, type:'API Gateway',    label:'API Gateway',  sublabel:'api.example.com', category:'Networking', icon:'🚪', theme:'orange', description:'REST API entrypoint with throttling + auth', zIndex:11 },
-        { id:'n_3', x:540, y:140, w:160, type:'Lambda',         label:'Auth Fn',      sublabel:'auth-fn',       category:'Compute',    icon:'⚡', theme:'orange',  description:'JWT validation. 256MB, 5s timeout.', zIndex:12 },
-        { id:'n_4', x:540, y:340, w:160, type:'Lambda',         label:'Orders Fn',    sublabel:'orders-fn',     category:'Compute',    icon:'⚡', theme:'orange',  description:'CRUD on orders. 512MB.', zIndex:13 },
-        { id:'n_5', x:800, y:140, w:160, type:'Cognito',        label:'User Pool',    sublabel:'us-east-1-pool',category:'Security',   icon:'🪪', theme:'red',     description:'Managed user auth', zIndex:14 },
-        { id:'n_6', x:800, y:340, w:160, type:'DynamoDB',       label:'Orders Table', sublabel:'orders-prod',   category:'Database',   icon:'🔷', theme:'blue',    description:'NoSQL key-value. On-demand billing.', zIndex:15 },
-        { id:'n_7', x:1040,y:340, w:160, type:'EventBridge',    label:'Event Bus',    sublabel:'orders-events', category:'Integration',icon:'⚡', theme:'pink',    description:'Fans out order events to downstream', zIndex:16 }
+      meta: { version:'1.0', name:'AWS Serverless API' },
+      nodes: [
+        { id:'n_1', x:60,   y:280, w:160, type:'Client',              label:'Client',        sublabel:'Web / Mobile',         category:'Frontend',   icon:'📱', theme:'gray',    description:'API consumer — web SPA or mobile app.', zIndex:10 },
+        { id:'n_2', x:280,  y:280, w:160, type:'Amazon API Gateway',  label:'API Gateway',   sublabel:'REST — api.example.com',category:'Networking', icon:'🚪', iconUrl:'icons/aws/Networking-Content-Delivery/Amazon-API-Gateway.svg', theme:'purple', description:'Managed REST API with throttling, caching, and request validation. Handles TLS termination.', zIndex:11 },
+        { id:'n_3', x:280,  y:130, w:160, type:'Amazon Cognito',      label:'Cognito',       sublabel:'user-pool-prod',        category:'Security',   icon:'🪪', iconUrl:'icons/aws/Security-Identity/Amazon-Cognito.svg',              theme:'red',    description:'Managed user pool. Issues JWT tokens validated by API GW authorizer.', zIndex:12 },
+        { id:'n_4', x:500,  y:280, w:160, type:'AWS Lambda',          label:'Handler Fn',    sublabel:'api-handler / 512 MB', category:'Compute',    icon:'⚡', iconUrl:'icons/aws/Compute/AWS-Lambda.svg',                            theme:'orange', description:'Stateless function — processes requests, reads/writes DynamoDB, emits events.', zIndex:13 },
+        { id:'n_5', x:720,  y:280, w:160, type:'Amazon DynamoDB',     label:'DynamoDB',      sublabel:'orders-table / on-demand',category:'Database',  icon:'🔷', iconUrl:'icons/aws/Databases/Amazon-DynamoDB.svg',                    theme:'blue',   description:'Single-table design. On-demand billing scales to any throughput spike.', zIndex:14 },
+        { id:'n_6', x:720,  y:440, w:160, type:'Amazon SQS',          label:'Job Queue',     sublabel:'async-jobs.fifo',       category:'Integration',icon:'📬', iconUrl:'icons/aws/Application-Integration/Amazon-Simple-Queue-Service.svg', theme:'orange', description:'FIFO queue buffers async work — email, webhooks, side effects.', zIndex:15 },
+        { id:'n_7', x:940,  y:440, w:160, type:'AWS Lambda',          label:'Worker Fn',     sublabel:'worker-fn / 1 GB',     category:'Compute',    icon:'⚡', iconUrl:'icons/aws/Compute/AWS-Lambda.svg',                            theme:'orange', description:'Async consumer polled via SQS event source mapping. Retries with DLQ on failure.', zIndex:16 },
+        { id:'n_8', x:940,  y:130, w:160, type:'AWS X-Ray',           label:'X-Ray',         sublabel:'distributed tracing',  category:'DevOps',     icon:'🔬', iconUrl:'icons/aws/Management-Tools/AWS-X-Ray.svg',                    theme:'teal',   description:'End-to-end distributed traces across API GW, Lambda, and DynamoDB.', zIndex:17 },
+        { id:'n_9', x:940,  y:280, w:160, type:'Amazon CloudWatch',   label:'CloudWatch',    sublabel:'logs + alarms',        category:'DevOps',     icon:'📡', iconUrl:'icons/aws/Management-Tools/Amazon-CloudWatch.svg',            theme:'teal',   description:'Lambda invocation errors, DLQ depth alarms, DynamoDB throttle metrics.', zIndex:18 }
       ],
-      arrows:[
-        { id:'a_1', from:'n_1', to:'n_2', fromPort:'right', toPort:'left', color:'default', style:'solid', label:'HTTPS' },
-        { id:'a_2', from:'n_2', to:'n_3', fromPort:'right', toPort:'left', color:'orange',  style:'solid', label:'authorize' },
-        { id:'a_3', from:'n_3', to:'n_5', fromPort:'right', toPort:'left', color:'red',     style:'solid', label:'verify' },
-        { id:'a_4', from:'n_2', to:'n_4', fromPort:'right', toPort:'left', color:'orange',  style:'solid', label:'invoke' },
-        { id:'a_5', from:'n_4', to:'n_6', fromPort:'right', toPort:'left', color:'blue',    style:'solid', label:'put/get' },
-        { id:'a_6', from:'n_4', to:'n_7', fromPort:'bottom',toPort:'top',  color:'pink',    style:'dashed',label:'emit', animated:true }
+      arrows: [
+        { id:'a_1', from:'n_1', to:'n_2', fromPort:'right', toPort:'left',  color:'default', style:'solid',  label:'HTTPS',    animated:false },
+        { id:'a_2', from:'n_1', to:'n_3', fromPort:'top',   toPort:'bottom',color:'red',     style:'solid',  label:'sign-in',  animated:false },
+        { id:'a_3', from:'n_3', to:'n_2', fromPort:'bottom',toPort:'top',   color:'red',     style:'dotted', label:'JWT',      animated:false },
+        { id:'a_4', from:'n_2', to:'n_4', fromPort:'right', toPort:'left',  color:'orange',  style:'solid',  label:'invoke',   animated:false },
+        { id:'a_5', from:'n_4', to:'n_5', fromPort:'right', toPort:'left',  color:'blue',    style:'solid',  label:'put/get',  animated:false },
+        { id:'a_6', from:'n_4', to:'n_6', fromPort:'bottom',toPort:'top',   color:'orange',  style:'dashed', label:'enqueue',  animated:true  },
+        { id:'a_7', from:'n_6', to:'n_7', fromPort:'right', toPort:'left',  color:'orange',  style:'solid',  label:'poll',     animated:false },
+        { id:'a_8', from:'n_4', to:'n_8', fromPort:'right', toPort:'left',  color:'teal',    style:'dotted', label:'trace',    animated:false },
+        { id:'a_9', from:'n_4', to:'n_9', fromPort:'right', toPort:'left',  color:'teal',    style:'dotted', label:'logs',     animated:false }
       ],
-      groups: []
+      groups: [],
+      playFlow: [
+        { arrow:'a_2', text:'User signs in through the Cognito hosted UI — a JWT access token is returned.' },
+        { arrow:'a_1', text:'Client sends an HTTPS request to API Gateway, attaching the JWT in the Authorization header.' },
+        { arrow:'a_3', text:'API Gateway validates the JWT signature against the Cognito JWKS endpoint before forwarding.' },
+        { arrow:'a_4', text:'API Gateway invokes the Handler Lambda — cold start typically <500ms with Provisioned Concurrency.' },
+        { arrow:'a_5', text:'Lambda reads or writes the DynamoDB single-table — eventually consistent reads cost half a capacity unit.' },
+        { arrow:'a_6', text:'Lambda enqueues an async job (e.g., send email, update search index) to the FIFO SQS queue so the response stays fast.' },
+        { arrow:'a_7', text:'The Worker Lambda polls the queue via event source mapping and processes each job at least once.' },
+        { arrow:'a_9', text:'All Lambda invocations and errors stream to CloudWatch Logs; an alarm fires on DLQ message count > 0.' }
+      ]
     }
   },
+
+  'aws-eventdriven': {
+    name: 'AWS Event-Driven Microservices',
+    desc: 'API Gateway → Lambda services → EventBridge → SQS fan-out → async consumers.',
+    icon: '📡',
+    data: {
+      meta: { version:'1.0', name:'AWS Event-Driven Microservices' },
+      nodes: [
+        { id:'n_1',  x:60,  y:300, w:160, type:'Client',                      label:'Client',          sublabel:'Web / Mobile',        category:'Frontend',   icon:'📱', theme:'gray',   description:'API consumer.', zIndex:10 },
+        { id:'n_2',  x:280, y:300, w:160, type:'Amazon API Gateway',           label:'API Gateway',     sublabel:'orders.api',          category:'Networking', icon:'🚪', iconUrl:'icons/aws/Networking-Content-Delivery/Amazon-API-Gateway.svg',          theme:'purple', description:'REST API routes to Orders and Users services.', zIndex:11 },
+        { id:'n_3',  x:500, y:180, w:160, type:'AWS Lambda',                   label:'Orders Service',  sublabel:'orders-fn',           category:'Compute',    icon:'⚡', iconUrl:'icons/aws/Compute/AWS-Lambda.svg',                                        theme:'orange', description:'Handles order creation, updates, and queries.', zIndex:12 },
+        { id:'n_4',  x:500, y:420, w:160, type:'AWS Lambda',                   label:'Users Service',   sublabel:'users-fn',            category:'Compute',    icon:'⚡', iconUrl:'icons/aws/Compute/AWS-Lambda.svg',                                        theme:'orange', description:'Manages user profiles and preferences.', zIndex:13 },
+        { id:'n_5',  x:720, y:180, w:160, type:'Amazon DynamoDB',              label:'Orders Table',    sublabel:'orders-table',        category:'Database',   icon:'🔷', iconUrl:'icons/aws/Databases/Amazon-DynamoDB.svg',                                 theme:'blue',   description:'Per-service DynamoDB table — database-per-service pattern.', zIndex:14 },
+        { id:'n_6',  x:720, y:420, w:160, type:'Amazon DynamoDB',              label:'Users Table',     sublabel:'users-table',         category:'Database',   icon:'🔷', iconUrl:'icons/aws/Databases/Amazon-DynamoDB.svg',                                 theme:'blue',   description:'Isolated user data store.', zIndex:15 },
+        { id:'n_7',  x:720, y:300, w:160, type:'Amazon EventBridge',           label:'EventBridge',     sublabel:'orders-events-bus',   category:'Integration',icon:'⚡', iconUrl:'icons/aws/Application-Integration/Amazon-EventBridge.svg',                theme:'orange', description:'Custom event bus. Routes domain events to downstream consumers via rules.', zIndex:16 },
+        { id:'n_8',  x:940, y:180, w:160, type:'Amazon SQS',                   label:'Email Queue',     sublabel:'email-q',             category:'Integration',icon:'📬', iconUrl:'icons/aws/Application-Integration/Amazon-Simple-Queue-Service.svg',       theme:'orange', description:'Buffers email notification jobs — survives Lambda throttles.', zIndex:17 },
+        { id:'n_9',  x:940, y:420, w:160, type:'Amazon SQS',                   label:'Analytics Queue', sublabel:'analytics-q',         category:'Integration',icon:'📬', iconUrl:'icons/aws/Application-Integration/Amazon-Simple-Queue-Service.svg',       theme:'orange', description:'Decouples analytics writes from the critical path.', zIndex:18 },
+        { id:'n_10', x:1160,y:180, w:160, type:'AWS Lambda',                   label:'Email Sender',    sublabel:'email-fn',            category:'Compute',    icon:'⚡', iconUrl:'icons/aws/Compute/AWS-Lambda.svg',                                        theme:'orange', description:'Sends transactional email via SES. Retries with exponential backoff.', zIndex:19 },
+        { id:'n_11', x:1160,y:420, w:160, type:'AWS Lambda',                   label:'Analytics Writer',sublabel:'analytics-fn',        category:'Compute',    icon:'⚡', iconUrl:'icons/aws/Compute/AWS-Lambda.svg',                                        theme:'orange', description:'Writes enriched event records to Redshift or DynamoDB analytics table.', zIndex:20 }
+      ],
+      arrows: [
+        { id:'a_1', from:'n_1',  to:'n_2',  fromPort:'right', toPort:'left',   color:'default', style:'solid',  label:'HTTPS',   animated:false },
+        { id:'a_2', from:'n_2',  to:'n_3',  fromPort:'right', toPort:'left',   color:'orange',  style:'solid',  label:'invoke',  animated:false },
+        { id:'a_3', from:'n_2',  to:'n_4',  fromPort:'right', toPort:'left',   color:'orange',  style:'solid',  label:'invoke',  animated:false },
+        { id:'a_4', from:'n_3',  to:'n_5',  fromPort:'right', toPort:'left',   color:'blue',    style:'solid',  label:'put/get', animated:false },
+        { id:'a_5', from:'n_4',  to:'n_6',  fromPort:'right', toPort:'left',   color:'blue',    style:'solid',  label:'put/get', animated:false },
+        { id:'a_6', from:'n_3',  to:'n_7',  fromPort:'right', toPort:'left',   color:'orange',  style:'dashed', label:'emit',    animated:true  },
+        { id:'a_7', from:'n_7',  to:'n_8',  fromPort:'right', toPort:'left',   color:'orange',  style:'solid',  label:'rule',    animated:false },
+        { id:'a_8', from:'n_7',  to:'n_9',  fromPort:'right', toPort:'left',   color:'orange',  style:'solid',  label:'rule',    animated:false },
+        { id:'a_9', from:'n_8',  to:'n_10', fromPort:'right', toPort:'left',   color:'orange',  style:'solid',  label:'poll',    animated:false },
+        { id:'a_10',from:'n_9',  to:'n_11', fromPort:'right', toPort:'left',   color:'orange',  style:'solid',  label:'poll',    animated:false }
+      ],
+      groups: [
+        { id:'g_1', x:480, y:140, w:200, h:340, label:'Microservices', color:'orange' }
+      ],
+      playFlow: [
+        { arrow:'a_1', text:'Client submits a POST /orders request through API Gateway.' },
+        { arrow:'a_2', text:'API Gateway invokes the Orders Service Lambda with the request payload.' },
+        { arrow:'a_4', text:'Orders Lambda persists the new order to its dedicated DynamoDB table — database-per-service pattern.' },
+        { arrow:'a_6', text:'Orders Lambda publishes an OrderPlaced event to the EventBridge custom bus — fire and forget.' },
+        { arrow:'a_7', text:'EventBridge rule matches OrderPlaced and routes to the Email Queue.' },
+        { arrow:'a_8', text:'A second rule routes the same event to the Analytics Queue — fan-out with zero coupling between consumers.' },
+        { arrow:'a_9', text:'Email Sender Lambda polls the queue and sends a transactional confirmation email via SES.' },
+        { arrow:'a_10',text:'Analytics Writer Lambda writes enriched event data to the analytics store asynchronously.' }
+      ]
+    }
+  },
+
+  'aws-static-cdn': {
+    name: 'AWS Static Site + CDN',
+    desc: 'S3 origin → CloudFront global CDN → WAF → Route 53 → ACM. Zero-server hosting.',
+    icon: '🪣',
+    data: {
+      meta: { version:'1.0', name:'AWS Static Site + CDN' },
+      nodes: [
+        { id:'n_1', x:60,  y:280, w:160, type:'Browser',                 label:'Browser',      sublabel:'End User',             category:'Frontend',   icon:'🌐', theme:'gray',   description:'User visits the website from any browser or device.', zIndex:10 },
+        { id:'n_2', x:280, y:280, w:160, type:'Amazon Route 53',         label:'Route 53',     sublabel:'example.com A alias',  category:'Networking', icon:'🛣️', iconUrl:'icons/aws/Networking-Content-Delivery/Amazon-Route-53.svg',       theme:'purple', description:'Alias A record points to the CloudFront distribution. No per-query charge for alias records.', zIndex:11 },
+        { id:'n_3', x:280, y:440, w:160, type:'AWS Certificate Manager', label:'ACM',          sublabel:'*.example.com TLS',    category:'Security',   icon:'🔐', iconUrl:'icons/aws/Security-Identity/AWS-Certificate-Manager.svg',         theme:'red',    description:'Free ACM certificate auto-renews. Attached to the CloudFront distribution for HTTPS.', zIndex:12 },
+        { id:'n_4', x:500, y:280, w:160, type:'Amazon CloudFront',       label:'CloudFront',   sublabel:'400+ edge POPs',       category:'Networking', icon:'🌐', iconUrl:'icons/aws/Networking-Content-Delivery/Amazon-CloudFront.svg',      theme:'purple', description:'Global CDN — caches HTML/JS/CSS/images at edge. Origin shield reduces S3 load.', zIndex:13 },
+        { id:'n_5', x:500, y:440, w:160, type:'AWS WAF',                 label:'AWS WAF',      sublabel:'web ACL',              category:'Security',   icon:'🛡️', iconUrl:'icons/aws/Security-Identity/AWS-WAF.svg',                          theme:'red',    description:'Rate limiting, geo-blocking, and managed rule groups attached to the CloudFront distribution.', zIndex:14 },
+        { id:'n_6', x:720, y:280, w:160, type:'Amazon S3',               label:'S3 Origin',    sublabel:'my-site-bucket',       category:'Storage',    icon:'🪣', iconUrl:'icons/aws/Storage/Amazon-Simple-Storage-Service.svg',              theme:'green',  description:'Private S3 bucket. Origin Access Control (OAC) allows only CloudFront to read objects.', zIndex:15 },
+        { id:'n_7', x:720, y:440, w:160, type:'AWS Lambda',              label:'Lambda@Edge',  sublabel:'viewer-request fn',    category:'Compute',    icon:'⚡', iconUrl:'icons/aws/Compute/AWS-Lambda.svg',                                 theme:'orange', description:'Runs at the edge: URL rewrites, auth header injection, A/B traffic splitting.', zIndex:16 },
+        { id:'n_8', x:940, y:280, w:160, type:'Amazon CloudWatch',       label:'CloudWatch',   sublabel:'CDN metrics',          category:'DevOps',     icon:'📡', iconUrl:'icons/aws/Management-Tools/Amazon-CloudWatch.svg',                 theme:'teal',   description:'CloudFront standard logs and real-time metrics — cache hit ratio, 4xx/5xx rates.', zIndex:17 }
+      ],
+      arrows: [
+        { id:'a_1', from:'n_1', to:'n_2', fromPort:'right', toPort:'left',   color:'default', style:'solid',  label:'DNS',     animated:false },
+        { id:'a_2', from:'n_2', to:'n_4', fromPort:'right', toPort:'left',   color:'purple',  style:'solid',  label:'HTTPS',   animated:false },
+        { id:'a_3', from:'n_3', to:'n_4', fromPort:'top',   toPort:'bottom', color:'red',     style:'dotted', label:'TLS cert',animated:false },
+        { id:'a_4', from:'n_4', to:'n_5', fromPort:'bottom',toPort:'top',    color:'red',     style:'dotted', label:'inspect', animated:false },
+        { id:'a_5', from:'n_4', to:'n_6', fromPort:'right', toPort:'left',   color:'green',   style:'solid',  label:'origin',  animated:false },
+        { id:'a_6', from:'n_4', to:'n_7', fromPort:'bottom',toPort:'top',    color:'orange',  style:'dashed', label:'edge fn', animated:false },
+        { id:'a_7', from:'n_4', to:'n_8', fromPort:'right', toPort:'left',   color:'teal',    style:'dotted', label:'metrics', animated:false },
+        { id:'a_8', from:'n_6', to:'n_8', fromPort:'right', toPort:'left',   color:'teal',    style:'dotted', label:'logs',    animated:false }
+      ],
+      groups: [],
+      playFlow: [
+        { arrow:'a_1', text:'User types the URL — browser resolves example.com via Route 53, which returns the CloudFront distribution IP.' },
+        { arrow:'a_2', text:'Browser opens an HTTPS connection to the nearest CloudFront edge POP — TLS handshake uses the ACM certificate.' },
+        { arrow:'a_3', text:'ACM auto-renews and distributes the TLS certificate to all CloudFront edge locations.' },
+        { arrow:'a_4', text:'WAF inspects the request against rate-limit and managed rules before CloudFront serves or fetches content.' },
+        { arrow:'a_6', text:'Lambda@Edge rewrites the URL path and injects security headers at the edge — zero origin round-trip.' },
+        { arrow:'a_5', text:'On a cache miss, CloudFront fetches the object from the private S3 bucket via Origin Access Control.' },
+        { arrow:'a_7', text:'CloudFront streams access logs and cache-hit-ratio metrics to CloudWatch for monitoring.' }
+      ]
+    }
+  },
+
+  'aws-datalake': {
+    name: 'AWS Data Lake & Analytics',
+    desc: 'S3 raw → Glue ETL → S3 curated → Athena + Redshift → QuickSight dashboards.',
+    icon: '📊',
+    data: {
+      meta: { version:'1.0', name:'AWS Data Lake & Analytics' },
+      nodes: [
+        { id:'n_1',  x:60,  y:300, w:160, type:'Data Sources',         label:'Data Sources',   sublabel:'apps / IoT / logs',    category:'Ingestion',  icon:'📃', theme:'gray',   description:'Streaming events, application logs, IoT sensor data, and third-party exports.', zIndex:10 },
+        { id:'n_2',  x:280, y:300, w:160, type:'Amazon S3',            label:'S3 Raw Zone',    sublabel:'s3://raw-data-lake',   category:'Storage',    icon:'🪣', iconUrl:'icons/aws/Storage/Amazon-Simple-Storage-Service.svg',   theme:'green',  description:'Landing zone — data arrives partitioned by source/year/month/day.', zIndex:11 },
+        { id:'n_3',  x:500, y:180, w:160, type:'AWS Glue',             label:'Glue Crawler',   sublabel:'daily crawl',          category:'Analytics',  icon:'🔍', iconUrl:'icons/aws/Analytics/AWS-Glue.svg',                       theme:'teal',   description:'Crawls S3 raw zone and updates the Glue Data Catalog schema automatically.', zIndex:12 },
+        { id:'n_4',  x:500, y:420, w:160, type:'AWS Glue',             label:'Glue ETL Job',   sublabel:'glue-spark-etl',       category:'Analytics',  icon:'🔍', iconUrl:'icons/aws/Analytics/AWS-Glue.svg',                       theme:'teal',   description:'Spark-based ETL: clean, deduplicate, type-cast, and write Parquet to the curated zone.', zIndex:13 },
+        { id:'n_5',  x:720, y:180, w:160, type:'AWS Glue Data Catalog',label:'Data Catalog',   sublabel:'central schema store', category:'Analytics',  icon:'📋', iconUrl:'icons/aws/Analytics/AWS-Glue.svg',                       theme:'teal',   description:'Central Hive-compatible metastore — shared by Athena, Redshift Spectrum, and EMR.', zIndex:14 },
+        { id:'n_6',  x:720, y:420, w:160, type:'Amazon S3',            label:'S3 Curated Zone',sublabel:'s3://curated-data',   category:'Storage',    icon:'🪣', iconUrl:'icons/aws/Storage/Amazon-Simple-Storage-Service.svg',   theme:'green',  description:'Clean Parquet data, columnar, compressed, partitioned. Queried by Athena and Redshift Spectrum.', zIndex:15 },
+        { id:'n_7',  x:940, y:180, w:160, type:'Amazon Athena',        label:'Amazon Athena',  sublabel:'ad-hoc SQL queries',   category:'Analytics',  icon:'📊', iconUrl:'icons/aws/Analytics/Amazon-Athena.svg',                  theme:'blue',   description:'Serverless SQL engine — queries S3 Parquet at $5/TB scanned. No infrastructure.', zIndex:16 },
+        { id:'n_8',  x:940, y:420, w:160, type:'Amazon Redshift',      label:'Redshift',       sublabel:'ra3.4xlarge cluster',  category:'Database',   icon:'📊', iconUrl:'icons/aws/Analytics/Amazon-Redshift.svg',               theme:'blue',   description:'Columnar MPP warehouse for complex analytical workloads. Spectrum queries S3 directly.', zIndex:17 },
+        { id:'n_9',  x:1160,y:300, w:160, type:'Amazon QuickSight',    label:'QuickSight',     sublabel:'BI dashboards',        category:'Analytics',  icon:'📈', iconUrl:'icons/aws/Business-Applications/Amazon-Quick.svg',      theme:'purple', description:'Serverless BI — dashboards auto-scale to thousands of readers with no BI server to manage.', zIndex:18 },
+        { id:'n_10', x:280, y:460, w:160, type:'AWS Lake Formation',   label:'Lake Formation', sublabel:'access control',       category:'Security',   icon:'🔑', iconUrl:'icons/aws/Analytics/AWS-Lake-Formation.svg',            theme:'red',    description:'Column/row-level access control on the data lake — grants permissions to Athena and Redshift users.', zIndex:19 }
+      ],
+      arrows: [
+        { id:'a_1', from:'n_1',  to:'n_2',  fromPort:'right', toPort:'left',  color:'green',   style:'dashed', label:'ingest',   animated:true  },
+        { id:'a_2', from:'n_2',  to:'n_3',  fromPort:'right', toPort:'left',  color:'teal',    style:'solid',  label:'crawl',    animated:false },
+        { id:'a_3', from:'n_3',  to:'n_5',  fromPort:'right', toPort:'left',  color:'teal',    style:'solid',  label:'catalog',  animated:false },
+        { id:'a_4', from:'n_2',  to:'n_4',  fromPort:'bottom',toPort:'top',   color:'green',   style:'solid',  label:'read raw', animated:false },
+        { id:'a_5', from:'n_4',  to:'n_6',  fromPort:'right', toPort:'left',  color:'green',   style:'solid',  label:'write',    animated:false },
+        { id:'a_6', from:'n_5',  to:'n_7',  fromPort:'bottom',toPort:'top',   color:'blue',    style:'solid',  label:'schema',   animated:false },
+        { id:'a_7', from:'n_6',  to:'n_7',  fromPort:'right', toPort:'left',  color:'blue',    style:'solid',  label:'query',    animated:false },
+        { id:'a_8', from:'n_6',  to:'n_8',  fromPort:'bottom',toPort:'top',   color:'blue',    style:'solid',  label:'COPY',     animated:false },
+        { id:'a_9', from:'n_7',  to:'n_9',  fromPort:'right', toPort:'left',  color:'purple',  style:'solid',  label:'results',  animated:false },
+        { id:'a_10',from:'n_8',  to:'n_9',  fromPort:'right', toPort:'left',  color:'purple',  style:'solid',  label:'results',  animated:false },
+        { id:'a_11',from:'n_10', to:'n_6',  fromPort:'top',   toPort:'bottom',color:'red',     style:'dotted', label:'policy',   animated:false }
+      ],
+      groups: [
+        { id:'g_1', x:480, y:140, w:200, h:340, label:'Glue Jobs', color:'teal' }
+      ],
+      playFlow: [
+        { arrow:'a_1', text:'Applications and IoT devices stream events to the S3 raw zone, partitioned by source and timestamp.' },
+        { arrow:'a_2', text:'Glue Crawler runs on a schedule, discovers new partitions, and updates the Data Catalog schema.' },
+        { arrow:'a_3', text:'Updated schemas are stored in the Glue Data Catalog — the single metastore for all analytics tools.' },
+        { arrow:'a_4', text:'Glue ETL Spark job reads raw JSON, strips PII, casts types, and converts to compressed Parquet.' },
+        { arrow:'a_5', text:'Clean Parquet files land in the curated S3 zone, partitioned for efficient predicate pushdown.' },
+        { arrow:'a_7', text:'Data analyst runs an ad-hoc Athena query — serverless SQL scans only the relevant S3 partitions.' },
+        { arrow:'a_8', text:'Redshift COPY command loads curated data for complex multi-table joins and BI workloads.' },
+        { arrow:'a_9', text:'Athena and Redshift results feed into QuickSight dashboards visible to hundreds of business stakeholders.' }
+      ]
+    }
+  },
+
+  'aws-containers': {
+    name: 'AWS Container Platform',
+    desc: 'CodePipeline → ECR → ECS Fargate (multi-AZ) → ALB → Aurora. Full CI/CD.',
+    icon: '🐳',
+    data: {
+      meta: { version:'1.0', name:'AWS Container Platform' },
+      nodes: [
+        { id:'n_1',  x:60,   y:180, w:160, type:'Developer',                    label:'Developer',    sublabel:'git push',              category:'Frontend',   icon:'👤', theme:'gray',   description:'Developer pushes code to the source repository.', zIndex:10 },
+        { id:'n_2',  x:280,  y:180, w:160, type:'AWS CodeCommit',               label:'CodeCommit',   sublabel:'main branch',           category:'DevOps',     icon:'📦', iconUrl:'icons/aws/Developer-Tools/AWS-CodeCommit.svg',                       theme:'teal',   description:'Managed Git repository. Merge to main triggers the pipeline.', zIndex:11 },
+        { id:'n_3',  x:500,  y:180, w:160, type:'AWS CodePipeline',             label:'CodePipeline', sublabel:'build → test → deploy', category:'DevOps',     icon:'🔗', iconUrl:'icons/aws/Developer-Tools/AWS-CodePipeline.svg',                      theme:'teal',   description:'Orchestrates source → build → test → deploy stages. Approval gate before production.', zIndex:12 },
+        { id:'n_4',  x:500,  y:340, w:160, type:'AWS CodeBuild',                label:'CodeBuild',    sublabel:'docker build + tests',  category:'DevOps',     icon:'🔨', iconUrl:'icons/aws/Developer-Tools/AWS-CodeBuild.svg',                         theme:'teal',   description:'Builds Docker image, runs unit tests, security scans (Trivy), and pushes to ECR.', zIndex:13 },
+        { id:'n_5',  x:720,  y:180, w:160, type:'Amazon ECR',                   label:'ECR',          sublabel:'my-app:latest',         category:'Containers', icon:'📦', iconUrl:'icons/aws/Containers/Amazon-Elastic-Container-Registry.svg',          theme:'orange', description:'Private container registry. Image scanning on push. Immutable tags enforced.', zIndex:14 },
+        { id:'n_6',  x:940,  y:120, w:160, type:'Amazon ECS',                   label:'ECS Fargate',  sublabel:'app-svc / us-east-1a',  category:'Compute',    icon:'🐳', iconUrl:'icons/aws/Containers/Amazon-Elastic-Container-Service.svg',           theme:'orange', description:'Fargate task in AZ-a. Scales 2–20 tasks based on ALB request-per-target metric.', zIndex:15 },
+        { id:'n_7',  x:940,  y:300, w:160, type:'Amazon ECS',                   label:'ECS Fargate',  sublabel:'app-svc / us-east-1b',  category:'Compute',    icon:'🐳', iconUrl:'icons/aws/Containers/Amazon-Elastic-Container-Service.svg',           theme:'orange', description:'Fargate task in AZ-b — availability zone redundancy.', zIndex:16 },
+        { id:'n_8',  x:60,   y:460, w:160, type:'Client',                       label:'Client',       sublabel:'Web / Mobile',          category:'Frontend',   icon:'📱', theme:'gray',   description:'End users accessing the application.', zIndex:17 },
+        { id:'n_9',  x:280,  y:460, w:160, type:'Amazon Route 53',              label:'Route 53',     sublabel:'app.example.com',       category:'Networking', icon:'🛣️', iconUrl:'icons/aws/Networking-Content-Delivery/Amazon-Route-53.svg',            theme:'purple', description:'Alias record to the ALB. Health checks enable automatic failover.', zIndex:18 },
+        { id:'n_10', x:500,  y:460, w:160, type:'Application Load Balancer',    label:'ALB',          sublabel:'alb-prod',              category:'Networking', icon:'⚖️', iconUrl:'icons/aws/Networking-Content-Delivery/Elastic-Load-Balancing.svg',     theme:'purple', description:'ALB with sticky sessions disabled — stateless containers scale freely.', zIndex:19 },
+        { id:'n_11', x:1160, y:210, w:160, type:'Amazon Aurora',                label:'Aurora',       sublabel:'aurora-prod / Multi-AZ',category:'Database',   icon:'🗄️', iconUrl:'icons/aws/Databases/Amazon-Aurora.svg',                               theme:'blue',   description:'Multi-AZ Aurora cluster. Containers connect via RDS Proxy — no connection storms on scale-out.', zIndex:20 },
+        { id:'n_12', x:1160, y:420, w:160, type:'Amazon CloudWatch',            label:'CloudWatch',   sublabel:'ECS + ALB metrics',     category:'DevOps',     icon:'📡', iconUrl:'icons/aws/Management-Tools/Amazon-CloudWatch.svg',                    theme:'teal',   description:'Container Insights: per-task CPU/memory, ALB 5xx alarm, Aurora latency dashboards.', zIndex:21 }
+      ],
+      arrows: [
+        { id:'a_1',  from:'n_1',  to:'n_2',  fromPort:'right', toPort:'left',  color:'default', style:'solid',  label:'git push', animated:false },
+        { id:'a_2',  from:'n_2',  to:'n_3',  fromPort:'right', toPort:'left',  color:'teal',    style:'solid',  label:'trigger',  animated:false },
+        { id:'a_3',  from:'n_3',  to:'n_4',  fromPort:'bottom',toPort:'top',   color:'teal',    style:'solid',  label:'build',    animated:false },
+        { id:'a_4',  from:'n_4',  to:'n_5',  fromPort:'top',   toPort:'bottom',color:'orange',  style:'solid',  label:'push img', animated:false },
+        { id:'a_5',  from:'n_5',  to:'n_6',  fromPort:'right', toPort:'left',  color:'orange',  style:'solid',  label:'pull',     animated:false },
+        { id:'a_6',  from:'n_5',  to:'n_7',  fromPort:'right', toPort:'left',  color:'orange',  style:'solid',  label:'pull',     animated:false },
+        { id:'a_7',  from:'n_8',  to:'n_9',  fromPort:'right', toPort:'left',  color:'default', style:'solid',  label:'DNS',      animated:false },
+        { id:'a_8',  from:'n_9',  to:'n_10', fromPort:'right', toPort:'left',  color:'purple',  style:'solid',  label:'HTTPS',    animated:false },
+        { id:'a_9',  from:'n_10', to:'n_6',  fromPort:'right', toPort:'left',  color:'teal',    style:'solid',  label:'AZ-a',     animated:false },
+        { id:'a_10', from:'n_10', to:'n_7',  fromPort:'right', toPort:'left',  color:'teal',    style:'solid',  label:'AZ-b',     animated:false },
+        { id:'a_11', from:'n_6',  to:'n_11', fromPort:'right', toPort:'left',  color:'blue',    style:'solid',  label:'SQL',      animated:false },
+        { id:'a_12', from:'n_7',  to:'n_11', fromPort:'right', toPort:'left',  color:'blue',    style:'solid',  label:'SQL',      animated:false },
+        { id:'a_13', from:'n_6',  to:'n_12', fromPort:'bottom',toPort:'top',   color:'teal',    style:'dotted', label:'metrics',  animated:false }
+      ],
+      groups: [
+        { id:'g_1', x:920, y:80,  w:200, h:370, label:'ECS Cluster', color:'orange' },
+        { id:'g_2', x:460, y:140, w:700, h:440, label:'VPC — Private Subnet', color:'purple' }
+      ],
+      playFlow: [
+        { arrow:'a_1', text:'Developer merges a pull request to main — this triggers the CodePipeline source stage.' },
+        { arrow:'a_2', text:'CodePipeline detects the commit and kicks off the pipeline.' },
+        { arrow:'a_3', text:'CodeBuild builds the Docker image, runs unit tests and a Trivy vulnerability scan.' },
+        { arrow:'a_4', text:'Passing build pushes the immutable image tag to ECR — latest is pinned to the SHA.' },
+        { arrow:'a_5', text:'ECS rolling deployment pulls the new image — old tasks drain connections before termination.' },
+        { arrow:'a_7', text:'End user visits the app — DNS resolves to the ALB via Route 53 alias record.' },
+        { arrow:'a_9', text:'ALB routes the request to the least-loaded Fargate task; containers are fully stateless.' },
+        { arrow:'a_11',text:'Container queries Aurora via RDS Proxy — proxy reuses connections and buffers scale-out bursts.' }
+      ]
+    }
+  },
+
+  'aws-hub-spoke': {
+    name: 'AWS Hub-and-Spoke Network',
+    desc: 'Transit Gateway central hub connecting Production, Shared Services, and Dev VPCs + on-premises.',
+    icon: '🔗',
+    data: {
+      meta: { version:'1.0', name:'AWS Hub-and-Spoke Network' },
+      nodes: [
+        { id:'n_1',  x:60,  y:300, w:160, type:'On-Premises',              label:'Corporate DC',   sublabel:'HQ / branch offices',   category:'External',   icon:'🏢', theme:'gray',   description:'Corporate data center and branch offices that need access to AWS workloads.', zIndex:10 },
+        { id:'n_2',  x:280, y:180, w:160, type:'AWS Direct Connect',       label:'Direct Connect', sublabel:'1 Gbps dedicated',       category:'Networking', icon:'🔌', iconUrl:'icons/aws/Networking-Content-Delivery/AWS-Direct-Connect.svg',    theme:'purple', description:'Dedicated private connection — consistent latency, bypasses public internet.', zIndex:11 },
+        { id:'n_3',  x:280, y:420, w:160, type:'Site-to-Site VPN',         label:'VPN Gateway',    sublabel:'IPsec / BGP',            category:'Networking', icon:'🔒', iconUrl:'icons/aws/Networking-Content-Delivery/Amazon-Virtual-Private-Cloud.svg', theme:'purple', description:'Encrypted IPsec tunnels as backup path for Direct Connect failover.', zIndex:12 },
+        { id:'n_4',  x:500, y:300, w:160, type:'AWS Transit Gateway',      label:'Transit Gateway',sublabel:'tgw-hub / us-east-1',    category:'Networking', icon:'🔗', iconUrl:'icons/aws/Networking-Content-Delivery/AWS-Transit-Gateway.svg',  theme:'purple', description:'Central routing hub — all VPCs and on-premises connections attach here. Replaces full-mesh VPC peering.', zIndex:13 },
+        { id:'n_5',  x:500, y:500, w:160, type:'AWS Network Firewall',     label:'Network Firewall',sublabel:'inspection VPC',        category:'Security',   icon:'🛡️', iconUrl:'icons/aws/Security-Identity/AWS-Network-Firewall.svg',            theme:'red',    description:'Centralized stateful inspection for east-west and north-south traffic via TGW route tables.', zIndex:14 },
+        { id:'n_6',  x:720, y:130, w:160, type:'Amazon VPC',               label:'Prod VPC',       sublabel:'10.0.0.0/16',           category:'Networking', icon:'🔒', iconUrl:'icons/aws/Networking-Content-Delivery/Amazon-Virtual-Private-Cloud.svg', theme:'purple', description:'Production workloads — no direct internet access, all traffic via TGW.', zIndex:15 },
+        { id:'n_7',  x:720, y:300, w:160, type:'Amazon VPC',               label:'Shared Svcs VPC',sublabel:'10.1.0.0/16',           category:'Networking', icon:'🔒', iconUrl:'icons/aws/Networking-Content-Delivery/Amazon-Virtual-Private-Cloud.svg', theme:'teal',   description:'Shared services: Route 53 Resolver, AD, secrets, container registry.', zIndex:16 },
+        { id:'n_8',  x:720, y:470, w:160, type:'Amazon VPC',               label:'Dev/Test VPC',   sublabel:'10.2.0.0/16',           category:'Networking', icon:'🔒', iconUrl:'icons/aws/Networking-Content-Delivery/Amazon-Virtual-Private-Cloud.svg', theme:'orange', description:'Development and staging — isolated from production, shares Shared Services.', zIndex:17 },
+        { id:'n_9',  x:940, y:130, w:160, type:'Amazon ECS',               label:'App Workloads',  sublabel:'prod-ecs-cluster',       category:'Compute',    icon:'🐳', iconUrl:'icons/aws/Containers/Amazon-Elastic-Container-Service.svg',      theme:'orange', description:'Production ECS Fargate services — private subnets, no NAT needed for S3/DDB via VPC endpoints.', zIndex:18 },
+        { id:'n_10', x:940, y:300, w:160, type:'Amazon Route 53',          label:'R53 Resolver',   sublabel:'inbound + outbound',     category:'Networking', icon:'🛣️', iconUrl:'icons/aws/Networking-Content-Delivery/Amazon-Route-53.svg',       theme:'teal',   description:'Centralized DNS resolver — forwards on-prem queries to AWS and vice-versa.', zIndex:19 },
+        { id:'n_11', x:940, y:470, w:160, type:'Amazon EC2',               label:'Dev Workloads',  sublabel:'ec2 dev instances',      category:'Compute',    icon:'🖥️', iconUrl:'icons/aws/Compute/Amazon-EC2.svg',                                theme:'orange', description:'Developer EC2 instances — reach shared services and AWS APIs through TGW.', zIndex:20 },
+        { id:'n_12', x:1160,y:130, w:160, type:'Amazon Aurora',            label:'Aurora (Prod)',  sublabel:'aurora-prod',            category:'Database',   icon:'🗄️', iconUrl:'icons/aws/Databases/Amazon-Aurora.svg',                           theme:'blue',   description:'Production database in isolated DB subnet — accessible only from Prod VPC.', zIndex:21 },
+        { id:'n_13', x:1160,y:300, w:160, type:'Amazon CloudWatch',        label:'CloudWatch',     sublabel:'network + app metrics',  category:'DevOps',     icon:'📡', iconUrl:'icons/aws/Management-Tools/Amazon-CloudWatch.svg',               theme:'teal',   description:'VPC Flow Logs, TGW attachment metrics, firewall blocked-packet alarms.', zIndex:22 }
+      ],
+      arrows: [
+        { id:'a_1',  from:'n_1',  to:'n_2',  fromPort:'right', toPort:'left',  color:'purple',  style:'solid',  label:'1 Gbps',   animated:false },
+        { id:'a_2',  from:'n_1',  to:'n_3',  fromPort:'right', toPort:'left',  color:'purple',  style:'dashed', label:'IPsec',    animated:false },
+        { id:'a_3',  from:'n_2',  to:'n_4',  fromPort:'right', toPort:'left',  color:'purple',  style:'solid',  label:'attach',   animated:false },
+        { id:'a_4',  from:'n_3',  to:'n_4',  fromPort:'right', toPort:'left',  color:'purple',  style:'solid',  label:'attach',   animated:false },
+        { id:'a_5',  from:'n_4',  to:'n_6',  fromPort:'right', toPort:'left',  color:'purple',  style:'solid',  label:'route',    animated:false },
+        { id:'a_6',  from:'n_4',  to:'n_7',  fromPort:'right', toPort:'left',  color:'teal',    style:'solid',  label:'route',    animated:false },
+        { id:'a_7',  from:'n_4',  to:'n_8',  fromPort:'right', toPort:'left',  color:'orange',  style:'solid',  label:'route',    animated:false },
+        { id:'a_8',  from:'n_4',  to:'n_5',  fromPort:'bottom',toPort:'top',   color:'red',     style:'solid',  label:'inspect',  animated:false },
+        { id:'a_9',  from:'n_6',  to:'n_9',  fromPort:'right', toPort:'left',  color:'orange',  style:'solid',  label:'',         animated:false },
+        { id:'a_10', from:'n_7',  to:'n_10', fromPort:'right', toPort:'left',  color:'teal',    style:'solid',  label:'DNS',      animated:false },
+        { id:'a_11', from:'n_8',  to:'n_11', fromPort:'right', toPort:'left',  color:'orange',  style:'solid',  label:'',         animated:false },
+        { id:'a_12', from:'n_9',  to:'n_12', fromPort:'right', toPort:'left',  color:'blue',    style:'solid',  label:'SQL',      animated:false },
+        { id:'a_13', from:'n_10', to:'n_13', fromPort:'right', toPort:'left',  color:'teal',    style:'dotted', label:'metrics',  animated:false }
+      ],
+      groups: [
+        { id:'g_1', x:700, y:90,  w:520, h:200, label:'Production VPC',       color:'purple' },
+        { id:'g_2', x:700, y:260, w:280, h:200, label:'Shared Services VPC',  color:'teal'   },
+        { id:'g_3', x:700, y:430, w:280, h:200, label:'Dev/Test VPC',         color:'orange' }
+      ],
+      playFlow: [
+        { arrow:'a_1',  text:'Corporate network connects to AWS over a dedicated Direct Connect 1 Gbps private circuit — consistent latency, no internet.' },
+        { arrow:'a_2',  text:'A Site-to-Site VPN runs in parallel as an automatic failover path if Direct Connect goes down.' },
+        { arrow:'a_3',  text:'Both Direct Connect and VPN attach to the Transit Gateway — the single routing hub for all connectivity.' },
+        { arrow:'a_5',  text:'TGW route table sends production-bound traffic to the Prod VPC attachment.' },
+        { arrow:'a_8',  text:'East-west traffic between VPCs is steered through the Network Firewall inspection VPC for stateful filtering.' },
+        { arrow:'a_9',  text:'ECS Fargate tasks in the Prod VPC run in private subnets — internet access via NAT Gateway, AWS APIs via VPC endpoints.' },
+        { arrow:'a_10', text:'Route 53 Resolver in the Shared Services VPC forwards on-prem DNS queries (.corp domain) to the on-prem DNS server and vice-versa.' },
+        { arrow:'a_12', text:'Production containers reach Aurora in the DB subnet — traffic stays entirely within the VPC, no TGW hop needed.' }
+      ]
+    }
+  },
+
+  /* -- Unique non-AWS specialty templates -------------------------------- */
+
   'agent': {
     name: 'AI Agent Architecture',
     desc: 'Supervisor + sub-agents pattern with Bedrock, tools, and memory.',
@@ -8712,111 +8987,28 @@ const TEMPLATES = {
     data: {
       meta:{ version:'1.0', name:'AI Agent Architecture' },
       nodes:[
-        { id:'n_1', x:60,  y:240, w:160, type:'User',          label:'User Query',     sublabel:'Chat UI',       category:'Frontend',   icon:'👤', theme:'gray',     description:'User chat input', zIndex:10 },
-        { id:'n_2', x:300, y:240, w:160, type:'AgentCore',     label:'Supervisor',     sublabel:'agentcore-rt',  category:'Agents',     icon:'🧠', theme:'gradient', description:'Routes queries to specialised agents', zIndex:11 },
-        { id:'n_3', x:540, y:80,  w:160, type:'Bedrock',       label:'Claude Sonnet',  sublabel:'bedrock',       category:'AI/ML',      icon:'🧱', theme:'purple',   description:'Reasoning + planning LLM', zIndex:12 },
-        { id:'n_4', x:540, y:240, w:160, type:'Agent',         label:'Search Agent',   sublabel:'search-agent',  category:'Agents',     icon:'🤖', theme:'blue',     description:'Web + knowledge base search', zIndex:13 },
-        { id:'n_5', x:540, y:400, w:160, type:'Agent',         label:'Code Agent',     sublabel:'code-agent',    category:'Agents',     icon:'🤖', theme:'blue',     description:'Code interpretation + sandboxed exec', zIndex:14 },
-        { id:'n_6', x:800, y:240, w:160, type:'DynamoDB',      label:'Session Memory', sublabel:'agent-memory',  category:'Database',   icon:'🔷', theme:'blue',     description:'Conversation + tool history', zIndex:15 },
-        { id:'n_7', x:800, y:400, w:160, type:'S3',            label:'Artifact Store', sublabel:'agent-output',  category:'Storage',    icon:'🪣', theme:'green',    description:'Generated files, code, reports', zIndex:16 }
+        { id:'n_1', x:60,  y:240, w:160, type:'User',       label:'User Query',    sublabel:'Chat UI',       category:'Frontend', icon:'👤', theme:'gray',     description:'User chat input', zIndex:10 },
+        { id:'n_2', x:300, y:240, w:160, type:'AgentCore',  label:'Supervisor',    sublabel:'agentcore-rt',  category:'Agents',   icon:'🧠', theme:'gradient', description:'Routes queries to specialised agents', zIndex:11 },
+        { id:'n_3', x:540, y:80,  w:160, type:'Bedrock',    label:'Claude Sonnet', sublabel:'bedrock',       category:'AI/ML',    icon:'🧱', iconUrl:'icons/aws/Artificial-Intelligence/Amazon-Bedrock.svg', theme:'purple', description:'Reasoning + planning LLM', zIndex:12 },
+        { id:'n_4', x:540, y:240, w:160, type:'Agent',      label:'Search Agent',  sublabel:'search-agent',  category:'Agents',   icon:'🤖', theme:'blue',     description:'Web + knowledge base search', zIndex:13 },
+        { id:'n_5', x:540, y:400, w:160, type:'Agent',      label:'Code Agent',    sublabel:'code-agent',    category:'Agents',   icon:'🤖', theme:'blue',     description:'Code interpretation + sandboxed exec', zIndex:14 },
+        { id:'n_6', x:800, y:240, w:160, type:'DynamoDB',   label:'Session Memory',sublabel:'agent-memory',  category:'Database', icon:'🔷', iconUrl:'icons/aws/Databases/Amazon-DynamoDB.svg', theme:'blue', description:'Conversation + tool history', zIndex:15 },
+        { id:'n_7', x:800, y:400, w:160, type:'S3',         label:'Artifact Store',sublabel:'agent-output',  category:'Storage',  icon:'🪣', iconUrl:'icons/aws/Storage/Amazon-Simple-Storage-Service.svg', theme:'green', description:'Generated files, code, reports', zIndex:16 }
       ],
       arrows:[
-        { id:'a_1', from:'n_1', to:'n_2', fromPort:'right', toPort:'left',  color:'default',style:'solid', label:'query' },
-        { id:'a_2', from:'n_2', to:'n_3', fromPort:'top',   toPort:'bottom',color:'purple', style:'solid', label:'plan' },
-        { id:'a_3', from:'n_2', to:'n_4', fromPort:'right', toPort:'left',  color:'blue',   style:'solid', label:'route' },
-        { id:'a_4', from:'n_2', to:'n_5', fromPort:'right', toPort:'left',  color:'blue',   style:'solid', label:'route' },
-        { id:'a_5', from:'n_4', to:'n_6', fromPort:'right', toPort:'left',  color:'blue',   style:'dashed',label:'recall' },
-        { id:'a_6', from:'n_5', to:'n_7', fromPort:'right', toPort:'left',  color:'green',  style:'solid', label:'save' }
+        { id:'a_1', from:'n_1', to:'n_2', fromPort:'right', toPort:'left',  color:'default', style:'solid',  label:'query' },
+        { id:'a_2', from:'n_2', to:'n_3', fromPort:'top',   toPort:'bottom',color:'purple',  style:'solid',  label:'plan' },
+        { id:'a_3', from:'n_2', to:'n_4', fromPort:'right', toPort:'left',  color:'blue',    style:'solid',  label:'route' },
+        { id:'a_4', from:'n_2', to:'n_5', fromPort:'right', toPort:'left',  color:'blue',    style:'solid',  label:'route' },
+        { id:'a_5', from:'n_4', to:'n_6', fromPort:'right', toPort:'left',  color:'blue',    style:'dashed', label:'recall' },
+        { id:'a_6', from:'n_5', to:'n_7', fromPort:'right', toPort:'left',  color:'green',   style:'solid',  label:'save' }
       ],
       groups: [
         { id:'g_1', x:520, y:50, w:200, h:520, label:'Agent Workers', color:'teal' }
       ]
     }
   },
-  'data-pipeline': {
-    name: 'Data Pipeline',
-    desc: 'S3 → Lambda → Kinesis → Redshift. Streaming ETL.',
-    icon: '🌊',
-    data: {
-      meta:{ version:'1.0', name:'Data Pipeline' },
-      nodes:[
-        { id:'n_1', x:60,  y:240, w:160, type:'S3',         label:'Raw Bucket',   sublabel:'raw-data-lake',   category:'Storage',    icon:'🪣', theme:'green',  description:'Landing zone for raw events', zIndex:10 },
-        { id:'n_2', x:300, y:240, w:160, type:'Lambda',     label:'PII Masker',   sublabel:'pii-fn',          category:'Compute',    icon:'⚡', theme:'orange', description:'Strips PII before downstream', zIndex:11 },
-        { id:'n_3', x:540, y:240, w:160, type:'S3',         label:'Clean Bucket', sublabel:'clean-data-lake', category:'Storage',    icon:'🪣', theme:'green',  description:'PII-free intermediate', zIndex:12 },
-        { id:'n_4', x:780, y:240, w:160, type:'Kinesis',    label:'Stream',       sublabel:'events-stream',   category:'Integration',icon:'🌊', theme:'blue',   description:'Real-time event streaming', zIndex:13 },
-        { id:'n_5', x:1020,y:140, w:160, type:'Redshift',   label:'Warehouse',    sublabel:'analytics-rs',    category:'Database',   icon:'📊', theme:'red',    description:'Columnar OLAP for BI', zIndex:14 },
-        { id:'n_6', x:1020,y:340, w:160, type:'CloudWatch', label:'Monitoring',   sublabel:'pipeline-cw',     category:'DevOps',     icon:'📡', theme:'orange', description:'Metrics, logs, alarms', zIndex:15 }
-      ],
-      arrows:[
-        { id:'a_1', from:'n_1', to:'n_2', fromPort:'right', toPort:'left', color:'green',   style:'dashed',label:'event', animated:true },
-        { id:'a_2', from:'n_2', to:'n_3', fromPort:'right', toPort:'left', color:'green',   style:'solid', label:'write' },
-        { id:'a_3', from:'n_3', to:'n_4', fromPort:'right', toPort:'left', color:'blue',    style:'solid', label:'publish' },
-        { id:'a_4', from:'n_4', to:'n_5', fromPort:'right', toPort:'left', color:'red',     style:'solid', label:'COPY' },
-        { id:'a_5', from:'n_2', to:'n_6', fromPort:'bottom',toPort:'top',  color:'orange',  style:'dotted',label:'logs' },
-        { id:'a_6', from:'n_4', to:'n_6', fromPort:'bottom',toPort:'top',  color:'orange',  style:'dotted',label:'metrics' }
-      ],
-      groups: []
-    }
-  },
-  'microservices': {
-    name: 'Microservices',
-    desc: 'Gateway → 3 services with their own DBs, behind a service mesh.',
-    icon: '🧩',
-    data: {
-      meta:{ version:'1.0', name:'Microservices' },
-      nodes:[
-        { id:'n_1', x:60,  y:280, w:160, type:'Client',      label:'Client',      sublabel:'Web/Mobile',   category:'Frontend',   icon:'📱', theme:'gray',   description:'External traffic source', zIndex:10 },
-        { id:'n_2', x:300, y:280, w:160, type:'API Gateway', label:'API Gateway', sublabel:'edge-api',     category:'Networking', icon:'🚪', theme:'orange', description:'Auth, rate-limit, routing', zIndex:11 },
-        { id:'n_3', x:540, y:120, w:160, type:'Service',     label:'Users Svc',   sublabel:'users-svc',    category:'Compute',    icon:'🐳', theme:'orange', description:'User profile + auth APIs', zIndex:12 },
-        { id:'n_4', x:540, y:280, w:160, type:'Service',     label:'Orders Svc',  sublabel:'orders-svc',   category:'Compute',    icon:'🐳', theme:'orange', description:'Order lifecycle + ledger', zIndex:13 },
-        { id:'n_5', x:540, y:440, w:160, type:'Service',     label:'Catalog Svc', sublabel:'catalog-svc',  category:'Compute',    icon:'🐳', theme:'orange', description:'Product catalog + search', zIndex:14 },
-        { id:'n_6', x:800, y:120, w:160, type:'PostgreSQL',  label:'Users DB',    sublabel:'users-db',     category:'Database',   icon:'🗄️', theme:'blue',   description:'Per-service DB pattern', zIndex:15 },
-        { id:'n_7', x:800, y:280, w:160, type:'PostgreSQL',  label:'Orders DB',   sublabel:'orders-db',    category:'Database',   icon:'🗄️', theme:'blue',   description:'Per-service DB pattern', zIndex:16 },
-        { id:'n_8', x:800, y:440, w:160, type:'OpenSearch',  label:'Search Idx',  sublabel:'catalog-idx',  category:'Database',   icon:'🔍', theme:'teal',   description:'Search index for product catalog', zIndex:17 },
-        { id:'n_9', x:1060,y:280, w:160, type:'EventBus',    label:'Event Bus',   sublabel:'domain-bus',   category:'Integration',icon:'⚡', theme:'pink',   description:'Cross-service domain events', zIndex:18 }
-      ],
-      arrows:[
-        { id:'a_1', from:'n_1', to:'n_2', fromPort:'right', toPort:'left', color:'default', style:'solid', label:'HTTPS' },
-        { id:'a_2', from:'n_2', to:'n_3', fromPort:'right', toPort:'left', color:'orange',  style:'solid', label:'' },
-        { id:'a_3', from:'n_2', to:'n_4', fromPort:'right', toPort:'left', color:'orange',  style:'solid', label:'' },
-        { id:'a_4', from:'n_2', to:'n_5', fromPort:'right', toPort:'left', color:'orange',  style:'solid', label:'' },
-        { id:'a_5', from:'n_3', to:'n_6', fromPort:'right', toPort:'left', color:'blue',    style:'solid', label:'SQL' },
-        { id:'a_6', from:'n_4', to:'n_7', fromPort:'right', toPort:'left', color:'blue',    style:'solid', label:'SQL' },
-        { id:'a_7', from:'n_5', to:'n_8', fromPort:'right', toPort:'left', color:'teal',    style:'solid', label:'index' },
-        { id:'a_8', from:'n_4', to:'n_9', fromPort:'right', toPort:'right',color:'pink',    style:'dashed',label:'emit', animated:true },
-        { id:'a_9', from:'n_3', to:'n_9', fromPort:'right', toPort:'right',color:'pink',    style:'dashed',label:'emit', animated:true }
-      ],
-      groups: []
-    }
-  },
-  'eventdriven': {
-    name: 'Event-Driven Pipeline',
-    desc: 'SNS fans out to multiple SQS queues, each driving a Lambda.',
-    icon: '📡',
-    data: {
-      meta:{ version:'1.0', name:'Event-Driven Pipeline' },
-      nodes:[
-        { id:'n_1', x:60,  y:280, w:160, type:'Producer',    label:'Producer',     sublabel:'ingest-svc',   category:'Compute',    icon:'🐳', theme:'orange', description:'Emits domain events', zIndex:10 },
-        { id:'n_2', x:300, y:280, w:160, type:'SNS',         label:'Topic',        sublabel:'order-events', category:'Integration',icon:'📢', theme:'orange', description:'Fan-out topic', zIndex:11 },
-        { id:'n_3', x:540, y:120, w:160, type:'SQS',         label:'Email Queue',  sublabel:'email-q',      category:'Integration',icon:'📬', theme:'orange', description:'Buffered consumer', zIndex:12 },
-        { id:'n_4', x:540, y:280, w:160, type:'SQS',         label:'Search Queue', sublabel:'search-q',     category:'Integration',icon:'📬', theme:'orange', description:'Buffered consumer', zIndex:13 },
-        { id:'n_5', x:540, y:440, w:160, type:'SQS',         label:'Audit Queue',  sublabel:'audit-q',      category:'Integration',icon:'📬', theme:'orange', description:'Buffered consumer', zIndex:14 },
-        { id:'n_6', x:800, y:120, w:160, type:'Lambda',      label:'Email Sender', sublabel:'send-email',   category:'Compute',    icon:'⚡', theme:'orange', description:'Sends transactional email', zIndex:15 },
-        { id:'n_7', x:800, y:280, w:160, type:'Lambda',      label:'Search Index', sublabel:'reindex-fn',   category:'Compute',    icon:'⚡', theme:'orange', description:'Updates search index', zIndex:16 },
-        { id:'n_8', x:800, y:440, w:160, type:'Lambda',      label:'Audit Logger', sublabel:'audit-fn',     category:'Compute',    icon:'⚡', theme:'orange', description:'Writes immutable audit', zIndex:17 }
-      ],
-      arrows:[
-        { id:'a_1', from:'n_1', to:'n_2', fromPort:'right', toPort:'left', color:'orange', style:'dashed', label:'publish', animated:true },
-        { id:'a_2', from:'n_2', to:'n_3', fromPort:'right', toPort:'left', color:'orange', style:'solid', label:'' },
-        { id:'a_3', from:'n_2', to:'n_4', fromPort:'right', toPort:'left', color:'orange', style:'solid', label:'' },
-        { id:'a_4', from:'n_2', to:'n_5', fromPort:'right', toPort:'left', color:'orange', style:'solid', label:'' },
-        { id:'a_5', from:'n_3', to:'n_6', fromPort:'right', toPort:'left', color:'orange', style:'solid', label:'poll' },
-        { id:'a_6', from:'n_4', to:'n_7', fromPort:'right', toPort:'left', color:'orange', style:'solid', label:'poll' },
-        { id:'a_7', from:'n_5', to:'n_8', fromPort:'right', toPort:'left', color:'orange', style:'solid', label:'poll' }
-      ],
-      groups: []
-    }
-  },
+
   'ml-pipeline': {
     name: 'ML Training Pipeline',
     desc: 'S3 → SageMaker training → Model registry → Real-time endpoint.',
