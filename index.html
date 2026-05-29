@@ -1474,7 +1474,7 @@ kbd {
     <div style="display:flex;gap:8px;margin-top:6px;margin-bottom:10px;flex-wrap:wrap">
       <button type="button" class="tb-btn" onclick="flowEditorAddStep()" style="font-size:11px">+ Add step</button>
       <button type="button" class="tb-btn" onclick="flowEditorResetToAuto()" style="font-size:11px" title="Replace sequence with the auto-derived BFS order">↺ Reset to auto-order</button>
-      <button type="button" class="tb-btn" onclick="flowEditorDownload()" style="font-size:11px" title="Download the ordered workflow as a Markdown file">⬇ Download workflow</button>
+      <button type="button" class="tb-btn" onclick="flowEditorDownload()" style="font-size:11px" title="Download the ordered workflow as a text file">⬇ Download workflow</button>
       <button type="button" class="tb-btn danger" onclick="flowEditorClear()" style="font-size:11px">Clear all</button>
     </div>
     <div id="flow-editor-list" style="flex:1;overflow-y:auto;border:1px solid var(--border);border-radius:8px;padding:8px;background:var(--bg);min-height:200px"></div>
@@ -6672,14 +6672,15 @@ function flowEditorClear() {
   renderFlowEditor();
 }
 
-// Export the current draft sequence as a readable Markdown workflow so users can
+// Export the current draft sequence as a readable plain-text workflow so users can
 // drop the walkthrough into docs, runbooks, or a PR. Uses the live draft (not the
 // saved playFlow) so unsaved edits are included.
 function flowEditorDownload() {
   if (!_flowDraft || !_flowDraft.length) { notify('No steps to download', 'warning'); return; }
   const arrowById = new Map(arrows.map(a => [a.id, a]));
   const title = ((document.getElementById('filename-input') || {}).value || 'Workflow').trim() || 'Workflow';
-  const lines = [`# ${title} — Workflow`, ''];
+  const heading = `${title} — Workflow`;
+  const lines = [heading, '='.repeat(heading.length), ''];
   let n = 0;
   _flowDraft.forEach(step => {
     const a = arrowById.get(step.arrow);
@@ -6688,17 +6689,17 @@ function flowEditorDownload() {
     const f = (getNode(a.from) || {}).label || a.from;
     const t = (getNode(a.to) || {}).label || a.to;
     const hop = a.label ? `${f} → ${t} (${a.label})` : `${f} → ${t}`;
-    lines.push(`${n}. **${hop}**`);
+    lines.push(`${n}. ${hop}`);
     if ((step.text || '').trim()) lines.push(`   ${step.text.trim()}`);
     lines.push('');
   });
-  const md = lines.join('\n');
+  const txt = lines.join('\n');
   const safe = title.replace(/[^a-z0-9]+/gi, '-').replace(/^-+|-+$/g, '').toLowerCase() || 'workflow';
-  const blob = new Blob([md], { type: 'text/markdown' });
+  const blob = new Blob([txt], { type: 'text/plain' });
   const url = URL.createObjectURL(blob);
   const link = document.createElement('a');
   link.href = url;
-  link.download = `${safe}-workflow.md`;
+  link.download = `${safe}-workflow.txt`;
   link.click();
   URL.revokeObjectURL(url);
   notify(`Downloaded ${n} step${n !== 1 ? 's' : ''}`);
