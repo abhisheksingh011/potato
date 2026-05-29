@@ -123,7 +123,8 @@ Open `✨ Templates` in the toolbar and pick:
 - Inline LLM prompt — one click to copy, no GitHub round-trip
 - `🤖 AI Import` validates + sanitizes + rescues icon paths the LLM guessed wrong
 - `playFlow` narration ships inside the diagram; ▶ Play walks through it on-screen
-- Sequence Editor to reorder, edit, or rewrite the narration
+- Sequence Editor to reorder, edit, or rewrite the narration — and **⬇ download the whole walkthrough as a Markdown workflow** (numbered steps + narration) for docs, runbooks, or a PR
+- Prompt asks the LLM for detailed, walkthrough-style narration — full service names, the trigger/data/why of each hop, and the complete lifecycle end-to-end
 - Works with **GitHub Copilot Chat** out of the box — just reference [`POTATO_LLM_PROMPT.md`](POTATO_LLM_PROMPT.md)
 
 **Knowledge**
@@ -140,6 +141,7 @@ Open `✨ Templates` in the toolbar and pick:
 **Export & share**
 - `💾 Save` → self-contained `.potato.html` (~10–60 KB). Reopens in Potato to edit, double-clicks to view standalone.
 - The saved-HTML viewer is **interactive** — hover for tooltips, ▶ Play the flow, switch dark/light theme, no editor required.
+- `⬇ Download workflow` (in the Sequence Editor) → exports the ordered steps + narration as a Markdown file, ready to paste into docs or a PR.
 
 **Import**
 - AI Import (LLM HTML or raw JSON)
