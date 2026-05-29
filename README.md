@@ -145,20 +145,29 @@ The first six rows are the product. The drawing is table stakes.
 
 ---
 
-## 📚 10 templates to start from
+## 📚 12 templates to start from
 
 Open `✨ Templates` in the toolbar and pick:
 
+**AWS architectures**
+
 | Template | What you get |
 |---|---|
-| **3-Tier Web App** | User → CDN → ALB → ECS → RDS + worker + SQS |
-| **Serverless API** | API Gateway → Lambdas → DynamoDB + Cognito + EventBridge |
+| **AWS Three-Tier Web App** | Route 53 → CloudFront → WAF → ALB → ECS Fargate (2 AZs) → Aurora + ElastiCache |
+| **AWS Serverless API** | API GW → Cognito → Lambda → DynamoDB + SQS async worker + X-Ray |
+| **AWS Event-Driven Microservices** | API GW → Lambda services → EventBridge → SQS fan-out → Lambda consumers |
+| **AWS Static Site + CDN** | S3 → CloudFront → WAF + ACM + Lambda@Edge → Route 53 |
+| **AWS Data Lake & Analytics** | S3 raw → Glue ETL → S3 curated → Athena + Redshift → QuickSight |
+| **AWS Container Platform** | CodeCommit → CodePipeline → ECR → ECS Fargate → ALB → Aurora |
+| **AWS Hub-and-Spoke Network** | Direct Connect + VPN → Transit Gateway → Prod/Shared/Dev VPCs + Network Firewall |
+
+**Specialty / cross-cloud**
+
+| Template | What you get |
+|---|---|
 | **AI Agent Architecture** | Supervisor + sub-agents on Bedrock with memory + tools |
-| **RAG Chatbot** | Embedding pipeline + vector DB + Bedrock RAG |
-| **Microservices** | API Gateway + 3 services with per-service DBs + event bus |
-| **Event-Driven Pipeline** | SNS fans out to 3 SQS queues, each driving a Lambda |
 | **ML Training Pipeline** | S3 → SageMaker → Model Registry → real-time + batch inference |
-| **Data Pipeline** | S3 → Lambda → Kinesis → Redshift + monitoring |
+| **RAG Chatbot** | Embedding pipeline + vector DB + Bedrock RAG |
 | **Kubernetes App** | Ingress → 2 deployments → Redis + Postgres statefulsets |
 | **Multi-Region Active-Active (AWS)** | Two regions live + serving. ECS on Spot, DDB Global Tables, S3 CRR, KMS multi-region keys, ECR replicated. Includes Play Flow narration of one request + failover. |
 | **+ your own** | Save any diagram and it shows up under "Recent" |
@@ -362,19 +371,51 @@ Especially wanted:
 
 ---
 
+## ⚠️ Disclaimers
+
+**Not affiliated with or endorsed by any cloud provider.**
+Potato is an independent open-source project. It is not affiliated with, sponsored by, or endorsed by Amazon Web Services, Inc., Microsoft Corporation, or Google LLC.
+
+**Trademark notices.**
+Amazon Web Services and the AWS logo are trademarks of Amazon.com, Inc. or its affiliates.
+Microsoft Azure and the Azure logo are trademarks of Microsoft Corporation.
+Google Cloud and the Google Cloud logo are trademarks of Google LLC.
+All cloud service names, icons, and logos appearing in this tool are the property of their respective owners and are used solely to identify those services in technical architecture diagrams. Use of these marks does not imply any relationship with or endorsement by the respective trademark holders. All icon usage is subject to the brand guidelines of the respective provider — see [NOTICE](NOTICE) for details.
+
+**Cost estimates are approximate and may be outdated.**
+The built-in cost estimator and the pricing figures in the service knowledge base are editorial summaries of publicly available information, accurate as of the "as of" date shown for each service. Prices change frequently. **Do not use these estimates for budget planning, procurement decisions, or commercial commitments.** Always verify current pricing with the official provider calculators:
+- AWS: https://calculator.aws/
+- Azure: https://azure.microsoft.com/en-us/pricing/calculator/
+- GCP: https://cloud.google.com/products/calculator
+
+**SLA, limits, and service information may be outdated.**
+The service knowledge base (SLA values, quota limits, pitfalls) summarises public documentation as of the stated date and may not reflect the current state of each service. Cloud providers update limits, SLAs, and feature availability frequently. Always verify against official provider documentation before making architectural or operational decisions.
+
+**AI-generated diagrams may contain errors.**
+Diagrams produced by LLMs via the AI Import feature are machine-generated and may contain hallucinations, incorrect service configurations, wrong icon assignments, or architectures that do not follow best practices. Review every AI-generated diagram carefully before using it in a production design, a cost estimate, or any decision-making context.
+
+**No professional advice.**
+Potato is a diagramming and documentation tool. Nothing it produces — diagrams, cost estimates, SLA summaries, playFlow narrations, or runbooks — constitutes professional engineering, legal, financial, or security advice. Consult qualified professionals for architecture reviews, compliance requirements, and procurement decisions.
+
+**"As-is" warranty disclaimer.**
+Potato is provided under the MIT License "as is", without warranty of any kind. See [LICENSE](LICENSE) for the full disclaimer. The maintainers are not liable for errors, omissions, or decisions made in reliance on content produced by this tool.
+
+---
+
 ## 📄 License
 
 **Code** ([LICENSE](LICENSE)): MIT — free to use, modify, distribute, fork, sell, embed.
 
 **Icons** (`icons/aws/`, `icons/azure/`, `icons/gcp/`): subject to each cloud
-provider's trademark and brand guidelines. They're free to use in diagrams
-depicting AWS / Azure / GCP architectures, but not as logos, in advertising,
-or in ways that imply provider endorsement. See [NOTICE](NOTICE) for full
-attribution.
+provider's trademark and brand guidelines. They are intended for use only in
+diagrams depicting the respective provider's architectures — not as logos, in
+advertising, or in any way that implies provider endorsement. See [NOTICE](NOTICE)
+for full per-provider attribution and the upstream source.
 
-**Knowledge base** ([`service_kb.json`](service_kb.json)): MIT. Editorial
-summaries of public docs; verify pricing numbers against the providers'
-official calculators before committing.
+**Knowledge base** ([`service_kb.json`](service_kb.json)): MIT. Original
+editorial summaries of public documentation; the underlying facts and pricing
+numbers belong to the providers and change over time. Verify before acting on
+them.
 
 No telemetry. No tracking. No strings.
 
