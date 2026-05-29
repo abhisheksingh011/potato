@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 620" width="1000" height="620" role="img" aria-label="Cost estimator screenshot placeholder">
+  <rect width="1000" height="620" fill="#0f1419"/>
+  <rect x="12" y="12" width="976" height="596" rx="16" fill="#151b26" stroke="#FF9900" stroke-width="2.5" stroke-dasharray="12 9"/>
+  <text x="500" y="250" font-family="Segoe UI, system-ui, sans-serif" font-size="58" font-weight="800" fill="#e6edf3" text-anchor="middle">💰  Cost Estimator</text>
+  <text x="500" y="312" font-family="Segoe UI, system-ui, sans-serif" font-size="26" fill="#9aa7b4" text-anchor="middle">Per-service breakdown + monthly total (Small / Medium / Large)</text>
+  <text x="500" y="410" font-family="ui-monospace, Consolas, monospace" font-size="22" fill="#FF9900" text-anchor="middle">replace with → assets/cost-estimator.png</text>
+  <text x="500" y="452" font-family="ui-monospace, Consolas, monospace" font-size="18" fill="#5b6675" text-anchor="middle">open the 💰 Cost panel on a rich diagram, then screenshot</text>
+</svg>
