@@ -373,6 +373,19 @@ body {
   overflow: visible;
 }
 
+/* Overlay that holds the *selected* arrow's draggable endpoint handles.
+   It sits ABOVE the nodes (which use z-index 10–50) so the handles are
+   actually grabbable — the main #arrows-svg paints beneath the nodes, which
+   would otherwise cover any handle that sits on a node's edge port. */
+#arrow-handles-svg {
+  position: absolute;
+  top: 0; left: 0;
+  width: 100%; height: 100%;
+  pointer-events: none;   /* only the handle circles opt back in */
+  overflow: visible;
+  z-index: 60;
+}
+
 /* Arrow temp preview while drawing */
 #arrow-preview {
   position: absolute;
@@ -1292,6 +1305,9 @@ kbd {
         </defs>
       </svg>
       <!-- Nodes are injected here -->
+      <!-- Endpoint-handle overlay — painted above the nodes so the selected
+           arrow's reroute handles can always be grabbed. -->
+      <svg id="arrow-handles-svg" xmlns="http://www.w3.org/2000/svg"></svg>
       <div id="selection-rect"></div>
     </div>
 
@@ -3955,6 +3971,7 @@ const ARROW_COLORS = {
 const canvasArea = document.getElementById('canvas-area');
 const canvasViewport = document.getElementById('canvas-viewport');
 const arrowsSvg = document.getElementById('arrows-svg');
+const arrowHandlesSvg = document.getElementById('arrow-handles-svg');
 const selectionRect = document.getElementById('selection-rect');
 const propsPanel = document.getElementById('props-panel');
 const propsContent = document.getElementById('props-content');
@@ -4965,6 +4982,7 @@ function clearSelection() {
   // deselect arrows
   arrowsSvg.querySelectorAll('.arrow-path').forEach(a => a.classList.remove('selected'));
   arrowsSvg.querySelectorAll('g.arrow-selected').forEach(g => g.classList.remove('arrow-selected'));
+  clearEndpointHandles();
   updatePropsPanel();
 }
 
@@ -5180,20 +5198,6 @@ function drawArrow(arrow) {
     path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
     g.appendChild(path);
 
-    // Endpoint handles for reroute (only visible when the arrow is selected).
-    // Appended after the path so they paint on top and are clickable.
-    ['from', 'to'].forEach(end => {
-      const h = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
-      h.setAttribute('class', 'arrow-endpoint-handle');
-      h.setAttribute('data-end', end);
-      h.setAttribute('r', '6');
-      h.addEventListener('pointerdown', (e) => {
-        e.stopPropagation(); e.preventDefault();
-        startArrowEndpointDrag(arrow.id, end, e);
-      });
-      g.appendChild(h);
-    });
-
     arrowsSvg.appendChild(g);
   } else {
     hit  = g.querySelector('.arrow-hit-area');
@@ -5203,13 +5207,10 @@ function drawArrow(arrow) {
   hit.setAttribute('d', dStr);
   path.setAttribute('class', `arrow-path arrow-${arrow.style || 'solid'}${arrow.animated ? ' animated' : ''}${selectedArrow === arrow.id ? ' selected' : ''}`);
   path.setAttribute('d', dStr);
-  // Position the endpoint handles at the actual port centers and toggle the
-  // group's selected class so CSS reveals them.
-  const fromH = g.querySelector('.arrow-endpoint-handle[data-end="from"]');
-  const toH   = g.querySelector('.arrow-endpoint-handle[data-end="to"]');
-  if (fromH) { fromH.setAttribute('cx', from.x); fromH.setAttribute('cy', from.y); }
-  if (toH)   { toH.setAttribute('cx', to.x);     toH.setAttribute('cy', to.y); }
+  // If this is the selected arrow, keep its (overlay) endpoint handles glued
+  // to the live port centers as the node moves / the arrow reroutes.
   g.classList.toggle('arrow-selected', selectedArrow === arrow.id);
+  if (selectedArrow === arrow.id) positionEndpointHandles(from, to);
   // Use inline style.stroke (not setAttribute) so CSS vars in colorConf.stroke
   // — used by the theme-aware default arrow colour — actually resolve.
   path.style.stroke = colorConf.stroke;
@@ -5420,16 +5421,62 @@ function redrawArrows() {
   arrows.forEach(a => drawArrow(a));
 }
 
+// ----------------------------------------------------------------------
+// Endpoint reroute handles. These live in #arrow-handles-svg, an overlay
+// that paints ABOVE the nodes, so they're always grabbable — the main
+// #arrows-svg sits beneath the nodes, which would cover any handle that
+// lands on a node's edge port (the reason rerouting felt impossible).
+// Only the currently-selected arrow shows handles.
+// ----------------------------------------------------------------------
+function clearEndpointHandles() {
+  while (arrowHandlesSvg.firstChild) arrowHandlesSvg.removeChild(arrowHandlesSvg.firstChild);
+}
+
+function positionEndpointHandles(from, to) {
+  const fromH = arrowHandlesSvg.querySelector('.arrow-endpoint-handle[data-end="from"]');
+  const toH   = arrowHandlesSvg.querySelector('.arrow-endpoint-handle[data-end="to"]');
+  if (fromH) { fromH.setAttribute('cx', from.x); fromH.setAttribute('cy', from.y); }
+  if (toH)   { toH.setAttribute('cx', to.x);     toH.setAttribute('cy', to.y); }
+}
+
+function renderEndpointHandles(arrow) {
+  clearEndpointHandles();
+  if (!arrow) return;
+  const fp = arrow.fromPort || getBestPorts(arrow.from, arrow.to).fp;
+  const tp = arrow.toPort   || getBestPorts(arrow.from, arrow.to).tp;
+  const from = getPortCenter(arrow.from, fp);
+  const to   = getPortCenter(arrow.to,   tp);
+  if (!from || !to) return;
+  // Wrap in g.arrow-selected so the existing CSS reveals + enables the handles.
+  const g = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+  g.setAttribute('class', 'arrow-selected');
+  [['from', from], ['to', to]].forEach(([end, pt]) => {
+    const h = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+    h.setAttribute('class', 'arrow-endpoint-handle');
+    h.setAttribute('data-end', end);
+    h.setAttribute('r', '6');
+    h.setAttribute('cx', pt.x);
+    h.setAttribute('cy', pt.y);
+    h.addEventListener('pointerdown', (e) => {
+      e.stopPropagation(); e.preventDefault();
+      startArrowEndpointDrag(arrow.id, end, e);
+    });
+    g.appendChild(h);
+  });
+  arrowHandlesSvg.appendChild(g);
+}
+
 function selectArrow(id) {
   clearSelection();
   selectedArrow = id;
   arrowsSvg.querySelectorAll('.arrow-path').forEach(p => {
     p.classList.toggle('selected', p.closest('g') && p.closest('g').id === 'arrow-' + id);
   });
-  // Reveal endpoint handles only on the selected arrow's group.
+  // Mark the selected arrow's group and surface its reroute handles.
   arrowsSvg.querySelectorAll('g[id^="arrow-"]').forEach(g => {
     g.classList.toggle('arrow-selected', g.id === 'arrow-' + id);
   });
+  renderEndpointHandles(arrows.find(a => a.id === id));
   updatePropsPanel();
 }
 
@@ -5687,6 +5734,7 @@ function nudgeSelected(dx, dy) {
 function selectAll() {
   if (!nodes.length) { notify('Nothing on the canvas yet', 'info'); return; }
   selectedArrow = null;
+  clearEndpointHandles();
   arrowsSvg.querySelectorAll('.arrow-path').forEach(a => a.classList.remove('selected'));
   nodes.forEach(n => {
     selectedIds.add(n.id);
@@ -6145,6 +6193,7 @@ function deleteArrow(id) {
   playFlow = playFlow.filter(s => s.arrow !== id);
   removeArrowDom(id);
   selectedArrow = null;
+  clearEndpointHandles();
   markDirty();
   updateStatusBar();
   showPropsEmpty();
@@ -6176,6 +6225,7 @@ function deleteSelected() {
   playFlow = playFlow.filter(s => keepIds.has(s.arrow));
   selectedIds.clear();
   selectedArrow = null;
+  clearEndpointHandles();
   markDirty();
   updateStatusBar();
   showPropsEmpty();
@@ -7722,6 +7772,7 @@ function loadDiagramData(data) {
   canvasViewport.querySelectorAll('.node').forEach(el => el.remove());
   canvasViewport.querySelectorAll('.group-node').forEach(el => el.remove());
   arrowsSvg.querySelectorAll('g').forEach(el => el.remove());
+  clearEndpointHandles();
   // Render
   groups.forEach(g => renderGroup(g));
   nodes.forEach(n => renderNode(n));
@@ -7741,6 +7792,7 @@ function newDiagram() {
   canvasViewport.querySelectorAll('.node').forEach(el => el.remove());
   canvasViewport.querySelectorAll('.group-node').forEach(el => el.remove());
   arrowsSvg.querySelectorAll('g').forEach(el => el.remove());
+  clearEndpointHandles();
   document.getElementById('filename-input').value = 'my-diagram';
   zoomReset();
   updateStatusBar();
