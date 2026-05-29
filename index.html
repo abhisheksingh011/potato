@@ -646,6 +646,24 @@ g.arrow-selected .arrow-endpoint-handle { opacity: 1; pointer-events: all; }
 }
 .group-label:hover { background: rgba(123,47,190,0.15); color: var(--text); opacity: 1; }
 .group-label[contenteditable="true"] { outline: none; background: rgba(123,47,190,0.15); border-radius: 3px; padding: 1px 4px; color: var(--text); cursor: text; }
+.group-delete {
+  position: absolute;
+  top: 6px; right: 8px;
+  width: 18px; height: 18px;
+  line-height: 16px;
+  text-align: center;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text-muted);
+  background: rgba(0,0,0,0.18);
+  border-radius: 4px;
+  cursor: pointer;
+  opacity: 0;
+  pointer-events: auto;
+  transition: opacity 0.15s, background 0.15s, color 0.15s;
+}
+.group-node:hover .group-delete, .group-node.selected .group-delete { opacity: 0.75; }
+.group-delete:hover { opacity: 1; background: var(--red, #DD344C); color: #fff; }
 .group-resize {
   position: absolute;
   bottom: 4px; right: 4px;
@@ -1572,6 +1590,7 @@ let groups = [];      // { id, x, y, w, h, label, color }
 let playFlow = [];    // OPTIONAL ordered narration: [{ arrow: arrowId, text: "User opens app..." }, ...]
 let selectedIds = new Set();
 let selectedArrow = null;
+let selectedGroup = null;
 let currentTool = 'select';
 let zoom = 1;
 let panX = 100, panY = 60;
@@ -4969,6 +4988,12 @@ function selectNode(id, add = true) {
   const el = document.getElementById('node-' + id);
   if (el) el.classList.add('selected');
   selectedArrow = null;
+  // A node selection supersedes any selected container box.
+  if (selectedGroup) {
+    const gel = document.getElementById('grp-' + selectedGroup);
+    if (gel) gel.classList.remove('selected');
+    selectedGroup = null;
+  }
   updatePropsPanel();
 }
 
@@ -4983,7 +5008,34 @@ function clearSelection() {
   arrowsSvg.querySelectorAll('.arrow-path').forEach(a => a.classList.remove('selected'));
   arrowsSvg.querySelectorAll('g.arrow-selected').forEach(g => g.classList.remove('arrow-selected'));
   clearEndpointHandles();
+  // deselect groups
+  if (selectedGroup) {
+    const gel = document.getElementById('grp-' + selectedGroup);
+    if (gel) gel.classList.remove('selected');
+    selectedGroup = null;
+  }
   updatePropsPanel();
+}
+
+// Select a group (VPC / subnet / container box) so it can be renamed,
+// recolored, or deleted. Mutually exclusive with node/arrow selection.
+function selectGroup(id) {
+  clearSelection();
+  selectedGroup = id;
+  const gel = document.getElementById('grp-' + id);
+  if (gel) gel.classList.add('selected');
+  updatePropsPanel();
+}
+
+function deleteGroup(id) {
+  pushHistory();
+  groups = groups.filter(g => g.id !== id);
+  const gel = document.getElementById('grp-' + id);
+  if (gel) gel.parentNode.removeChild(gel);
+  if (selectedGroup === id) selectedGroup = null;
+  markDirty();
+  updateStatusBar();
+  showPropsEmpty();
 }
 
 // ===== CONNECTION DRAWING =====
@@ -5869,10 +5921,28 @@ function renderGroup(grp) {
   el.style.width = grp.w + 'px';
   el.style.height = grp.h + 'px';
 
+  el.classList.toggle('selected', selectedGroup === grp.id);
+
   const safeGid = escHtml(grp.id);
   el.innerHTML = `
     <div class="group-label" contenteditable="false" data-gid="${safeGid}">${escHtml(grp.label || '')}</div>
+    <div class="group-delete" data-gdel="${safeGid}" title="Delete group">✕</div>
     <div class="group-resize" data-gresize="${safeGid}"></div>`;
+
+  // Delete button (top-right) — removes just this container box; the nodes
+  // inside are independent and stay on the canvas.
+  const delEl = el.querySelector('.group-delete');
+  if (delEl) delEl.addEventListener('pointerdown', (e) => {
+    e.stopPropagation(); e.preventDefault();
+    deleteGroup(grp.id);
+  });
+
+  // Right-click anywhere on the box's border/label → group context menu.
+  el.addEventListener('contextmenu', (e) => {
+    e.preventDefault(); e.stopPropagation();
+    selectGroup(grp.id);
+    showGroupContextMenu(e, grp.id);
+  });
 
   // Inner listeners (label, resize handle) — rebind because innerHTML replaces them.
   const lblEl = el.querySelector('.group-label');
@@ -5904,6 +5974,7 @@ function renderGroup(grp) {
       };
       const onUp = () => {
         if (moved) markDirty();
+        else selectGroup(grp.id);   // a click (no drag) selects the box
         window.removeEventListener('pointermove', onMove);
         window.removeEventListener('pointerup', onUp);
         window.removeEventListener('pointercancel', onUp);
@@ -5946,6 +6017,48 @@ function updateGroupLabel(id, text) {
   if (g) { g.label = text; markDirty(); }
 }
 
+function updateGroupProp(id, key, val) {
+  const g = groups.find(g => g.id === id);
+  if (!g) return;
+  g[key] = val;
+  renderGroup(g);
+  markDirty();
+}
+
+// Properties panel for a selected container box (VPC / subnet / group).
+function renderGroupProps(grp) {
+  const content = document.getElementById('props-content');
+  content.innerHTML = `
+    <div class="prop-group">
+      <div class="prop-group-title">Container Box</div>
+      <div class="prop-row">
+        <span class="prop-label">Label</span>
+        <input class="prop-input" value="${escHtml(grp.label || '')}" oninput="updateGroupProp('${grp.id}','label',this.value)" placeholder="e.g. VPC, Subnet">
+      </div>
+    </div>
+
+    <div class="prop-group">
+      <div class="prop-group-title">Position & Size</div>
+      <div class="prop-row">
+        <span class="prop-label">X</span>
+        <input class="prop-input" type="number" value="${Math.round(grp.x)}" oninput="updateGroupProp('${grp.id}','x',+this.value)" style="width:70px">
+        <span class="prop-label" style="width:16px">Y</span>
+        <input class="prop-input" type="number" value="${Math.round(grp.y)}" oninput="updateGroupProp('${grp.id}','y',+this.value)" style="width:70px">
+      </div>
+      <div class="prop-row">
+        <span class="prop-label">W</span>
+        <input class="prop-input" type="number" value="${Math.round(grp.w)}" oninput="updateGroupProp('${grp.id}','w',+this.value)" style="width:70px">
+        <span class="prop-label" style="width:16px">H</span>
+        <input class="prop-input" type="number" value="${Math.round(grp.h)}" oninput="updateGroupProp('${grp.id}','h',+this.value)" style="width:70px">
+      </div>
+    </div>
+
+    <div class="prop-group">
+      <button class="prop-btn danger" onclick="deleteGroup('${grp.id}')">🗑️ Delete Box</button>
+      <div style="font-size:10px;color:var(--text-dim);margin-top:6px;font-family:var(--font-mono);">Nodes inside are independent and won't be deleted.</div>
+    </div>`;
+}
+
 // ===== PROPERTIES PANEL =====
 function updatePropsPanel() {
   const content = document.getElementById('props-content');
@@ -5953,13 +6066,20 @@ function updatePropsPanel() {
   // Auto-open the panel whenever a node or arrow is selected (panel starts hidden).
   // We never auto-CLOSE on deselect — once open, it stays until manually dismissed
   // via the × button on the panel header or the ⚙ button on the toolbar.
-  const hasSelection = !!selectedArrow || selectedIds.size > 0;
+  const hasSelection = !!selectedArrow || !!selectedGroup || selectedIds.size > 0;
   if (hasSelection) propsPanel.classList.remove('hidden');
 
   if (selectedArrow) {
     const arrow = arrows.find(a => a.id === selectedArrow);
     if (!arrow) { showPropsEmpty(); return; }
     renderArrowProps(arrow);
+    return;
+  }
+
+  if (selectedGroup) {
+    const grp = groups.find(g => g.id === selectedGroup);
+    if (!grp) { showPropsEmpty(); return; }
+    renderGroupProps(grp);
     return;
   }
 
@@ -6201,7 +6321,7 @@ function deleteArrow(id) {
 
 // ===== DELETE =====
 function confirmDeleteSelected() {
-  const count = selectedIds.size + (selectedArrow ? 1 : 0);
+  const count = selectedIds.size + (selectedArrow ? 1 : 0) + (selectedGroup ? 1 : 0);
   if (count >= 5) {
     if (!confirm('Delete ' + count + ' items? (Ctrl+Z to undo)')) return;
   }
@@ -6209,6 +6329,7 @@ function confirmDeleteSelected() {
 }
 
 function deleteSelected() {
+  if (selectedGroup && !selectedIds.size && !selectedArrow) { deleteGroup(selectedGroup); return; }
   if (selectedArrow && !selectedIds.size) { deleteArrow(selectedArrow); return; }
   if (!selectedIds.size) return;
   pushHistory();
@@ -6330,6 +6451,7 @@ function restoreState(state) {
   playFlow = Array.isArray(state.playFlow) ? state.playFlow : [];
   selectedIds.clear();
   selectedArrow = null;
+  selectedGroup = null;
   // Clear DOM
   canvasViewport.querySelectorAll('.node').forEach(el => el.remove());
   canvasViewport.querySelectorAll('.group-node').forEach(el => el.remove());
@@ -6424,6 +6546,15 @@ function showArrowContextMenu(e, id) {
   menu.style.left = e.clientX + 'px';
   menu.style.top = e.clientY + 'px';
   e.stopPropagation();
+}
+
+function showGroupContextMenu(e, id) {
+  const menu = document.getElementById('context-menu');
+  menu.innerHTML = `
+    <div class="ctx-item danger" onclick="document.getElementById('context-menu').style.display='none';deleteGroup('${id}')">🗑️ Delete Box</div>`;
+  menu.style.display = 'block';
+  menu.style.left = e.clientX + 'px';
+  menu.style.top = e.clientY + 'px';
 }
 
 function ctxAction(action) {
@@ -7768,6 +7899,7 @@ function loadDiagramData(data) {
     : [];
   selectedIds.clear();
   selectedArrow = null;
+  selectedGroup = null;
   // Clear
   canvasViewport.querySelectorAll('.node').forEach(el => el.remove());
   canvasViewport.querySelectorAll('.group-node').forEach(el => el.remove());
@@ -7786,7 +7918,7 @@ function newDiagram() {
     if (!confirm('Discard unsaved changes and start a new diagram?')) return;
   }
   nodes = []; arrows = []; groups = []; playFlow = [];
-  selectedIds.clear(); selectedArrow = null;
+  selectedIds.clear(); selectedArrow = null; selectedGroup = null;
   historyStack = []; redoStack = [];
   _diagramCreatedAt = null;
   canvasViewport.querySelectorAll('.node').forEach(el => el.remove());
