@@ -84,7 +84,7 @@ These are openings, not promises. If any of these excite you, open an issue firs
 - **GitHub Action** that renders `.potato.html` files into PR comments (would close the loop on architecture-as-code reviews)
 - **CLI**: `npx potato render diagram.potato.html --png out.png` so CI pipelines can produce images
 - **Architecture validator**: rules engine that walks the diagram and flags suspicious patterns ("RDS in public subnet", "Lambda with no inbound arrow", "Missing CloudWatch on critical services"). Could be driven by SERVICE_KB-style entries.
-- **More services with `costEstimate`** in `service_kb.json` — currently 18 priced out of 52 documented out of ~1067 icons. Each new service is one JSON edit + a regen.
+- **More services with `costEstimate`** in `service_kb.json` — currently 39 priced out of 52 documented out of ~1067 icons. The 13 unpriced are mostly Azure/GCP/generic shapes; each new entry is one JSON edit + `node _generate_kb.js`.
 - **More templates** in the gallery (we have 10; a "Microservices on K8s with Istio" or "Event-Sourcing CQRS" or "Serverless Data Lake" would be welcomed).
 - **Light theme** — add a `theme` toggle in the toolbar that flips the CSS variables in `:root`.
 - **Mermaid export** — Potato imports Mermaid; closing the loop is a small lift.

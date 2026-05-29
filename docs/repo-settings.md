@@ -113,7 +113,7 @@ First public release.
 
 **Knowledge & cost**
 - Service KB: limits, when-to-use, cost formulas, common pitfalls
-- 52 services documented, 18 priced
+- 52 services documented, 39 priced
 - 💰 Cost Estimator with three workload presets (Small/Medium/Large)
 - Quarterly refresh workflow via `service_kb.json` + build script
 
