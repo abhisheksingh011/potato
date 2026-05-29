@@ -1474,6 +1474,7 @@ kbd {
     <div style="display:flex;gap:8px;margin-top:6px;margin-bottom:10px;flex-wrap:wrap">
       <button type="button" class="tb-btn" onclick="flowEditorAddStep()" style="font-size:11px">+ Add step</button>
       <button type="button" class="tb-btn" onclick="flowEditorResetToAuto()" style="font-size:11px" title="Replace sequence with the auto-derived BFS order">↺ Reset to auto-order</button>
+      <button type="button" class="tb-btn" onclick="flowEditorDownload()" style="font-size:11px" title="Download the ordered workflow as a Markdown file">⬇ Download workflow</button>
       <button type="button" class="tb-btn danger" onclick="flowEditorClear()" style="font-size:11px">Clear all</button>
     </div>
     <div id="flow-editor-list" style="flex:1;overflow-y:auto;border:1px solid var(--border);border-radius:8px;padding:8px;background:var(--bg);min-height:200px"></div>
@@ -6671,6 +6672,38 @@ function flowEditorClear() {
   renderFlowEditor();
 }
 
+// Export the current draft sequence as a readable Markdown workflow so users can
+// drop the walkthrough into docs, runbooks, or a PR. Uses the live draft (not the
+// saved playFlow) so unsaved edits are included.
+function flowEditorDownload() {
+  if (!_flowDraft || !_flowDraft.length) { notify('No steps to download', 'warning'); return; }
+  const arrowById = new Map(arrows.map(a => [a.id, a]));
+  const title = ((document.getElementById('filename-input') || {}).value || 'Workflow').trim() || 'Workflow';
+  const lines = [`# ${title} — Workflow`, ''];
+  let n = 0;
+  _flowDraft.forEach(step => {
+    const a = arrowById.get(step.arrow);
+    if (!a) return; // skip steps whose arrow was deleted
+    n++;
+    const f = (getNode(a.from) || {}).label || a.from;
+    const t = (getNode(a.to) || {}).label || a.to;
+    const hop = a.label ? `${f} → ${t} (${a.label})` : `${f} → ${t}`;
+    lines.push(`${n}. **${hop}**`);
+    if ((step.text || '').trim()) lines.push(`   ${step.text.trim()}`);
+    lines.push('');
+  });
+  const md = lines.join('\n');
+  const safe = title.replace(/[^a-z0-9]+/gi, '-').replace(/^-+|-+$/g, '').toLowerCase() || 'workflow';
+  const blob = new Blob([md], { type: 'text/markdown' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = `${safe}-workflow.md`;
+  link.click();
+  URL.revokeObjectURL(url);
+  notify(`Downloaded ${n} step${n !== 1 ? 's' : ''}`);
+}
+
 function flowEditorMove(i, delta) {
   const j = i + delta;
   if (j < 0 || j >= _flowDraft.length) return;
@@ -8070,20 +8103,35 @@ THEME GUIDANCE:
   Azure → blue (all) | GCP → red (all)
   Generic frontend → teal | Users → gray | Caches → red
 
-PLAY FLOW (OPTIONAL but recommended) — an ordered narration of the diagram:
+PLAY FLOW (OPTIONAL but recommended) — an ordered, detailed narration of the diagram:
 "playFlow": [
-  { "arrow": "a_1", "text": "User opens the app and clicks Sign In." },
-  { "arrow": "a_2", "text": "API Gateway validates the JWT and routes to the Auth Lambda." },
+  { "arrow": "a_1", "text": "Using SFTP connectors with the AWS Transfer Family, invoices are uploaded to an Amazon Simple Storage Service (Amazon S3) bucket." },
+  { "arrow": "a_2", "text": "The upload generates an S3 event into an Amazon EventBridge bus, and an EventBridge rule invokes the AWS Step Functions workflow for invoice extraction and validation." },
   ...
 ]
 
-Rules:
+Rules — write the narration in this exact STYLE (this is the most important part):
 - Each entry references an existing arrow.id.
-- "text" is 1-2 sentences describing what happens at that step (the data, the action, why).
+- "text" is a complete, descriptive sentence (or two) — NOT a terse phrase. Model it on the
+  examples above and these reference sentences:
+    "Some utility providers send invoices directly to an email address enabled on Amazon SES;
+     the PDF attachment is extracted and uploaded to an Amazon S3 bucket."
+    "The Step Functions workflow validates invoices. It uses Amazon Textract for text extraction
+     and invokes the Amazon Titan Text V1 Express model to generate embeddings, storing them in
+     Amazon Aurora PostgreSQL-Compatible Edition with pgvector. It also stores the extracted
+     invoices in the DynamoDB table."
+    "Failed validations are flagged for manual processing by agents through Amazon Simple
+     Notification Service (Amazon SNS)."
+- ALWAYS spell out the full service name on first mention with the short name in parentheses —
+  e.g. "Amazon Simple Storage Service (Amazon S3)", "Amazon Simple Notification Service (Amazon SNS)".
+- Name the concrete mechanism, the data that moves, and WHY it happens — the trigger
+  (S3 event, EventBridge rule, scheduled rule), the transformation, and the destination.
+- Use active, narrative prose like an architecture walkthrough, not bullet fragments.
 - The order in the array is the order Potato will animate when the user hits Play.
-- Cover the full request lifecycle from start to end. Skip arrows that are pure observability
-  unless they're meaningful to the story.
-- The user can edit, reorder, or add steps in Potato's Sequence Editor after import.
+- Cover the full lifecycle end to end — ingestion, every processing/validation hop, branching
+  paths (e.g. failure/manual-review), scheduled/background jobs, and the final reporting/output
+  step. Skip arrows that are pure observability unless they're meaningful to the story.
+- The user can edit, reorder, add, or download the steps in Potato's Sequence Editor after import.
 
 USAGE: the user can save your reply as my-diagram.potato.html and open it via File → Open
 in Potato, or paste it into the 🤖 AI Import modal. The Play button at the top of Potato
