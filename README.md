@@ -64,7 +64,7 @@ If you're choosing Potato, you're not choosing it *over* draw.io. You're choosin
 | 📋 **Architecture knowledge, built in** | Every AWS / Azure / GCP node carries real **SLA, limits, when-to-use guidance, and common pitfalls** — Lambda's 15-min cap, DynamoDB's 400 KB item limit, RDS connection ceilings — one hover away. 52 services documented. |
 | 💰 **Monthly cost estimator** | Hover for pricing formulas; click `💰 Cost` to total the whole design at Small / Medium / Large workloads, with a per-service breakdown and a coverage indicator. |
 | ▶ **Play-the-flow sequences** | Hit ▶ Play and the architecture **explains itself** step-by-step, with detailed narration that ships inside the file — request lifecycle, failure branches, scheduled jobs, end to end. |
-| ⬇ **Downloadable workflow runbook** | Export the play-flow as a numbered **Markdown runbook** — drop it straight into your docs, a PR description, or an onboarding wiki. The diagram becomes documentation. |
+| ⬇ **Downloadable workflow runbook** | Export the play-flow as a numbered **plain-text runbook** (`.txt`) — drop it straight into your docs, a PR description, or an onboarding wiki. The diagram becomes documentation. |
 | 🤖 **Plain-English → architecture** | Paste the [Potato prompt](POTATO_LLM_PROMPT.md) into any LLM (ChatGPT / Claude / Gemini / Copilot), describe your system, paste the reply back. Get a real, editable, *knowledge-enriched* design — not just shapes. |
 | 📤 **A file that explains itself** | Save → email → recipient double-clicks → interactive viewer in any browser. They hover tooltips, ▶ Play the flow, see the costs. No Potato, no account, no install. |
 | 🪣 **1067 official cloud icons** | AWS / Azure / GCP, searchable, drag-and-drop — the real artwork the vendors ship, not stylised reproductions. |
@@ -81,7 +81,7 @@ If you're choosing Potato, you're not choosing it *over* draw.io. You're choosin
 │  2. Paste the reply into 🤖 AI Import → a real architecture appears   │
 │  3. Hover nodes → SLA · limits · pitfalls.  Click 💰 → monthly cost   │
 │  4. Hit ▶ Play → the flow narrates itself, step by step               │
-│  5. ⬇ Download the workflow as a Markdown runbook for your docs/PR    │
+│  5. ⬇ Download the workflow as a text runbook for your docs/PR        │
 │  6. 💾 Save → a self-contained .potato.html that explains itself      │
 └──────────────────────────────────────────────────────────────────────┘
 ```
@@ -103,7 +103,7 @@ Everyone can draw a box. The table below is deliberately *not* about drawing —
 | **Service knowledge** (SLA · limits · pitfalls) on every node | ✅ | ❌ | ❌ | ❌ | ❌ |
 | **Monthly cost estimator** | ✅ | ❌ | ❌ | ❌ | ❌ |
 | **Play-the-flow** animated walkthrough with narration | ✅ | ❌ | ❌ | ❌ | ❌ |
-| **Downloadable Markdown runbook** from the flow | ✅ | ❌ | ❌ | ❌ | ❌ |
+| **Downloadable text runbook** from the flow | ✅ | ❌ | ❌ | ❌ | ❌ |
 | **LLM-native** — describe it in English, any model | ✅ | ❌ | ❌ | ⚠️ syntax | ❌ |
 | **Self-explaining shareable file** (recipient interacts) | ✅ | ❌ | ❌ | ❌ | ❌ |
 | 1067 official AWS/Azure/GCP icons built-in | ✅ | ⚠️ download | ❌ | ❌ | ✅ paid |
@@ -180,7 +180,7 @@ Open `✨ Templates` in the toolbar and pick:
 - Inline LLM prompt — one click to copy, no GitHub round-trip
 - `🤖 AI Import` validates + sanitizes + rescues icon paths the LLM guessed wrong
 - `playFlow` narration ships inside the diagram; ▶ Play walks through it on-screen
-- Sequence Editor to reorder, edit, or rewrite the narration — and **⬇ download the whole walkthrough as a Markdown workflow** (numbered steps + narration) for docs, runbooks, or a PR
+- Sequence Editor to reorder, edit, or rewrite the narration — and **⬇ download the whole walkthrough as a text workflow** (`.txt`, numbered steps + narration) for docs, runbooks, or a PR
 - Prompt asks the LLM for detailed, walkthrough-style narration — full service names, the trigger/data/why of each hop, and the complete lifecycle end-to-end
 - Works with **GitHub Copilot Chat** out of the box — just reference [`POTATO_LLM_PROMPT.md`](POTATO_LLM_PROMPT.md)
 
@@ -198,7 +198,7 @@ Open `✨ Templates` in the toolbar and pick:
 **Export & share**
 - `💾 Save` → self-contained `.potato.html` (~10–60 KB). Reopens in Potato to edit, double-clicks to view standalone.
 - The saved-HTML viewer is **interactive** — hover for tooltips, ▶ Play the flow, switch dark/light theme, no editor required.
-- `⬇ Download workflow` (in the Sequence Editor) → exports the ordered steps + narration as a Markdown file, ready to paste into docs or a PR.
+- `⬇ Download workflow` (in the Sequence Editor) → exports the ordered steps + narration as a plain-text (`.txt`) file, ready to paste into docs or a PR.
 
 **Import**
 - AI Import (LLM HTML or raw JSON)
