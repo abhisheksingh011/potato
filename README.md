@@ -4,13 +4,12 @@
 
 **Architecture diagrams that live in your git repo.**
 
-*Drag-and-drop AWS / Azure / GCP icons, or describe the system to any LLM and paste the reply. Edit in VS Code. Share as a single self-contained HTML file. No account, no subscription, no internet.*
+*Drag-and-drop AWS / Azure / GCP icons, or describe the system to any LLM and paste the reply. Share as a single self-contained HTML file. No account, no subscription, no internet.*
 
 [![MIT License](https://img.shields.io/badge/license-MIT-1abc9c)](LICENSE)
 [![Single file](https://img.shields.io/badge/runtime-1%20html%20file-7B2FBE)](index.html)
 [![Real icons](https://img.shields.io/badge/icons-1067%20AWS%20%2F%20Azure%20%2F%20GCP-FF9900)](icons/)
 [![Zero deps](https://img.shields.io/badge/dependencies-zero-2E86C1)](#tech-stack)
-[![VS Code](https://img.shields.io/badge/VS%20Code-extension-007ACC)](extension.js)
 
 </div>
 
@@ -18,7 +17,7 @@
 
 ## ⚡ Try it in 10 seconds
 
-**Live demo** — open the editor in your browser, no install: *[demo coming with GitHub Pages — see [docs/repo-settings.md](docs/repo-settings.md)]*
+**Live demo** — open the editor in your browser, no install: **https://abhisheksingh011.github.io/potato/**
 
 **Local** — download or clone, then double-click `index.html`:
 
@@ -43,7 +42,6 @@ That's the whole install. One file, no build, runs from `file://`.
 | ▶ **Play the flow** | Click ▶ Play and watch your architecture explain itself, step-by-step, with the LLM-written narration that ships inside the file. |
 | 🪣 **1067 official icons** | AWS / Azure / GCP, searchable, drag-and-drop. The real artwork the cloud vendors ship — not stylised reproductions. |
 | 📤 **Shareable as a single file** | Save → email → recipient double-clicks → interactive viewer in any browser. Hovers icons. Plays the flow. Sees costs. No Potato install needed. |
-| 🧩 **VS Code custom editor** | Double-click any `*.potato.html` in the explorer — opens directly in the Potato editor. `Ctrl+S` saves through VS Code's text model so `git diff`, Revert, and split-editor views all stay in sync. |
 
 > No account. No telemetry. No subscription. No internet after the initial download.
 
@@ -82,7 +80,6 @@ Result: 7 real AWS-iconed nodes, color-themed by service family, a `playFlow` na
 | Animated play-the-flow with narration | ✅ | ❌ | ❌ | ❌ | ❌ |
 | Save → recipient interacts in browser | ✅ | ❌ | ❌ | ❌ | ❌ |
 | Lives in `git diff` next to your code | ✅ HTML | ⚠️ XML | ⚠️ JSON | ✅ MD | ❌ |
-| VS Code custom editor | ✅ | ❌ | ❌ | ⚠️ preview | ❌ |
 | Account / login required | ❌ | ❌ | ❌ | ❌ | ✅ |
 | Pricing | **Free** | Free | Free | Free | $$$ |
 
@@ -153,29 +150,6 @@ Open `✨ Templates` in the toolbar and pick:
 - Multi-select, drag-rect, arrow-key nudge, shift-nudge x10
 - Auto-save to localStorage + per-tab crash recovery
 - Recent diagrams (last 8) in the Templates modal
-- **VS Code custom editor** with proper file model sync (works with Revert, `git checkout`, split views)
-
----
-
-## 🧩 VS Code extension
-
-Edit `.potato.html` files in VS Code as if they were code.
-
-```bash
-# package the extension locally:
-npm install -g @vscode/vsce
-vsce package                              # → potato-diagram-1.0.0.vsix
-code --install-extension potato-diagram-1.0.0.vsix
-```
-
-What you get:
-- **Double-click any `*.potato.html`** in the file explorer → opens in the Potato editor
-- `Ctrl+Alt+D` (or `Cmd+Alt+D`) → new blank diagram
-- Status-bar button: `🥔 Potato`
-- Right-click any `.html` → `🥔 Open in Potato Editor`
-- `Ctrl+S` saves through VS Code's text document model — `git diff`, Revert, and external file changes (git pull, another editor) all stay in sync with the canvas.
-
-See [`extension.js`](extension.js) for the implementation.
 
 ---
 
@@ -291,8 +265,6 @@ potato/
 ├── _test_saved_viewer.js      ← Smoke test for the saved-viewer inline script
 ├── icons/                     ← 1067 SVGs across aws/azure/gcp by category
 ├── POTATO_LLM_PROMPT.md       ← Long-form prompt you can copy into any LLM
-├── extension.js               ← VS Code extension entry point
-├── package.json               ← VS Code extension manifest
 ├── .github/
 │   ├── copilot-instructions.md  ← Auto-loaded by Copilot Chat in this repo
 │   └── workflows/check.yml      ← CI: parses inline script, validates JSON, generator drift, viewer smoke test
@@ -312,9 +284,6 @@ potato/
 1. Edit [`service_kb.json`](service_kb.json) — add `costEstimate: { small, medium, large }` to any entry.
 2. Run `node _generate_kb.js`.
 3. The Cost Estimator picks it up automatically.
-
-**Use Potato in VS Code**
-The bundled extension (in [`extension.js`](extension.js)) registers a custom editor for `*.potato.html` — double-click any saved diagram. See [Contributing](CONTRIBUTING.md) for development setup.
 
 ---
 
