@@ -39,6 +39,14 @@ That's the whole install. One file, no build, runs from `file://`.
 
 ---
 
+## 🤖 Need a diagram fast? Let your LLM build it.
+
+1. **Grab the Potato format** — click **🤖 AI Import → Copy LLM prompt** (works with any model), or point a file-aware model at it: in Copilot Chat say `Read #file:POTATO_LLM_PROMPT.md`, or — once this repo is public — link [`POTATO_LLM_PROMPT.md`](POTATO_LLM_PROMPT.md) directly.
+2. **Describe your architecture** in plain English.
+3. **Paste the reply into 🤖 AI Import** (or save it as `*.potato.html` and **📂 Open** it).
+
+---
+
 ## 🧠 Why this isn't a diagram tool
 
 A diagram tool stops at the picture. **Potato keeps going** — it's where you *design, understand, price, and document* a cloud system, not just draw one.
