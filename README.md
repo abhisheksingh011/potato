@@ -20,7 +20,7 @@
 
 <br><br>
 
-<img src="assets/Landing Page.jpg" alt="Potato — The Cloud Architecture Studio in action" width="820">
+<img src="assets/gif.gif" alt="Potato — The Cloud Architecture Studio in action" width="820">
 
 </div>
 
