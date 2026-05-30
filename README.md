@@ -39,9 +39,11 @@ Just open the link. Nothing to install. Works in any browser.
 
 ## 🤖 Need a diagram fast? Let your LLM build it.
 
-1. **Grab the Potato format** — click **🤖 AI Import → Copy LLM prompt** (works with any model), or point a file-aware model at it: in Copilot Chat say `Read #file:POTATO_LLM_PROMPT.md`, or link [`POTATO_LLM_PROMPT.md`](POTATO_LLM_PROMPT.md) directly.
-2. **Describe your architecture** in plain English.
-3. **Paste the reply into 🤖 AI Import** (or save it as `*.potato.html` and **📂 Open** it).
+1. Open Potato → click **🤖 AI Import** → **Copy LLM prompt**
+2. Paste it into any LLM (ChatGPT, Claude, Gemini, Copilot…) and describe your architecture
+3. Copy the reply → back in Potato, paste it into **🤖 AI Import** → click **Import**
+
+That's it. A fully-wired, icon-labelled, cost-aware diagram appears in seconds.
 
 ---
 
