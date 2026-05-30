@@ -16,6 +16,10 @@
 
 <br>
 
+<img src="assets/brand.svg" alt="Potato — The Cloud Architecture Studio" width="320">
+
+<br><br>
+
 <img src="assets/hero.svg" alt="Potato in action: describe a system, get a diagram, Play the flow, see the cost" width="820">
 
 </div>
