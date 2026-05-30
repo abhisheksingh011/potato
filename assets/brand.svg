@@ -70,7 +70,7 @@
         letter-spacing="-2">Potato</text>
 
   <!-- Thin divider line -->
-  <line x1="140" y1="244" x2="340" y2="244" stroke="#30363d" stroke-width="1"/>
+  <line x1="80" y1="244" x2="400" y2="244" stroke="#30363d" stroke-width="1"/>
 
   <!-- Tagline -->
   <text x="240" y="272"
@@ -78,5 +78,5 @@
         font-size="13.5" font-weight="500"
         fill="#6e7681"
         text-anchor="middle"
-        letter-spacing="5">ARCHITECTURE STUDIO</text>
+        letter-spacing="5">THE CLOUD ARCHITECTURE STUDIO</text>
 </svg>
