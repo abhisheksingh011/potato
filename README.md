@@ -9,7 +9,7 @@
 *Not a drawing app. Describe your system to any LLM, watch the flow ▶ Play itself, read each service's SLA · limits · pitfalls on hover, total the monthly cost, and ⬇ download the whole workflow as a runbook. No account, no server, no internet.*
 
 [![MIT License](https://img.shields.io/badge/license-MIT-1abc9c)](LICENSE)
-[![Single file](https://img.shields.io/badge/runtime-1%20html%20file-7B2FBE)](index.html)
+[![Live demo](https://img.shields.io/badge/live%20demo-open%20in%20browser-7B2FBE)](https://abhisheksingh011.github.io/potato/)
 [![Knowledge built-in](https://img.shields.io/badge/SLA%20%C2%B7%20limits%20%C2%B7%20cost%20%C2%B7%20pitfalls-52%20services-1abc9c)](#-service-knowledge-base)
 [![Real icons](https://img.shields.io/badge/icons-1067%20AWS%20%2F%20Azure%20%2F%20GCP-FF9900)](icons/)
 [![Zero deps](https://img.shields.io/badge/dependencies-zero-2E86C1)](#tech-stack)
@@ -22,26 +22,24 @@
 
 ---
 
-## ⚡ Try it in 10 seconds
+## ⚡ Open it now — no install, no account
 
-**Live demo** — open the editor in your browser, no install: **[abhisheksingh011.github.io/potato](https://abhisheksingh011.github.io/potato/)**
+**👉 [abhisheksingh011.github.io/potato](https://abhisheksingh011.github.io/potato/)**
 
-**Local** — download or clone, then double-click `index.html`:
+Just open the link. Nothing to install. Works in any browser.
 
-```bash
-git clone https://github.com/abhisheksingh011/potato.git
-# macOS:   open potato/index.html
-# Linux:   xdg-open potato/index.html
-# Windows: start potato\index.html
-```
-
-That's the whole install. One file, no build, runs from `file://`.
+> **Want it offline?** The entire app is one self-contained HTML file — save it once and it works forever without internet.
+>
+> ```bash
+> git clone https://github.com/abhisheksingh011/potato.git
+> # then double-click index.html  — runs from file://, no build step
+> ```
 
 ---
 
 ## 🤖 Need a diagram fast? Let your LLM build it.
 
-1. **Grab the Potato format** — click **🤖 AI Import → Copy LLM prompt** (works with any model), or point a file-aware model at it: in Copilot Chat say `Read #file:POTATO_LLM_PROMPT.md`, or — once this repo is public — link [`POTATO_LLM_PROMPT.md`](POTATO_LLM_PROMPT.md) directly.
+1. **Grab the Potato format** — click **🤖 AI Import → Copy LLM prompt** (works with any model), or point a file-aware model at it: in Copilot Chat say `Read #file:POTATO_LLM_PROMPT.md`, or link [`POTATO_LLM_PROMPT.md`](POTATO_LLM_PROMPT.md) directly.
 2. **Describe your architecture** in plain English.
 3. **Paste the reply into 🤖 AI Import** (or save it as `*.potato.html` and **📂 Open** it).
 
