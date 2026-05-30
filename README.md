@@ -32,13 +32,6 @@
 
 Just open the link. Nothing to install. Works in any browser.
 
-> **Want it offline?** The entire app is one self-contained HTML file — save it once and it works forever without internet.
->
-> ```bash
-> git clone https://github.com/abhisheksingh011/potato.git
-> # then double-click index.html  — runs from file://, no build step
-> ```
-
 ---
 
 ## ✨ Start from a template — fastest path to a real diagram
