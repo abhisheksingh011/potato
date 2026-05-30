@@ -20,7 +20,7 @@
 
 <br><br>
 
-<img src="assets/hero.svg" alt="Potato in action: describe a system, get a diagram, Play the flow, see the cost" width="820">
+<img src="assets/Landing Page.jpg" alt="Potato — The Cloud Architecture Studio in action" width="820">
 
 </div>
 
@@ -45,9 +45,9 @@ Just open the link. Nothing to install. Works in any browser.
 
 Click **✨ Templates** in the toolbar (or on the empty canvas) and pick any of the 12 built-in AWS architectures. Every template loads as a fully-wired, editable diagram with real service icons, colour-coded by service family, and a Play Flow narration ready to run.
 
-```
-Templates → pick one → diagram loads instantly → edit any node, arrow, or group
-```
+<img src="assets/Pick a template process - options.jpg" alt="Template gallery — 12 real AWS architectures" width="100%">
+
+<img src="assets/architecture from template .jpg" alt="Architecture loaded from template — fully wired and editable" width="100%">
 
 **What you get out of the box:**
 
@@ -61,6 +61,23 @@ Templates → pick one → diagram loads instantly → edit any node, arrow, or 
 
 Everything is editable after loading — add nodes, redirect arrows, rename services, change themes, add VPC groups. The template is a starting point, not a contract.
 
+**AWS architectures available:**
+
+| Template | What you get |
+|---|---|
+| **AWS Three-Tier Web App** | Route 53 → CloudFront → WAF → ALB → ECS Fargate (2 AZs) → Aurora + ElastiCache |
+| **AWS Serverless API** | API GW → Cognito → Lambda → DynamoDB + SQS async worker + X-Ray |
+| **AWS Event-Driven Microservices** | API GW → Lambda services → EventBridge → SQS fan-out → Lambda consumers |
+| **AWS Static Site + CDN** | S3 → CloudFront → WAF + ACM + Lambda@Edge → Route 53 |
+| **AWS Data Lake & Analytics** | S3 raw → Glue ETL → S3 curated → Athena + Redshift → QuickSight |
+| **AWS Container Platform** | CodeCommit → CodePipeline → ECR → ECS Fargate → ALB → Aurora |
+| **AWS Hub-and-Spoke Network** | Direct Connect + VPN → Transit Gateway → Prod/Shared/Dev VPCs + Network Firewall |
+| **AI Agent Architecture** | Supervisor + sub-agents on Bedrock with memory + tools |
+| **ML Training Pipeline** | S3 → SageMaker → Model Registry → real-time + batch inference |
+| **RAG Chatbot** | Embedding pipeline + vector DB + Bedrock RAG |
+| **Kubernetes App** | Ingress → 2 deployments → Redis + Postgres statefulsets |
+| **Multi-Region Active-Active (AWS)** | Two regions live + serving. ECS on Spot, DDB Global Tables, S3 CRR, KMS multi-region keys, ECR replicated. |
+
 ---
 
 ## 🤖 Generate with AI — from description to production diagram in minutes
@@ -73,6 +90,8 @@ No drawing. No drag-and-drop. Just describe what you need, and Potato turns it i
 
 On the empty canvas, click **Generate with AI** (or click **🤖 AI Import** in the toolbar at any time).
 
+<img src="assets/AI -Step 1- slect AI option.jpg" alt="Step 1 — Click Generate with AI on the empty canvas" width="100%">
+
 The AI Import panel opens — it walks you through three steps.
 
 ---
@@ -80,6 +99,8 @@ The AI Import panel opens — it walks you through three steps.
 ### Step 2 — Copy the LLM prompt
 
 Click the green **📋 Copy LLM prompt** button.
+
+<img src="assets/AI- Step 2 - Copy Llm Prompt.jpg" alt="Step 2 — Copy the LLM prompt from the AI Import panel" width="100%">
 
 This copies Potato's Principal Cloud Architect prompt to your clipboard — a detailed set of instructions that tells any LLM exactly how to produce a valid Potato diagram: schemas, icon paths, layout rules, colour themes, and playFlow narration style. You only copy it once per session.
 
@@ -93,6 +114,8 @@ Paste the copied prompt, then on a new line describe what you want in plain Engl
 
 > *"Create a multi-region multi-AZ microservices architecture on AWS with API Gateway, ECS Fargate, Aurora PostgreSQL, DynamoDB Global Tables, ElastiCache Redis, Cognito auth, WAF, Route 53 latency routing, and CloudWatch observability. Two active regions: us-east-1 and eu-west-1."*
 
+<img src="assets/AI- step 3- Paste the prompt and write requirment in clude,chapgpt or any model.jpg" alt="Step 3 — Paste prompt into Claude and describe your architecture" width="100%">
+
 The LLM thinks like a principal architect and outputs a complete Potato-format HTML file — nodes, arrows, groups, and a step-by-step narration for every hop in the architecture.
 
 ---
@@ -101,7 +124,9 @@ The LLM thinks like a principal architect and outputs a complete Potato-format H
 
 Select and copy the **entire HTML reply** from the LLM — from `<!DOCTYPE html>` to `</html>`.
 
-The output is raw HTML text containing the diagram data as JSON. It includes every node, every arrow, every VPC group, and a `playFlow` narration array that Potato will animate.
+<img src="assets/AI- step 4 copy the results.jpg" alt="Step 4 — Copy the full HTML output from the LLM" width="100%">
+
+The output is raw HTML containing the diagram data as JSON — every node, arrow, VPC group, and a `playFlow` narration array that Potato will animate.
 
 ---
 
@@ -109,7 +134,9 @@ The output is raw HTML text containing the diagram data as JSON. It includes eve
 
 Back in Potato, paste the copied HTML into the text area in the AI Import panel, then click **⬇ Import Diagram**.
 
-Potato validates every node, arrow, and group — auto-correcting any icon paths the LLM guessed wrong, then drops you straight onto the canvas.
+<img src="assets/AI - Paste the prompt result in Potato.jpg" alt="Step 5 — Paste the HTML into Potato AI Import and click Import" width="100%">
+
+Potato validates every node, arrow, and group — auto-correcting any icon paths the LLM guessed wrong — then drops you straight onto the canvas.
 
 ---
 
@@ -117,7 +144,9 @@ Potato validates every node, arrow, and group — auto-correcting any icon paths
 
 The full architecture appears on the canvas — real AWS icons, colour-coded by service family, VPC and subnet group boundaries, and orthogonal routed arrows.
 
-Everything is live and editable: click any node to rename it, change its theme, or edit its description. Drag nodes to reposition them. Add new services from the sidebar. Redirect arrows by dragging their endpoints.
+<img src="assets/step 5 - get editable architeture.jpg" alt="Step 6 — Fully wired editable architecture on the canvas" width="100%">
+
+Everything is live and editable: click any node to rename it, change its theme, or edit its description. Drag nodes to reposition. Add services from the sidebar. Redirect arrows by dragging their endpoints.
 
 ---
 
@@ -125,23 +154,29 @@ Everything is live and editable: click any node to rename it, change its theme, 
 
 Click **▶ Play** in the toolbar (or press **Space**).
 
+<img src="assets/step 6 - play the sequence.jpg" alt="Step 7 — Click Play to animate the architecture flow step by step" width="100%">
+
 Potato animates the diagram step by step — each arrow lights up in sequence and the narration text appears at the bottom of the screen. It works like a recorded design review: every hop explains what moves, why it moves there, and what architectural principle it satisfies.
 
 ---
 
 ### Step 8 — Read the narration for each step
 
-As Play runs, each step shows a full architect-level description at the bottom:
+As Play runs, each step shows a full architect-level description at the bottom of the screen.
 
-> *"For European users, Amazon Cognito passes the authenticated request to the Amazon API Gateway regional endpoint in eu-west-1 — an identical active-active configuration — so that European traffic never needs to traverse the Atlantic to reach an API entry point, reducing latency by..."*
+<img src="assets/Step 7 description of each sequence.jpg" alt="Step 8 — Architect-level narration for each hop in the sequence" width="100%">
 
-The narration names the trigger, the data, the destination, and the architectural rationale for every connection in the diagram.
+> *"For European users, Amazon Cognito passes the authenticated request to the Amazon API Gateway regional endpoint in eu-west-1 — an identical active-active configuration — so that European traffic never needs to traverse the Atlantic to reach an API entry point, reducing latency..."*
+
+The narration names the trigger, the data, the destination, and the architectural rationale for every connection.
 
 ---
 
 ### Step 9 — Click 💰 Cost for a monthly estimate
 
 Click **💰 Cost** in the toolbar to open the Cost Estimator.
+
+<img src="assets/step8 - get the cost estimate.jpg" alt="Step 9 — Cost Estimator showing per-service breakdown and monthly total" width="100%">
 
 Switch between **Small (dev/hobby)**, **Medium (small production)**, and **Large (busy production)** workload presets. You get a per-service breakdown with pricing formulas, counts, per-unit costs, and subtotals — all totalled at the bottom.
 
@@ -151,16 +186,18 @@ Switch between **Small (dev/hobby)**, **Medium (small production)**, and **Large
 
 ---
 
-### Step 10 — Open Sequence Editor to edit, reorder, or download the flow
+### Step 10 — Edit, reorder, or download the sequence flow
 
 Click **Sequence** in the toolbar to open the **Play Sequence Editor**.
 
-Each step in the flow is shown as an editable card — connection name, narration text, up/down reorder handles, and a delete button. You can:
+<img src="assets/step 9- get the process flow or edit process flow or downlaod the flow.jpg" alt="Step 10 — Sequence Editor to edit, reorder, and download the flow" width="100%">
+
+Each step is shown as an editable card — connection name, narration text, reorder handles, and a delete button. You can:
 
 - **Edit** any narration step to match your exact system behaviour
 - **Reorder** steps by dragging or using the arrows
 - **Add** new steps for branches, error paths, or scheduled jobs
-- **⬇ Download Workflow** — exports the entire sequence as a numbered plain-text `.txt` runbook, ready to paste into a PR description, a Confluence doc, or an onboarding wiki
+- **⬇ Download Workflow** — exports the entire sequence as a numbered plain-text `.txt` runbook, ready to paste into a PR description, Confluence, or an onboarding wiki
 
 ---
 
@@ -194,30 +231,7 @@ If you're choosing Potato, you're not choosing it *over* draw.io. You're choosin
 
 ---
 
-## 🎬 The headline workflow
-
-```text
-┌──────────────────────────────────────────────────────────────────────┐
-│  1. Describe your system to any LLM (paste the Potato prompt)         │
-│  2. Paste the reply into 🤖 AI Import → a real architecture appears   │
-│  3. Hover nodes → SLA · limits · pitfalls.  Click 💰 → monthly cost   │
-│  4. Hit ▶ Play → the flow narrates itself, step by step               │
-│  5. ⬇ Download the workflow as a text runbook for your docs/PR        │
-│  6. 💾 Save → a self-contained .potato.html that explains itself      │
-└──────────────────────────────────────────────────────────────────────┘
-```
-
-**A real prompt that works**:
-
-> *"Show a RAG chatbot on AWS: S3 docs → embedding Lambda → OpenSearch vector index → API Gateway → Bedrock with Claude. Add CloudWatch on each Lambda."*
-
-What comes back isn't just a picture: real AWS-iconed nodes color-themed by service family, each carrying its SLA / limits / pitfalls, a `playFlow` narration that walks the request lifecycle end-to-end, a cost panel ready to total, and a runbook one click from export.
-
----
-
 ## 🆚 Drawing tools draw. Potato does the other 80%.
-
-Everyone can draw a box. The table below is deliberately *not* about drawing — it's about what happens **after** the boxes are on the canvas. That's the gap Potato fills, and it's why a head-to-head "which diagram tool" comparison misses the point.
 
 | | **Potato** | draw.io | Excalidraw | Mermaid | Lucidchart |
 |---|---|---|---|---|---|
@@ -237,64 +251,6 @@ The first six rows are the product. The drawing is table stakes.
 
 ---
 
-## 📸 See it in action
-
-<table>
-<tr>
-<td width="50%" align="center">
-<img src="assets/service-tooltip.svg" alt="Service knowledge tooltip showing SLA, limits, and pitfalls" width="100%"><br>
-<b>📋 Knowledge on every node</b><br><sub>SLA · limits · when-to-use · pitfalls, one hover away</sub>
-</td>
-<td width="50%" align="center">
-<img src="assets/cost-estimator.svg" alt="Cost estimator panel with per-service breakdown" width="100%"><br>
-<b>💰 Monthly cost, totalled</b><br><sub>Per-service breakdown at Small / Medium / Large</sub>
-</td>
-</tr>
-<tr>
-<td width="50%" align="center">
-<img src="assets/saved-viewer.svg" alt="Saved interactive viewer mid Play" width="100%"><br>
-<b>📤 A file that explains itself</b><br><sub>Recipient double-clicks → hovers, ▶ Plays, sees cost</sub>
-</td>
-<td width="50%" align="center">
-<img src="assets/hero.svg" alt="The end-to-end Potato workflow" width="100%"><br>
-<b>🤖 → ▶ → 💰 → ⬇</b><br><sub>Describe it, Play it, price it, download the runbook</sub>
-</td>
-</tr>
-</table>
-
-> Screenshots are placeholders right now — see [`assets/README.md`](assets/README.md) to drop in real captures (the layout updates automatically).
-
----
-
-## 📚 12 templates to start from
-
-Open `✨ Templates` in the toolbar and pick:
-
-**AWS architectures**
-
-| Template | What you get |
-|---|---|
-| **AWS Three-Tier Web App** | Route 53 → CloudFront → WAF → ALB → ECS Fargate (2 AZs) → Aurora + ElastiCache |
-| **AWS Serverless API** | API GW → Cognito → Lambda → DynamoDB + SQS async worker + X-Ray |
-| **AWS Event-Driven Microservices** | API GW → Lambda services → EventBridge → SQS fan-out → Lambda consumers |
-| **AWS Static Site + CDN** | S3 → CloudFront → WAF + ACM + Lambda@Edge → Route 53 |
-| **AWS Data Lake & Analytics** | S3 raw → Glue ETL → S3 curated → Athena + Redshift → QuickSight |
-| **AWS Container Platform** | CodeCommit → CodePipeline → ECR → ECS Fargate → ALB → Aurora |
-| **AWS Hub-and-Spoke Network** | Direct Connect + VPN → Transit Gateway → Prod/Shared/Dev VPCs + Network Firewall |
-
-**Specialty / cross-cloud**
-
-| Template | What you get |
-|---|---|
-| **AI Agent Architecture** | Supervisor + sub-agents on Bedrock with memory + tools |
-| **ML Training Pipeline** | S3 → SageMaker → Model Registry → real-time + batch inference |
-| **RAG Chatbot** | Embedding pipeline + vector DB + Bedrock RAG |
-| **Kubernetes App** | Ingress → 2 deployments → Redis + Postgres statefulsets |
-| **Multi-Region Active-Active (AWS)** | Two regions live + serving. ECS on Spot, DDB Global Tables, S3 CRR, KMS multi-region keys, ECR replicated. Includes Play Flow narration of one request + failover. |
-| **+ your own** | Save any diagram and it shows up under "Recent" |
-
----
-
 ## 🚀 Features at a glance
 
 **Diagramming**
@@ -304,15 +260,14 @@ Open `✨ Templates` in the toolbar and pick:
 - Groups / swimlanes for VPCs, subnets, service boundaries
 - Auto-layout (LR / TB), grid snap, fit-to-content
 - Touch + pen support on iPad / tablets
-- **Dark + light themes** with visible group borders in both
+- Dark + light themes with visible group borders in both
 
 **AI workflow**
 - Inline LLM prompt — one click to copy, no GitHub round-trip
 - `🤖 AI Import` validates + sanitizes + rescues icon paths the LLM guessed wrong
 - `playFlow` narration ships inside the diagram; ▶ Play walks through it on-screen
 - Sequence Editor to reorder, edit, or rewrite the narration — and **⬇ download the whole walkthrough as a text workflow** (`.txt`, numbered steps + narration) for docs, runbooks, or a PR
-- Prompt asks the LLM for detailed, walkthrough-style narration — full service names, the trigger/data/why of each hop, and the complete lifecycle end-to-end
-- Works with **GitHub Copilot Chat** out of the box — just reference [`POTATO_LLM_PROMPT.md`](POTATO_LLM_PROMPT.md)
+- Works with **GitHub Copilot Chat** — just reference [`POTATO_LLM_PROMPT.md`](POTATO_LLM_PROMPT.md)
 
 **Knowledge**
 - Service KB with **SLA, limits, when-to-use, cost formulas, and pitfalls** for 52 services
@@ -377,41 +332,7 @@ Every cloud node carries five fields you can edit, refresh quarterly, or extend:
 }
 ```
 
-Surfaced in:
-- Hover tooltip on the canvas
-- Properties panel when a node is selected
-- Cost Estimator breakdown
-- The standalone saved-HTML viewer
-
 Add new entries to [`service_kb.json`](service_kb.json), run `node _generate_kb.js`, commit. That's the entire workflow.
-
----
-
-## 🤖 AI workflow in detail
-
-1. **Click 🤖 AI Import** — modal walks you through 3 steps.
-2. **Step 1**: ▶ Copy the Potato prompt. It explains the JSON schema, the 1067 icon paths, layout rules, theme conventions, and the `playFlow` narration format.
-3. **Step 2**: Paste into your LLM (ChatGPT / Claude / Gemini / Copilot / Mistral / Llama / Grok — anything that returns HTML). Describe your architecture in plain English.
-4. **Step 3**: Paste the LLM's full HTML reply (or save it as `my-diagram.potato.html` and open via `📂 Open`). Click ⬇️ Import.
-
-Potato will:
-- Validate every node, arrow, group, and `playFlow` step
-- Rescue mismatched icon paths from the node's `type` field (LLMs guess paths wrong sometimes)
-- Show a sanitization toast: *"🔧 3 icon paths didn't match our catalog — rescued from node type."*
-- Drop you straight on the editable canvas
-
-The prompt lives in [`POTATO_LLM_PROMPT.md`](POTATO_LLM_PROMPT.md) if you want to read it, fork it, or feed it to Copilot Chat.
-
-### Use Potato from inside GitHub Copilot Chat
-
-In any project, ask Copilot:
-
-```
-Read #file:POTATO_LLM_PROMPT.md to learn the Potato format,
-then read my code under #file:src/ and produce architecture.potato.html.
-```
-
-Copilot writes the file. Double-click it. You have a diagram.
 
 ---
 
@@ -440,7 +361,7 @@ File size: typically 10–60 KB. No external dependencies. Works fully offline. 
 - **localStorage** for autosave; **BroadcastChannel** for cross-tab notifications; **IndexedDB** for FileSystemFileHandle persistence (Chromium).
 - **Pointer Events** — works on mouse, trackpad, touch, and pen with identical code paths.
 
-Zero `npm install`, zero compile step, zero runtime dependencies. The whole editor is one ~8700-line HTML file (the bulk is the inlined SVG icon library).
+Zero `npm install`, zero compile step, zero runtime dependencies. The whole editor is one ~9000-line HTML file (the bulk is the inlined SVG icon library).
 
 ---
 
@@ -454,7 +375,7 @@ potato/
 ├── _generate_components.js    ← Splices the icons/ tree into the COMPONENTS manifest
 ├── _test_saved_viewer.js      ← Smoke test for the saved-viewer inline script
 ├── icons/                     ← 1067 SVGs across aws/azure/gcp by category
-├── assets/                    ← README screenshots + capture guide
+├── assets/                    ← Screenshots and brand assets
 ├── POTATO_LLM_PROMPT.md       ← Long-form prompt you can copy into any LLM
 ├── .github/
 │   ├── copilot-instructions.md  ← Auto-loaded by Copilot Chat in this repo
@@ -498,10 +419,7 @@ Especially wanted:
 Potato is an independent open-source project. It is not affiliated with, sponsored by, or endorsed by Amazon Web Services, Inc., Microsoft Corporation, or Google LLC.
 
 **Trademark notices.**
-Amazon Web Services and the AWS logo are trademarks of Amazon.com, Inc. or its affiliates.
-Microsoft Azure and the Azure logo are trademarks of Microsoft Corporation.
-Google Cloud and the Google Cloud logo are trademarks of Google LLC.
-All cloud service names, icons, and logos appearing in this tool are the property of their respective owners and are used solely to identify those services in technical architecture diagrams. Use of these marks does not imply any relationship with or endorsement by the respective trademark holders. All icon usage is subject to the brand guidelines of the respective provider — see [NOTICE](NOTICE) for details.
+Amazon Web Services and the AWS logo are trademarks of Amazon.com, Inc. or its affiliates. Microsoft Azure and the Azure logo are trademarks of Microsoft Corporation. Google Cloud and the Google Cloud logo are trademarks of Google LLC. All cloud service names, icons, and logos appearing in this tool are the property of their respective owners and are used solely to identify those services in technical architecture diagrams. Use of these marks does not imply any relationship with or endorsement by the respective trademark holders. All icon usage is subject to the brand guidelines of the respective provider — see [NOTICE](NOTICE) for details.
 
 **Cost estimates are approximate and may be outdated.**
 The built-in cost estimator and the pricing figures in the service knowledge base are editorial summaries of publicly available information, accurate as of the "as of" date shown for each service. Prices change frequently. **Do not use these estimates for budget planning, procurement decisions, or commercial commitments.** Always verify current pricing with the official provider calculators:
@@ -510,16 +428,16 @@ The built-in cost estimator and the pricing figures in the service knowledge bas
 - GCP: https://cloud.google.com/products/calculator
 
 **SLA, limits, and service information may be outdated.**
-The service knowledge base (SLA values, quota limits, pitfalls) summarises public documentation as of the stated date and may not reflect the current state of each service. Cloud providers update limits, SLAs, and feature availability frequently. Always verify against official provider documentation before making architectural or operational decisions.
+The service knowledge base summarises public documentation as of the stated date and may not reflect the current state of each service. Always verify against official provider documentation before making architectural or operational decisions.
 
 **AI-generated diagrams may contain errors.**
-Diagrams produced by LLMs via the AI Import feature are machine-generated and may contain hallucinations, incorrect service configurations, wrong icon assignments, or architectures that do not follow best practices. Review every AI-generated diagram carefully before using it in a production design, a cost estimate, or any decision-making context.
+Diagrams produced by LLMs via the AI Import feature are machine-generated and may contain hallucinations, incorrect service configurations, or architectures that do not follow best practices. Review every AI-generated diagram carefully before using it in a production context.
 
 **No professional advice.**
-Potato is a diagramming and documentation tool. Nothing it produces — diagrams, cost estimates, SLA summaries, playFlow narrations, or runbooks — constitutes professional engineering, legal, financial, or security advice. Consult qualified professionals for architecture reviews, compliance requirements, and procurement decisions.
+Potato is a diagramming and documentation tool. Nothing it produces constitutes professional engineering, legal, financial, or security advice.
 
 **"As-is" warranty disclaimer.**
-Potato is provided under the MIT License "as is", without warranty of any kind. See [LICENSE](LICENSE) for the full disclaimer. The maintainers are not liable for errors, omissions, or decisions made in reliance on content produced by this tool.
+Potato is provided under the MIT License "as is", without warranty of any kind. See [LICENSE](LICENSE) for the full disclaimer.
 
 ---
 
@@ -527,16 +445,9 @@ Potato is provided under the MIT License "as is", without warranty of any kind. 
 
 **Code** ([LICENSE](LICENSE)): MIT — free to use, modify, distribute, fork, sell, embed.
 
-**Icons** (`icons/aws/`, `icons/azure/`, `icons/gcp/`): subject to each cloud
-provider's trademark and brand guidelines. They are intended for use only in
-diagrams depicting the respective provider's architectures — not as logos, in
-advertising, or in any way that implies provider endorsement. See [NOTICE](NOTICE)
-for full per-provider attribution and the upstream source.
+**Icons** (`icons/aws/`, `icons/azure/`, `icons/gcp/`): subject to each cloud provider's trademark and brand guidelines. See [NOTICE](NOTICE) for full per-provider attribution.
 
-**Knowledge base** ([`service_kb.json`](service_kb.json)): MIT. Original
-editorial summaries of public documentation; the underlying facts and pricing
-numbers belong to the providers and change over time. Verify before acting on
-them.
+**Knowledge base** ([`service_kb.json`](service_kb.json)): MIT. Original editorial summaries of public documentation; verify before acting on them.
 
 No telemetry. No tracking. No strings.
 
