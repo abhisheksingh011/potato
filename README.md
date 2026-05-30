@@ -41,7 +41,29 @@ Just open the link. Nothing to install. Works in any browser.
 
 ---
 
-## 🤖 Need a diagram fast? Let your LLM build it.
+## ✨ Start from a template — fastest path to a real diagram
+
+Click **✨ Templates** in the toolbar (or on the empty canvas) and pick any of the 12 built-in AWS architectures. Every template loads as a fully-wired, editable diagram with real service icons, colour-coded by service family, and a Play Flow narration ready to run.
+
+```
+Templates → pick one → diagram loads instantly → edit any node, arrow, or group
+```
+
+**What you get out of the box:**
+
+| Click | You see |
+|---|---|
+| Any node | Properties panel — edit label, sublabel, theme, description |
+| Hover a node | Tooltip — SLA · limits · when-to-use · cost · pitfalls |
+| ▶ Play | Animated step-by-step walkthrough with architect-level narration |
+| 💰 Cost | Per-service monthly cost breakdown at Small / Medium / Large |
+| ⬇ Sequence | Download the flow as a plain-text runbook |
+
+Everything is editable after loading — add nodes, redirect arrows, rename services, change themes, add VPC groups. The template is a starting point, not a contract.
+
+---
+
+## 🤖 Generate with AI — describe it, get a diagram
 
 1. Open Potato → click **🤖 AI Import** → **Copy LLM prompt**
 2. Paste it into any LLM (ChatGPT, Claude, Gemini, Copilot…) and describe your architecture
