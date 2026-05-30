@@ -63,13 +63,108 @@ Everything is editable after loading — add nodes, redirect arrows, rename serv
 
 ---
 
-## 🤖 Generate with AI — describe it, get a diagram
+## 🤖 Generate with AI — from description to production diagram in minutes
 
-1. Open Potato → click **🤖 AI Import** → **Copy LLM prompt**
-2. Paste it into any LLM (ChatGPT, Claude, Gemini, Copilot…) and describe your architecture
-3. Copy the reply → back in Potato, paste it into **🤖 AI Import** → click **Import**
+No drawing. No drag-and-drop. Just describe what you need, and Potato turns it into a fully-wired, editable cloud architecture — with real AWS icons, cost estimates, and a narrated walkthrough.
 
-That's it. A fully-wired, icon-labelled, cost-aware diagram appears in seconds.
+---
+
+### Step 1 — Open AI Import
+
+On the empty canvas, click **Generate with AI** (or click **🤖 AI Import** in the toolbar at any time).
+
+The AI Import panel opens — it walks you through three steps.
+
+---
+
+### Step 2 — Copy the LLM prompt
+
+Click the green **📋 Copy LLM prompt** button.
+
+This copies Potato's Principal Cloud Architect prompt to your clipboard — a detailed set of instructions that tells any LLM exactly how to produce a valid Potato diagram: schemas, icon paths, layout rules, colour themes, and playFlow narration style. You only copy it once per session.
+
+---
+
+### Step 3 — Paste the prompt into any LLM and describe your architecture
+
+Open **ChatGPT, Claude, Gemini, Copilot, Mistral, Llama** — any model that returns text.
+
+Paste the copied prompt, then on a new line describe what you want in plain English:
+
+> *"Create a multi-region multi-AZ microservices architecture on AWS with API Gateway, ECS Fargate, Aurora PostgreSQL, DynamoDB Global Tables, ElastiCache Redis, Cognito auth, WAF, Route 53 latency routing, and CloudWatch observability. Two active regions: us-east-1 and eu-west-1."*
+
+The LLM thinks like a principal architect and outputs a complete Potato-format HTML file — nodes, arrows, groups, and a step-by-step narration for every hop in the architecture.
+
+---
+
+### Step 4 — Copy the LLM's output
+
+Select and copy the **entire HTML reply** from the LLM — from `<!DOCTYPE html>` to `</html>`.
+
+The output is raw HTML text containing the diagram data as JSON. It includes every node, every arrow, every VPC group, and a `playFlow` narration array that Potato will animate.
+
+---
+
+### Step 5 — Paste into Potato and click Import
+
+Back in Potato, paste the copied HTML into the text area in the AI Import panel, then click **⬇ Import Diagram**.
+
+Potato validates every node, arrow, and group — auto-correcting any icon paths the LLM guessed wrong, then drops you straight onto the canvas.
+
+---
+
+### Step 6 — Your editable architecture is ready
+
+The full architecture appears on the canvas — real AWS icons, colour-coded by service family, VPC and subnet group boundaries, and orthogonal routed arrows.
+
+Everything is live and editable: click any node to rename it, change its theme, or edit its description. Drag nodes to reposition them. Add new services from the sidebar. Redirect arrows by dragging their endpoints.
+
+---
+
+### Step 7 — Hit ▶ Play to walk through the architecture
+
+Click **▶ Play** in the toolbar (or press **Space**).
+
+Potato animates the diagram step by step — each arrow lights up in sequence and the narration text appears at the bottom of the screen. It works like a recorded design review: every hop explains what moves, why it moves there, and what architectural principle it satisfies.
+
+---
+
+### Step 8 — Read the narration for each step
+
+As Play runs, each step shows a full architect-level description at the bottom:
+
+> *"For European users, Amazon Cognito passes the authenticated request to the Amazon API Gateway regional endpoint in eu-west-1 — an identical active-active configuration — so that European traffic never needs to traverse the Atlantic to reach an API entry point, reducing latency by..."*
+
+The narration names the trigger, the data, the destination, and the architectural rationale for every connection in the diagram.
+
+---
+
+### Step 9 — Click 💰 Cost for a monthly estimate
+
+Click **💰 Cost** in the toolbar to open the Cost Estimator.
+
+Switch between **Small (dev/hobby)**, **Medium (small production)**, and **Large (busy production)** workload presets. You get a per-service breakdown with pricing formulas, counts, per-unit costs, and subtotals — all totalled at the bottom.
+
+> *Example: a multi-region multi-AZ architecture with Route 53, CloudFront, WAF, Cognito, API Gateway, ECS ×7, ElastiCache, DynamoDB, RDS ×3, SQS = ~$19,270 / month at Large.*
+
+> ⚠️ Estimates are reference-grade, not authoritative. Always verify with the [official AWS calculator](https://calculator.aws/) before committing.
+
+---
+
+### Step 10 — Open Sequence Editor to edit, reorder, or download the flow
+
+Click **Sequence** in the toolbar to open the **Play Sequence Editor**.
+
+Each step in the flow is shown as an editable card — connection name, narration text, up/down reorder handles, and a delete button. You can:
+
+- **Edit** any narration step to match your exact system behaviour
+- **Reorder** steps by dragging or using the arrows
+- **Add** new steps for branches, error paths, or scheduled jobs
+- **⬇ Download Workflow** — exports the entire sequence as a numbered plain-text `.txt` runbook, ready to paste into a PR description, a Confluence doc, or an onboarding wiki
+
+---
+
+> **From a plain-English description to a 30-node, fully-narrated, costed, downloadable architecture — in under 5 minutes.**
 
 ---
 
