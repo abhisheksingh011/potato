@@ -1,0 +1,154 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 627" width="1200" height="627">
+  <defs>
+    <!-- Background gradient -->
+    <linearGradient id="bg" x1="0" y1="0" x2="1200" y2="627" gradientUnits="userSpaceOnUse">
+      <stop offset="0%"   stop-color="#060a10"/>
+      <stop offset="100%" stop-color="#0f1a2e"/>
+    </linearGradient>
+    <!-- Potato gradient -->
+    <linearGradient id="potatoG" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%"   stop-color="#9B3FDE"/>
+      <stop offset="55%"  stop-color="#5B6FDE"/>
+      <stop offset="100%" stop-color="#1ABC9C"/>
+    </linearGradient>
+    <!-- Title gradient -->
+    <linearGradient id="titleG" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%"   stop-color="#c084fc"/>
+      <stop offset="100%" stop-color="#1ABC9C"/>
+    </linearGradient>
+    <!-- Card gradients per feature -->
+    <linearGradient id="g1" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#FF9900" stop-opacity="0.18"/><stop offset="100%" stop-color="#FF9900" stop-opacity="0.04"/></linearGradient>
+    <linearGradient id="g2" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#7B2FBE" stop-opacity="0.18"/><stop offset="100%" stop-color="#7B2FBE" stop-opacity="0.04"/></linearGradient>
+    <linearGradient id="g3" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#2E86C1" stop-opacity="0.18"/><stop offset="100%" stop-color="#2E86C1" stop-opacity="0.04"/></linearGradient>
+    <linearGradient id="g4" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#1ABC9C" stop-opacity="0.18"/><stop offset="100%" stop-color="#1ABC9C" stop-opacity="0.04"/></linearGradient>
+    <linearGradient id="g5" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#4CAF50" stop-opacity="0.18"/><stop offset="100%" stop-color="#4CAF50" stop-opacity="0.04"/></linearGradient>
+    <linearGradient id="g6" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#E91E63" stop-opacity="0.18"/><stop offset="100%" stop-color="#E91E63" stop-opacity="0.04"/></linearGradient>
+    <!-- Glow filters -->
+    <filter id="glow"><feGaussianBlur in="SourceGraphic" stdDeviation="12" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+    <filter id="softglow"><feGaussianBlur in="SourceGraphic" stdDeviation="22" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+    <filter id="cardshadow"><feDropShadow dx="0" dy="2" stdDeviation="8" flood-color="#000" flood-opacity="0.4"/></filter>
+  </defs>
+
+  <!-- Background -->
+  <rect width="1200" height="627" fill="url(#bg)"/>
+
+  <!-- Subtle grid dots -->
+  <pattern id="dots" x="0" y="0" width="40" height="40" patternUnits="userSpaceOnUse">
+    <circle cx="20" cy="20" r="1" fill="rgba(255,255,255,0.04)"/>
+  </pattern>
+  <rect width="1200" height="627" fill="url(#dots)"/>
+
+  <!-- Ambient glow behind potato -->
+  <ellipse cx="600" cy="313" rx="130" ry="100" fill="#7B2FBE" opacity="0.12" filter="url(#softglow)"/>
+
+  <!-- ── Connection lines from potato centre to each card ── -->
+  <!-- Top-left (AI) -->
+  <line x1="564" y1="282" x2="270" y2="148" stroke="#FF9900" stroke-width="1.5" stroke-dasharray="5,4" opacity="0.35"/>
+  <!-- Top-right (Templates) -->
+  <line x1="643" y1="282" x2="930" y2="148" stroke="#7B2FBE" stroke-width="1.5" stroke-dasharray="5,4" opacity="0.35"/>
+  <!-- Left (Knowledge) -->
+  <line x1="543" y1="313" x2="272" y2="313" stroke="#2E86C1" stroke-width="1.5" stroke-dasharray="5,4" opacity="0.35"/>
+  <!-- Right (Play) -->
+  <line x1="659" y1="313" x2="928" y2="313" stroke="#1ABC9C" stroke-width="1.5" stroke-dasharray="5,4" opacity="0.35"/>
+  <!-- Bottom-left (Cost) -->
+  <line x1="564" y1="348" x2="270" y2="478" stroke="#4CAF50" stroke-width="1.5" stroke-dasharray="5,4" opacity="0.35"/>
+  <!-- Bottom-right (Runbook) -->
+  <line x1="643" y1="348" x2="930" y2="478" stroke="#E91E63" stroke-width="1.5" stroke-dasharray="5,4" opacity="0.35"/>
+
+  <!-- ── Potato icon ── -->
+  <path d="M590 268
+           C617 264 648 276 660 300
+           C671 324 661 350 641 358
+           C619 367 588 364 568 352
+           C547 340 537 319 541 299
+           C544 280 561 271 590 268 Z"
+        fill="url(#potatoG)" filter="url(#glow)"/>
+  <!-- Potato highlight -->
+  <path d="M578 276 C596 271 618 276 628 287 C634 293 634 300 628 304 C618 309 598 308 586 302 C576 296 574 283 578 276 Z"
+        fill="rgba(255,255,255,0.08)"/>
+  <!-- Architecture nodes on potato -->
+  <circle cx="609" cy="297" r="4.5" fill="rgba(255,255,255,0.85)"/>
+  <circle cx="637" cy="316" r="3.5" fill="rgba(255,255,255,0.65)"/>
+  <circle cx="581" cy="319" r="3.5" fill="rgba(255,255,255,0.65)"/>
+  <circle cx="605" cy="341" r="3"   fill="rgba(255,255,255,0.55)"/>
+  <circle cx="647" cy="338" r="2.5" fill="rgba(255,255,255,0.45)"/>
+  <circle cx="564" cy="304" r="2.5" fill="rgba(255,255,255,0.45)"/>
+  <!-- Node connectors -->
+  <line x1="609" y1="297" x2="637" y2="316" stroke="rgba(255,255,255,0.38)" stroke-width="1.5" stroke-linecap="round"/>
+  <line x1="609" y1="297" x2="581" y2="319" stroke="rgba(255,255,255,0.38)" stroke-width="1.5" stroke-linecap="round"/>
+  <line x1="637" y1="316" x2="605" y2="341" stroke="rgba(255,255,255,0.28)" stroke-width="1.5" stroke-linecap="round"/>
+  <line x1="581" y1="319" x2="605" y2="341" stroke="rgba(255,255,255,0.28)" stroke-width="1.5" stroke-linecap="round"/>
+  <line x1="637" y1="316" x2="647" y2="338" stroke="rgba(255,255,255,0.20)" stroke-width="1" stroke-linecap="round"/>
+  <line x1="581" y1="319" x2="564" y2="304" stroke="rgba(255,255,255,0.20)" stroke-width="1" stroke-linecap="round"/>
+
+  <!-- ── Brand text below potato ── -->
+  <text x="600" y="400" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif"
+        font-size="38" font-weight="800" fill="url(#titleG)" text-anchor="middle" letter-spacing="-1">Potato</text>
+  <text x="600" y="424" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif"
+        font-size="12" font-weight="500" fill="#4a5568" text-anchor="middle" letter-spacing="4">THE CLOUD ARCHITECTURE STUDIO</text>
+
+  <!-- ═══════════════════════════════════════════
+       FEATURE CARDS  (220 × 100, rounded-14)
+       ═══════════════════════════════════════════ -->
+
+  <!-- Card 1 — Generate with AI (top-left, orange) -->
+  <rect x="50" y="60" width="220" height="100" rx="14" fill="url(#g1)" stroke="#FF9900" stroke-width="1.2" stroke-opacity="0.5" filter="url(#cardshadow)"/>
+  <text x="74" y="97"  font-family="system-ui,sans-serif" font-size="26">🤖</text>
+  <text x="108" y="97" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-serif" font-size="14" font-weight="700" fill="#FF9900">Generate with AI</text>
+  <text x="74" y="118" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-serif" font-size="11.5" fill="#8b949e">Describe your system to Claude,</text>
+  <text x="74" y="133" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-serif" font-size="11.5" fill="#8b949e">ChatGPT or Gemini — get a</text>
+  <text x="74" y="148" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-serif" font-size="11.5" fill="#8b949e">production-ready diagram in seconds</text>
+
+  <!-- Card 2 — Templates (top-right, purple) -->
+  <rect x="930" y="60" width="220" height="100" rx="14" fill="url(#g2)" stroke="#7B2FBE" stroke-width="1.2" stroke-opacity="0.5" filter="url(#cardshadow)"/>
+  <text x="954" y="97"  font-family="system-ui,sans-serif" font-size="26">✨</text>
+  <text x="988" y="97" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-serif" font-size="14" font-weight="700" fill="#a855f7">12 AWS Templates</text>
+  <text x="954" y="118" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-serif" font-size="11.5" fill="#8b949e">Three-tier, serverless, ECS, data</text>
+  <text x="954" y="133" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-serif" font-size="11.5" fill="#8b949e">lake, hub-and-spoke, multi-region</text>
+  <text x="954" y="148" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-serif" font-size="11.5" fill="#8b949e">— load and edit in one click</text>
+
+  <!-- Card 3 — Knowledge (left, blue) -->
+  <rect x="30" y="263" width="232" height="100" rx="14" fill="url(#g3)" stroke="#2E86C1" stroke-width="1.2" stroke-opacity="0.5" filter="url(#cardshadow)"/>
+  <text x="54" y="300"  font-family="system-ui,sans-serif" font-size="26">📋</text>
+  <text x="88" y="300" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-serif" font-size="14" font-weight="700" fill="#60a5fa">Knowledge on Every Node</text>
+  <text x="54" y="321" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-serif" font-size="11.5" fill="#8b949e">SLA · Limits · When to use ·</text>
+  <text x="54" y="336" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-serif" font-size="11.5" fill="#8b949e">Common pitfalls — hover any</text>
+  <text x="54" y="351" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-serif" font-size="11.5" fill="#8b949e">node. 79 services documented.</text>
+
+  <!-- Card 4 — Play the Flow (right, teal) -->
+  <rect x="938" y="263" width="232" height="100" rx="14" fill="url(#g4)" stroke="#1ABC9C" stroke-width="1.2" stroke-opacity="0.5" filter="url(#cardshadow)"/>
+  <text x="962" y="300"  font-family="system-ui,sans-serif" font-size="26">▶</text>
+  <text x="996" y="300" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-serif" font-size="14" font-weight="700" fill="#1ABC9C">Play the Flow</text>
+  <text x="962" y="321" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-serif" font-size="11.5" fill="#8b949e">Hit Play — the architecture</text>
+  <text x="962" y="336" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-serif" font-size="11.5" fill="#8b949e">narrates itself step by step like</text>
+  <text x="962" y="351" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-serif" font-size="11.5" fill="#8b949e">a recorded design review</text>
+
+  <!-- Card 5 — Cost Estimator (bottom-left, green) -->
+  <rect x="50" y="468" width="220" height="100" rx="14" fill="url(#g5)" stroke="#4CAF50" stroke-width="1.2" stroke-opacity="0.5" filter="url(#cardshadow)"/>
+  <text x="74" y="505"  font-family="system-ui,sans-serif" font-size="26">💰</text>
+  <text x="108" y="505" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-serif" font-size="14" font-weight="700" fill="#4ade80">Cost Estimator</text>
+  <text x="74" y="526" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-serif" font-size="11.5" fill="#8b949e">Per-service monthly breakdown</text>
+  <text x="74" y="541" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-serif" font-size="11.5" fill="#8b949e">at Small / Medium / Large scale.</text>
+  <text x="74" y="556" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-serif" font-size="11.5" fill="#8b949e">AWS · Azure · GCP</text>
+
+  <!-- Card 6 — Download Runbook (bottom-right, pink) -->
+  <rect x="930" y="468" width="220" height="100" rx="14" fill="url(#g6)" stroke="#E91E63" stroke-width="1.2" stroke-opacity="0.5" filter="url(#cardshadow)"/>
+  <text x="954" y="505"  font-family="system-ui,sans-serif" font-size="26">⬇</text>
+  <text x="988" y="505" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-serif" font-size="14" font-weight="700" fill="#f472b6">Download Runbook</text>
+  <text x="954" y="526" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-serif" font-size="11.5" fill="#8b949e">Export the full sequence as a</text>
+  <text x="954" y="541" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-serif" font-size="11.5" fill="#8b949e">numbered plain-text runbook.</text>
+  <text x="954" y="556" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-serif" font-size="11.5" fill="#8b949e">Drop it in your PR or Confluence.</text>
+
+  <!-- ── Bottom bar ── -->
+  <rect x="0" y="597" width="1200" height="30" fill="rgba(123,47,190,0.12)"/>
+  <text x="600" y="617" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-serif"
+        font-size="12" font-weight="600" fill="#6b7280" text-anchor="middle" letter-spacing="1">
+    Free · No account · No install · abhisheksingh011.github.io/potato/
+  </text>
+
+  <!-- Corner accent dots -->
+  <circle cx="16"  cy="16"  r="3" fill="#7B2FBE" opacity="0.5"/>
+  <circle cx="1184" cy="16"  r="3" fill="#1ABC9C" opacity="0.5"/>
+  <circle cx="16"  cy="595" r="3" fill="#1ABC9C" opacity="0.5"/>
+  <circle cx="1184" cy="595" r="3" fill="#7B2FBE" opacity="0.5"/>
+</svg>
