@@ -22,3 +22,6 @@ local/
 # Logs
 *.log
 npm-debug.log*
+
+# Promotion docs — private, never push to GitHub
+promotion/
