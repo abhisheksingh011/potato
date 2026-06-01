@@ -920,7 +920,13 @@
       "Consumption cold starts can be 1-3s — use Premium pre-warmed instances for latency SLAs",
       "Durable Functions orchestrator replays the entire history every continuation — keep history small",
       "Premium plan has a base monthly cost even with zero traffic"
-    ]
+    ],
+    "sla": "99.95% (Premium / Dedicated) | Consumption: no formal SLA for cold-start latency",
+    "costEstimate": {
+      "small": 0,
+      "medium": 18,
+      "large": 400
+    }
   },
   "az-cosmos": {
     "name": "Azure Cosmos DB",
@@ -937,7 +943,13 @@
       "Cross-partition queries can blow through RU budget — design partition key for query patterns",
       "Provisioned min 400 RU/s per container — many small containers = many minimums",
       "Multi-region writes are 2x the storage and RU cost"
-    ]
+    ],
+    "sla": "99.999% (multi-region writes) | 99.99% (single-region write) | 99.999% reads (multi-region)",
+    "costEstimate": {
+      "small": 25,
+      "medium": 120,
+      "large": 900
+    }
   },
   "az-blob": {
     "name": "Azure Blob Storage",
@@ -953,7 +965,13 @@
       "Egress to internet is a major cost driver — pair with Azure CDN",
       "Early deletion fees apply to Cool/Cold/Archive — design lifecycle policies carefully",
       "Archive retrieval takes hours and has retrieval fees per GB"
-    ]
+    ],
+    "sla": "99.9% (RA-GRS read) | 99% (LRS/ZRS read) | 99.99% (RA-GRS) for read access",
+    "costEstimate": {
+      "small": 3,
+      "medium": 25,
+      "large": 220
+    }
   },
   "gcf": {
     "name": "Google Cloud Functions",
@@ -969,7 +987,13 @@
       "2nd gen runs on Cloud Run — same cold start behavior, but more flexible",
       "Network egress charged separately — VPC connector adds cost too",
       "Min instances eliminate cold starts but bill 24/7 per instance"
-    ]
+    ],
+    "sla": "99.95% (2nd gen / Cloud Run-based) | 99.5% (1st gen)",
+    "costEstimate": {
+      "small": 0,
+      "medium": 10,
+      "large": 280
+    }
   },
   "bq": {
     "name": "Google BigQuery",
@@ -986,7 +1010,13 @@
       "Lack of partitioning turns every query into a full scan — partition on date and cluster on filter columns",
       "Streaming inserts cost $0.01/200 MB on top of storage — batch loads are free",
       "Materialized views save cost on repeated aggregations but storage charges apply"
-    ]
+    ],
+    "sla": "99.9%",
+    "costEstimate": {
+      "small": 0,
+      "medium": 25,
+      "large": 600
+    }
   },
   "router": {
     "name": "Router",
@@ -1104,6 +1134,663 @@
       "Resource requests/limits set wrong = OOM kills or wasted nodes — measure actual usage",
       "etcd is the chokepoint — high churn in CRDs or events can OOM the cluster",
       "Operators add operational complexity — only adopt if you'll actually maintain them"
+    ],
+    "sla": "Varies by provider — GKE regional: 99.95% | AKS: 99.95% (paid SLA) | EKS: 99.9%",
+    "costEstimate": {
+      "small": 30,
+      "medium": 300,
+      "large": 2500
+    }
+  },
+  "az-vm": {
+    "name": "Azure Virtual Machines",
+    "matches": [
+      "Azure Virtual Machine",
+      "Azure VM",
+      "Azure VMs",
+      "Virtual Machine",
+      "Azure Compute"
+    ],
+    "sla": "99.99% (Availability Zones) | 99.95% (Availability Set, 2+ VMs) | 99.9% (single VM with Premium SSD)",
+    "limits": "Max vCPUs per subscription: 10,000 (default, increasable) | Max NICs per VM: depends on size (up to 8) | Temp disk: ephemeral, lost on reboot | Burstable (B-series): CPU credits exhaust under sustained load | Max data disks: up to 64 (varies by size)",
+    "whenToUse": "Lift-and-shift workloads, licensed software requiring specific OS, GPU workloads (NC/ND series), full OS control. Prefer PaaS (App Service, AKS, Container Apps) for new workloads to reduce management overhead.",
+    "cost": "B2ms (2 vCPU, 8 GB): ~$60/mo. D4s v5 (4 vCPU, 16 GB): ~$140/mo. Reserved instances (1yr) save ~30–40%. Spot VMs save up to 90% but can be evicted. (as of Q2 2026)",
+    "costEstimate": {
+      "small": 15,
+      "medium": 140,
+      "large": 1200
+    },
+    "pitfalls": [
+      "\"Stopped\" VM still charges for compute — must be Stopped (Deallocated) to avoid compute charges",
+      "Premium SSD required for 99.9% single-VM SLA — standard SSD gets no SLA",
+      "B-series burstable VMs deplete CPU credits under sustained load — CPU-throttled to baseline",
+      "Spot VMs can be evicted with 30s notice — design workloads for restartability"
+    ]
+  },
+  "az-appservice": {
+    "name": "Azure App Service",
+    "matches": [
+      "Azure App Service",
+      "App Service",
+      "Azure Web App",
+      "Azure Web Apps",
+      "App Service Plan"
+    ],
+    "sla": "99.95% (Standard / Premium) | Free / Shared tiers: no SLA",
+    "limits": "Max instances: 30 (Standard), unlimited (Premium v3) | Max apps per plan: 100 | Max deployment slots: 5 (Standard), 20 (Premium) | App size: 50 GB (Standard) | Always On required to prevent app sleep on Basic+",
+    "whenToUse": "Fully managed PaaS for web apps and REST APIs (.NET, Node, Python, Java, PHP). Zero infra management. Use deployment slots for blue-green deployments. Choose Premium v3 for VNet integration and no cold starts.",
+    "cost": "B1 (Basic): ~$13/mo. S2 (Standard): ~$73/mo. P2v3 (Premium): ~$155/mo. Consumption (Functions only). Per plan, not per app. (as of Q2 2026)",
+    "costEstimate": {
+      "small": 13,
+      "medium": 75,
+      "large": 600
+    },
+    "pitfalls": [
+      "Free / Shared tiers have no SLA and sleep after 20 min of inactivity — not for production",
+      "Plan billing is 24/7 regardless of traffic — over-provisioned plans waste money",
+      "VNet integration requires Standard or higher; private endpoints require Premium",
+      "Deployment slots share the same App Service Plan resources — not a load increase"
+    ]
+  },
+  "az-aks": {
+    "name": "Azure Kubernetes Service",
+    "matches": [
+      "Azure Kubernetes Service",
+      "AKS",
+      "Azure AKS"
+    ],
+    "sla": "99.95% (paid Uptime SLA add-on, Availability Zones) | 99.9% (without paid SLA)",
+    "limits": "5,000 nodes per cluster | 250 pods per node (default 110) | 1,000 services per cluster | Control plane is free — pay only for agent nodes | Max node pools: 100",
+    "whenToUse": "Managed Kubernetes for containerised microservices at scale. Autopilot mode (pod-based billing, managed nodes) for teams wanting minimal K8s ops. Standard mode for full node control and GPU workloads.",
+    "cost": "Control plane: free. Agent nodes billed as VMs (D2s v5: ~$70/mo/node). 3-node cluster (D2s v5): ~$210/mo. Paid SLA add-on: ~$0.10/cluster/hr. (as of Q2 2026)",
+    "costEstimate": {
+      "small": 30,
+      "medium": 210,
+      "large": 2000
+    },
+    "pitfalls": [
+      "Paid SLA add-on ($73/mo) required for 99.95% — default free tier is 99.9% only",
+      "Node pool upgrades need capacity headroom — plan for surge capacity during upgrades",
+      "Egress traffic from pods billed at standard Azure networking rates — costs accumulate",
+      "System node pool must remain always-on — cannot scale to zero unlike user pools"
+    ]
+  },
+  "az-sql": {
+    "name": "Azure SQL Database",
+    "matches": [
+      "Azure SQL",
+      "Azure SQL Database",
+      "Azure SQL DB",
+      "SQL Database"
+    ],
+    "sla": "99.99% (Business Critical) | 99.99% (General Purpose with zone redundancy) | 99.9% (General Purpose, single zone)",
+    "limits": "Max DB size: 4 TB (General Purpose) | Max vCores: 80 | Serverless: 0.5–40 vCores auto-scale, pauses after configurable idle | Max concurrent connections: ~30,000 | Hyperscale: up to 100 TB, up to 30 named replicas",
+    "whenToUse": "Fully managed SQL Server on Azure. Choose General Purpose for most workloads. Business Critical for in-memory OLTP and read scale-out. Hyperscale for 4TB+ or unpredictable scale. Serverless for dev/test with intermittent usage.",
+    "cost": "Serverless (0.5 vCore min): ~$5/mo idle. General Purpose 4 vCores: ~$370/mo. Business Critical 4 vCores: ~$1,100/mo. Reserved capacity (1yr) saves ~30%. (as of Q2 2026)",
+    "costEstimate": {
+      "small": 5,
+      "medium": 150,
+      "large": 1100
+    },
+    "pitfalls": [
+      "Serverless auto-pause causes cold-start connection delays of 60–90s — disable auto-pause for latency-sensitive apps",
+      "DTU model caps at 4,000 DTU — migrate to vCore for predictable, scalable pricing",
+      "Geo-replication doubles storage cost and adds per-hour replication fee",
+      "Connection pool exhaustion common at scale — use Azure SQL connection string with retry logic"
+    ]
+  },
+  "az-entra": {
+    "name": "Microsoft Entra ID",
+    "matches": [
+      "Azure Active Directory",
+      "Azure AD",
+      "Entra ID",
+      "Microsoft Entra",
+      "Azure Identity"
+    ],
+    "sla": "99.9% (Entra ID P1 / P2) | 99.9% (Free tier for authentication)",
+    "limits": "Free: 50,000 directory objects | Free B2B: 50,000 monthly active external users | P1 required for Conditional Access, PIM, SSPR | B2C: billed per Monthly Active User (MAU)",
+    "whenToUse": "Identity provider for Azure, M365, and third-party SaaS. Use P1 for Conditional Access and MFA. Use B2C for customer-facing identity (external users). Workload Identity Federation for service-to-service auth without secrets.",
+    "cost": "Free tier: $0. P1: $6/user/mo. P2: $9/user/mo. B2C: first 50k MAU free, then $0.0016/MAU. (as of Q2 2026)",
+    "costEstimate": {
+      "small": 0,
+      "medium": 30,
+      "large": 180
+    },
+    "pitfalls": [
+      "Conditional Access requires P1 ($6/user/mo) — not included in free tier",
+      "Privileged Identity Management (PIM) requires P2 — budget accordingly for enterprise",
+      "B2C MAU billing counts any user who authenticates in that month — spikes are expensive",
+      "Guest users (B2B) consume directory object quota — monitor for large partner ecosystems"
+    ]
+  },
+  "az-apim": {
+    "name": "Azure API Management",
+    "matches": [
+      "Azure API Management",
+      "API Management",
+      "Azure APIM",
+      "APIM"
+    ],
+    "sla": "99.95% (Developer with Availability Zones) | 99.99% (Premium multi-region) | Consumption: 99.9% | Developer tier: no SLA (not for production)",
+    "limits": "Consumption: 1M calls/mo included, 3,500 req/s | Standard: 4,000 req/s per unit | Premium: 4,000 req/s per unit | Max policies per API: unlimited | VNet injection: Premium only",
+    "whenToUse": "Full-featured API gateway — rate limiting, caching, auth, transformation, developer portal. Consumption tier for spiky low-volume APIs. Premium for enterprise with VNet, multi-region, and 99.99% SLA.",
+    "cost": "Consumption: $0.035 per 10k calls (first 1M free). Standard: ~$280/mo. Premium: ~$2,800/unit/mo. (as of Q2 2026)",
+    "costEstimate": {
+      "small": 0,
+      "medium": 280,
+      "large": 2800
+    },
+    "pitfalls": [
+      "Developer tier has no SLA — never deploy to production on Developer tier",
+      "VNet integration requires Premium tier ($2,800/unit/mo) — expensive entry point",
+      "Self-hosted gateway (for on-premises) requires Premium license — plan ahead",
+      "Policy errors (XML misconfiguration) silently break APIs — test policies thoroughly in dev"
+    ]
+  },
+  "az-servicebus": {
+    "name": "Azure Service Bus",
+    "matches": [
+      "Azure Service Bus",
+      "Service Bus",
+      "Azure Messaging"
+    ],
+    "sla": "99.9%",
+    "limits": "Basic: queues only, max 256 KB message | Standard: topics + queues, 80 GB/namespace, max 256 KB | Premium: 1-100 messaging units, max 100 MB message, VNET, zone redundancy | Message lock: 5 min default (max 5 min Basic/Standard, 10 min Premium)",
+    "whenToUse": "Enterprise message broker with guaranteed delivery, dead-letter queue, sessions for ordered processing, and FIFO queues. Use topics/subscriptions for pub/sub fanout. Prefer over Storage Queues for enterprise features.",
+    "cost": "Basic: $0.05 per 1M operations. Standard: $9.81/mo base + $0.01 per 1M ops. Premium: ~$670/mo per messaging unit. (as of Q2 2026)",
+    "costEstimate": {
+      "small": 10,
+      "medium": 30,
+      "large": 670
+    },
+    "pitfalls": [
+      "Basic tier has no topics — only queues; upgrade to Standard for pub/sub",
+      "Sessions (for ordered FIFO processing) require Premium tier",
+      "Dead-letter queue messages accumulate silently — set up alerts on DLQ depth",
+      "Message lock timeout default is short — increase for slow consumers to avoid redelivery"
+    ]
+  },
+  "az-eventhubs": {
+    "name": "Azure Event Hubs",
+    "matches": [
+      "Azure Event Hubs",
+      "Event Hubs",
+      "Azure Event Hub"
+    ],
+    "sla": "99.9%",
+    "limits": "Basic: 1-day retention, 1 consumer group | Standard: 7-day retention, 20 consumer groups | Premium: 90-day retention, unlimited CGs | 1 TU = 1 MB/s ingress or 1,000 events/s | Max message size: 1 MB (Standard), 1 MB (Premium) | Capture to Blob/ADLS: extra cost",
+    "whenToUse": "High-volume event streaming and telemetry ingestion. Kafka-compatible surface on Standard+. Use for IoT telemetry, clickstreams, log pipelines. Not a message broker — no dead-letter, no ordered delivery guarantees.",
+    "cost": "Basic: ~$10/mo per TU. Standard: ~$22/mo base + per TU. Premium: ~$750/mo per PU. Dedicated: ~$6,000/mo (Capacity Units). (as of Q2 2026)",
+    "costEstimate": {
+      "small": 10,
+      "medium": 50,
+      "large": 750
+    },
+    "pitfalls": [
+      "Event Hubs is a stream store, not a message broker — no DLQ, no retry, no ordered delivery",
+      "Capture to Blob Storage adds storage + write operation cost — budget separately",
+      "Consumer group limit (20 on Standard) blocks scaling to many independent consumers",
+      "Auto-inflate TUs have a cost ceiling to configure — set to avoid runaway bills"
+    ]
+  },
+  "az-monitor": {
+    "name": "Azure Monitor",
+    "matches": [
+      "Azure Monitor",
+      "Application Insights",
+      "Azure Application Insights",
+      "Log Analytics",
+      "Azure Monitoring"
+    ],
+    "sla": "N/A — monitoring service (no uptime commitment)",
+    "limits": "Log Analytics: 500 MB/day free per workspace, then $2.30/GB | Application Insights: 5 GB/month free per resource | Metrics retention: 93 days (free) | Log retention: 30 days included (up to 2 years configurable) | Daily cap configurable to prevent runaway ingestion cost",
+    "whenToUse": "Full-stack observability for Azure workloads. Application Insights for APM/distributed tracing. Log Analytics for log aggregation and querying. Azure Monitor Metrics for time-series dashboards and autoscaling signals.",
+    "cost": "Log ingestion: $2.30/GB after 5 GB/day free. Alerts: $0.10 per metric alert/mo. Application Insights: $2.30/GB after free tier. Commitment tiers save up to 30%. (as of Q2 2026)",
+    "costEstimate": {
+      "small": 5,
+      "medium": 40,
+      "large": 300
+    },
+    "pitfalls": [
+      "Log ingestion costs surprise teams at scale — always configure a daily ingestion cap",
+      "Application Insights sampling helps cost but can lose rare error traces — tune carefully",
+      "Verbose dependency tracking (every SQL call, every HTTP call) multiplies log volume fast",
+      "Workspace-based Application Insights shares quota with Log Analytics — plan jointly"
+    ]
+  },
+  "az-containerapps": {
+    "name": "Azure Container Apps",
+    "matches": [
+      "Azure Container Apps",
+      "Container Apps",
+      "Azure Container App"
+    ],
+    "sla": "99.95%",
+    "limits": "Consumption plan: 2M requests + 100k vCPU-s + 250k GB-s free/mo | Max replicas: 300 | Max CPUs: 4 per container | Dedicated plan: reserved capacity, no scale-to-zero | KEDA-based autoscaling | Max scale-out time: depends on workload and KEDA rules",
+    "whenToUse": "Serverless containers without Kubernetes complexity. Best for microservices, HTTP APIs, background workers, event-driven workloads. Scale to zero built in. Dapr integration available for service mesh patterns.",
+    "cost": "Consumption: $0.000024 per vCPU-s + $0.000003 per GB-s + $0.40 per 1M requests after free tier. Dedicated: ~$0.115/vCPU-hr. (as of Q2 2026)",
+    "costEstimate": {
+      "small": 0,
+      "medium": 25,
+      "large": 200
+    },
+    "pitfalls": [
+      "KEDA scale-from-zero has a cold-start delay — use min-replicas for latency-sensitive apps",
+      "Dapr integration adds a sidecar vCPU/memory overhead — factor into cost estimates",
+      "Not appropriate for stateful workloads — use AKS with StatefulSets instead",
+      "Consumption plan shares capacity — Dedicated plan required for consistent performance SLA"
+    ]
+  },
+  "az-openai": {
+    "name": "Azure OpenAI Service",
+    "matches": [
+      "Azure OpenAI",
+      "Azure OpenAI Service",
+      "Azure AI",
+      "Azure GPT",
+      "OpenAI Azure"
+    ],
+    "sla": "99.9%",
+    "limits": "Tokens per minute (TPM) quota per deployment — varies by model, region, and subscription tier | Rate limits enforced per subscription per region | Model availability varies by region | Max context: model-dependent (GPT-4o: 128k tokens) | Provisioned throughput units (PTU) for guaranteed capacity",
+    "whenToUse": "Access to OpenAI models (GPT-4o, o1, Whisper, DALL-E, Embeddings) within Azure compliance boundary. Required for data residency, private networking (VNet), and enterprise compliance. Use PTU for predictable throughput at scale.",
+    "cost": "GPT-4o: $2.50/1M input tokens + $10/1M output tokens. GPT-4o mini: $0.15/$0.60 per 1M tokens. Embeddings (ada-002): $0.10/1M tokens. PTU: ~$2/hr per unit. (as of Q2 2026)",
+    "costEstimate": {
+      "small": 20,
+      "medium": 250,
+      "large": 3000
+    },
+    "pitfalls": [
+      "TPM quotas are low by default per subscription/region — request increases before production launch",
+      "Model availability varies by region — your preferred region may not have the latest model",
+      "Latency is higher than OpenAI direct for some regions due to routing through Azure endpoints",
+      "PTU (provisioned throughput) is costly but required for predictable performance at enterprise scale"
+    ]
+  },
+  "az-keyvault": {
+    "name": "Azure Key Vault",
+    "matches": [
+      "Azure Key Vault",
+      "Key Vault",
+      "Azure Secrets",
+      "Azure KV"
+    ],
+    "sla": "99.9%",
+    "limits": "Max secret/key/certificate size: 25 KB | Max objects per vault: 5,000 (Standard), unlimited (HSM) | RSA 2048 operations: 2,000/10s | Soft-delete: 90-day retention (cannot be disabled) | Purge protection: prevents permanent deletion during retention | Max vaults per subscription: 600",
+    "whenToUse": "Centralised secrets management, encryption keys, and certificates for Azure workloads. Use Managed Identity to authenticate — eliminates credential management entirely. Premium tier (HSM-backed) for FIPS 140-2 Level 3 compliance.",
+    "cost": "Standard secret operations: $0.03 per 10,000. Certificate renewals: $3/renewal. HSM key operations: $1 per 10,000. Premium (HSM-protected key): $1/key/mo. (as of Q2 2026)",
+    "costEstimate": {
+      "small": 5,
+      "medium": 15,
+      "large": 80
+    },
+    "pitfalls": [
+      "Soft-delete cannot be disabled — purge-protected vaults need explicit purge during cleanup",
+      "High-volume key operations hit throttling limits — cache secrets locally with short TTL",
+      "One vault per environment is an anti-pattern at scale — use separate vaults by workload/team",
+      "Certificate near-expiry alerts require explicit configuration — set up alert policies"
+    ]
+  },
+  "az-redis": {
+    "name": "Azure Cache for Redis",
+    "matches": [
+      "Azure Cache for Redis",
+      "Azure Redis",
+      "Azure Redis Cache"
+    ],
+    "sla": "99.9% (Standard / Premium) | Basic: no SLA (single node, not for production)",
+    "limits": "Basic: 53 MB–53 GB, no replication, no SLA | Standard: primary + replica | Premium: clustering (up to 10 shards), data persistence (RDB/AOF), VNet injection | Max clients per cache: 1,000 (per shard for cluster) | Max memory: 1.2 TB (Enterprise cluster)",
+    "whenToUse": "Distributed cache, session store, pub/sub, leaderboards, rate limiting on Azure. Premium required for VNet injection, persistence, and geo-replication. Enterprise tier for active geo-replication and RediSearch.",
+    "cost": "C1 Standard (1 GB): ~$55/mo. C2 Standard (6 GB): ~$100/mo. P3 Premium (26 GB): ~$440/mo. (as of Q2 2026)",
+    "costEstimate": {
+      "small": 13,
+      "medium": 55,
+      "large": 440
+    },
+    "pitfalls": [
+      "Basic tier has no SLA and is single-node — never use in production",
+      "Eviction policy not configured by default — set appropriate policy (allkeys-lru for cache, noeviction for session)",
+      "Persistence (AOF) in Premium increases storage IOPS cost significantly",
+      "Connection multiplexing required (StackExchange.Redis in .NET) — creating connections per request exhausts limits"
+    ]
+  },
+  "az-frontdoor": {
+    "name": "Azure Front Door",
+    "matches": [
+      "Azure Front Door",
+      "Front Door",
+      "Azure CDN",
+      "Azure Global Load Balancer"
+    ],
+    "sla": "99.99%",
+    "limits": "Max origins per profile: 500 | Max endpoints: 10 (Standard), 25 (Premium) | Max custom domains: 500 | WAF policies: 100 managed rules + 100 custom rules | Cache purge: 2 min SLA | Max rules engine rules: 25 per profile",
+    "whenToUse": "Global anycast load balancing, CDN, WAF, and SSL termination in one service. Replaces Traffic Manager + CDN for most workloads. Use Premium for bot protection, Private Link origin connections, and WAF managed rules.",
+    "cost": "Standard: $35/mo base + $0.01/GB data transfer. Premium: $330/mo base. WAF: $5/policy/mo + $0.006/10k requests. (as of Q2 2026)",
+    "costEstimate": {
+      "small": 20,
+      "medium": 80,
+      "large": 500
+    },
+    "pitfalls": [
+      "Standard vs Premium have fundamentally different WAF capabilities — Premium required for bot protection",
+      "Private Link origins (Premium only) required for secure backend connectivity — plan SKU early",
+      "Legacy CDN profiles (Verizon/Akamai/Microsoft Standard) still exist but are being retired",
+      "Cache TTL must be set at origin — Front Door respects Cache-Control headers from backend"
+    ]
+  },
+  "az-devops": {
+    "name": "Azure DevOps",
+    "matches": [
+      "Azure DevOps",
+      "Azure Pipelines",
+      "Azure Boards",
+      "Azure Repos",
+      "ADO"
+    ],
+    "sla": "99.9%",
+    "limits": "Free: 5 users (Basic), 1 parallel job (1,800 min/mo private), unlimited parallel jobs (public) | Basic: $6/user/mo | Extra parallel jobs: $40/mo (hosted), $15/mo (self-hosted) | Artifacts: 2 GB free, $2/GB/mo extra | Test Plans: $52/user/mo",
+    "whenToUse": "End-to-end DevOps platform (Boards, Repos, Pipelines, Artifacts, Test Plans) best for .NET-heavy or Microsoft-centric shops. Azure Pipelines supports any language and cloud. Use self-hosted agents for large-scale builds or specific environments.",
+    "cost": "Free (5 users): $0. Basic plan: $6/user/mo. Self-hosted agents: free unlimited. Additional parallel jobs: $40/mo. (as of Q2 2026)",
+    "costEstimate": {
+      "small": 0,
+      "medium": 30,
+      "large": 150
+    },
+    "pitfalls": [
+      "Parallel job limit of 1 (free) blocks concurrent builds — buy extra jobs or use self-hosted agents",
+      "Self-hosted agents are free but require maintenance and scaling management",
+      "YAML pipelines have a steep learning curve compared to classic UI pipelines",
+      "Service connections (GitHub, Docker Hub etc.) require explicit permission grants per pipeline"
+    ]
+  },
+  "gce": {
+    "name": "Google Compute Engine",
+    "matches": [
+      "Google Compute Engine",
+      "GCP Compute Engine",
+      "Compute Engine",
+      "GCE",
+      "GCP VM"
+    ],
+    "sla": "99.99% (regional Managed Instance Group) | 99.9% (single VM with premium storage)",
+    "limits": "Default vCPU quota: 24 per region (increasable) | Max network bandwidth: 100 Gbps | Preemptible/Spot: up to 91% discount, may be reclaimed with 30s notice | Live migration: supported for standard VMs | Custom machine types: any vCPU+memory combination",
+    "whenToUse": "Full VM control on GCP. GPU instances (A100, H100) for AI training. Custom machine types for memory- or CPU-optimised workloads. Prefer Cloud Run or GKE for containerised stateless workloads.",
+    "cost": "e2-micro (0.25 vCPU, 1 GB): ~$6/mo. n2-standard-4 (4 vCPU, 16 GB): ~$155/mo. Sustained use discounts up to 30% applied automatically. Committed use (1yr) saves ~37%. (as of Q2 2026)",
+    "costEstimate": {
+      "small": 7,
+      "medium": 155,
+      "large": 1500
+    },
+    "pitfalls": [
+      "Preemptible/Spot VMs reclaimed with 30s notice — design for restart and use with stateless workloads",
+      "Sustained use discounts applied automatically — committed use discounts require explicit purchase",
+      "Persistent disk IOPS are provisioned (not burst) — size the disk for IOPS, not just capacity",
+      "Egress between regions is charged — architect data flows to minimise cross-region traffic"
+    ]
+  },
+  "cloudrun": {
+    "name": "Google Cloud Run",
+    "matches": [
+      "Google Cloud Run",
+      "Cloud Run",
+      "GCP Cloud Run"
+    ],
+    "sla": "99.95%",
+    "limits": "Max instances: 1,000 (default) | Max concurrency: 1,000 req per instance | Max CPU: 8 vCPUs per instance | Max memory: 32 GB | Max timeout: 3,600s | Max request size: 32 MB | Min instances: configurable (eliminates cold start)",
+    "whenToUse": "Serverless containers on GCP. Best for stateless HTTP services, APIs, microservices that scale to zero. Scale from zero to hundreds of instances in seconds. Full container flexibility without Kubernetes cluster management.",
+    "cost": "Free: 2M req + 360k vCPU-s + 180k GB-s/mo. Beyond free: $0.24/vCPU-hr + $0.025/GB-hr + $0.40/1M req. Min instances billed 24/7. (as of Q2 2026)",
+    "costEstimate": {
+      "small": 0,
+      "medium": 20,
+      "large": 250
+    },
+    "pitfalls": [
+      "CPU throttled to near-zero between requests by default — enable \"CPU always allocated\" for background work",
+      "Cold starts on first request after scale-to-zero — use min-instances for latency-sensitive APIs",
+      "No persistent local disk — all state must go to Cloud Storage or managed databases",
+      "Container image stored in Artifact Registry — factor in storage costs for large images"
+    ]
+  },
+  "gke": {
+    "name": "Google Kubernetes Engine",
+    "matches": [
+      "Google Kubernetes Engine",
+      "GKE",
+      "GCP GKE",
+      "GCP Kubernetes"
+    ],
+    "sla": "99.95% (regional Autopilot or Standard cluster) | 99.5% (zonal cluster)",
+    "limits": "15,000 nodes per cluster | 110 pods per node (configurable up to 256) | 5,000 services per cluster | Autopilot: pod-level billing, managed nodes, min 1 node equivalent | Standard: full node control, scale to zero possible for user node pools",
+    "whenToUse": "Managed Kubernetes on GCP. Autopilot mode for minimal ops — pay per pod CPU/memory, not per node. Standard mode for GPU workloads, custom node configurations, or privileged containers. Integrated with Anthos for multi-cloud.",
+    "cost": "Control plane: free (Autopilot) or $0.10/hr (Standard). Autopilot nodes: ~$0.0575/vCPU-hr + $0.006/GB-hr. Standard: node VMs billed as GCE. 3-node n2-std-4 cluster: ~$450/mo. (as of Q2 2026)",
+    "costEstimate": {
+      "small": 30,
+      "medium": 250,
+      "large": 2500
+    },
+    "pitfalls": [
+      "Autopilot charges minimum pod resource requests — over-requesting CPU/memory wastes budget",
+      "Zonal clusters have a single control plane — use regional clusters for production HA",
+      "Persistent volumes are zone-scoped by default — cross-zone volume attachment causes pod scheduling issues",
+      "Cluster upgrades require testing — use maintenance windows and blue-green node pools"
+    ]
+  },
+  "cloudsql": {
+    "name": "Google Cloud SQL",
+    "matches": [
+      "Google Cloud SQL",
+      "Cloud SQL",
+      "GCP Cloud SQL",
+      "GCP SQL"
+    ],
+    "sla": "99.95% (HA configuration with failover replica)",
+    "limits": "Max storage: 64 TB | Max connections: ~4,000 (db-n1-standard-4) | Max read replicas: 10 | HA: synchronous replication to standby in same region | Cross-region replica: asynchronous read replica, no auto-failover | Cloud SQL Proxy: recommended for secure connections",
+    "whenToUse": "Fully managed PostgreSQL, MySQL, SQL Server on GCP. HA with automatic failover for production. Not suited for >64 TB — use AlloyDB or Spanner. Use Cloud SQL Proxy or Workload Identity for secure app connectivity.",
+    "cost": "db-f1-micro (shared): ~$10/mo. db-n1-standard-2 (HA): ~$140/mo. db-n1-standard-8 (HA): ~$450/mo. Storage: $0.17/GB/mo (SSD). Egress extra. (as of Q2 2026)",
+    "costEstimate": {
+      "small": 10,
+      "medium": 140,
+      "large": 700
+    },
+    "pitfalls": [
+      "HA standby doubles compute cost — required for 99.95% SLA in production",
+      "Cross-region read replica adds storage + replication costs and does not auto-failover",
+      "Connection limits per instance are fixed — use Cloud SQL Auth Proxy + connection pooler (PgBouncer) at scale",
+      "Automatic storage increase cannot be reversed — set max storage limit to avoid cost surprises"
+    ]
+  },
+  "pubsub": {
+    "name": "Google Cloud Pub/Sub",
+    "matches": [
+      "Google Pub/Sub",
+      "Cloud Pub/Sub",
+      "GCP Pub/Sub",
+      "Pub/Sub"
+    ],
+    "sla": "99.9%",
+    "limits": "Max message size: 10 MB | Max subscription retention: 31 days | Max throughput: virtually unlimited (regional) | At-least-once delivery — design consumers to be idempotent | Ordering keys: enables ordering within a key, reduces throughput | Dead-letter topic: configurable max delivery attempts (5–100)",
+    "whenToUse": "Managed async messaging and event streaming on GCP. Best for decoupling microservices, streaming pipelines to Dataflow/BigQuery, fanout to multiple subscribers. Kafka-compatible via Pub/Sub Lite for byte-efficient streaming.",
+    "cost": "First 10 GB/mo: free. $0.04/GB after. Snapshot storage: $0.012/GB/mo. BigQuery subscriptions charged per byte. (as of Q2 2026)",
+    "costEstimate": {
+      "small": 0,
+      "medium": 20,
+      "large": 250
+    },
+    "pitfalls": [
+      "At-least-once delivery means duplicate messages are possible — build idempotent consumers",
+      "Default acknowledgement deadline (10s) causes redelivery for slow consumers — increase per subscription",
+      "Ordering keys limit throughput per key to one partition — avoid hot keys",
+      "Undelivered messages accumulate cost if consumers fall behind — monitor oldest-unacked-message-age"
+    ]
+  },
+  "gcs": {
+    "name": "Google Cloud Storage",
+    "matches": [
+      "Google Cloud Storage",
+      "GCP Cloud Storage",
+      "GCS",
+      "Cloud Storage"
+    ],
+    "sla": "99.95% (multi-region / dual-region Standard) | 99.9% (regional Standard)",
+    "limits": "Max object size: 5 TB | No bucket size limit | Max metadata per object: 8 KB | Lifecycle rules: 100 per bucket | Object versioning: per-version storage charged | Retention policy: prevents deletion/overwrite for compliance | Uniform bucket-level access: recommended, disables per-object ACLs",
+    "whenToUse": "GCP object storage for any scale. Standard for hot data, Nearline ($0.01/GB, 30-day min) for monthly backups, Coldline ($0.004/GB, 90-day) for quarterly, Archive ($0.0012/GB, 365-day) for long-term. Use lifecycle rules to auto-transition.",
+    "cost": "Standard (regional): $0.02/GB/mo. Nearline: $0.01/GB/mo. Coldline: $0.004/GB/mo. Archive: $0.0012/GB/mo. Egress: $0.12/GB to internet (first 1 TB/mo). (as of Q2 2026)",
+    "costEstimate": {
+      "small": 2,
+      "medium": 20,
+      "large": 200
+    },
+    "pitfalls": [
+      "Egress to internet is the dominant cost driver — pair with Cloud CDN for public assets",
+      "Early deletion fees for Nearline (30d), Coldline (90d), Archive (365d) — design lifecycle policies",
+      "Object versioning stores every version at full price — set lifecycle rule to delete non-current versions",
+      "XML ACLs on objects are deprecated — migrate to uniform bucket-level IAM access"
+    ]
+  },
+  "spanner": {
+    "name": "Google Cloud Spanner",
+    "matches": [
+      "Google Cloud Spanner",
+      "Cloud Spanner",
+      "GCP Spanner",
+      "Spanner"
+    ],
+    "sla": "99.999% (multi-region config) | 99.99% (single-region)",
+    "limits": "Processing unit = 0.1 node | 1 node handles ~2,000 QPS reads + 1,000 QPS writes | Max row size: 1024 columns, each up to 2.5 MB | Max database size: unlimited | Max tables: 2,048 per database | No sequential primary keys — use UUID to avoid hot spots",
+    "whenToUse": "Globally distributed, strongly consistent, horizontally scalable relational database. For workloads that have outgrown Cloud SQL or need global multi-region writes with ACID guarantees. Expensive — reserve for true global-scale or compliance-critical workloads.",
+    "cost": "Processing unit: $0.09/hr (~$65/mo). 1 node: $0.90/hr (~$648/mo). Storage: $0.30/GB/mo. Multi-region configs are 3× the node cost. (as of Q2 2026)",
+    "costEstimate": {
+      "small": 65,
+      "medium": 650,
+      "large": 6500
+    },
+    "pitfalls": [
+      "Minimum 1 processing unit ($65/mo) — not a dev database, even for tiny workloads",
+      "Sequential primary keys create hot spots — always use UUID or hash-prefixed keys",
+      "Multi-region config (for 99.999% SLA) costs 3× single-region — validate if required",
+      "Interleaved tables improve locality but complicate schema migrations — design upfront"
+    ]
+  },
+  "vertexai": {
+    "name": "Google Vertex AI",
+    "matches": [
+      "Google Vertex AI",
+      "Vertex AI",
+      "GCP Vertex AI",
+      "GCP AI"
+    ],
+    "sla": "99.9%",
+    "limits": "Gemini API: rate limits per project per model per region (TPM/RPM) | Online prediction: latency depends on model size and hardware | Batch prediction: quotas per region | Training: job-level quotas | Model Registry: unlimited models per project | Feature Store: online serving quota per QPS",
+    "whenToUse": "End-to-end ML platform on GCP. Gemini API for foundation model inference. AutoML for no-code training. Custom training for full control with any framework. Model Registry for versioning and deployment. Best for GCP-native ML pipelines.",
+    "cost": "Gemini 1.5 Pro: $3.50/1M input tokens + $10.50/1M output tokens. Gemini Flash: $0.075/$0.30 per 1M tokens. Training: per-hour GPU cost (A100: ~$3/hr). Online prediction: per node-hour. (as of Q2 2026)",
+    "costEstimate": {
+      "small": 20,
+      "medium": 250,
+      "large": 3000
+    },
+    "pitfalls": [
+      "Prediction endpoints bill per node-hour even at zero traffic — delete idle endpoints",
+      "Gemini quota limits per project/region — request increases well before launch",
+      "Training job costs can spiral — set max run-time and budget alerts",
+      "Feature Store online serving has per-QPS latency SLA — provision adequately for production"
+    ]
+  },
+  "cloudarmor": {
+    "name": "Google Cloud Armor",
+    "matches": [
+      "Google Cloud Armor",
+      "Cloud Armor",
+      "GCP WAF",
+      "GCP DDoS"
+    ],
+    "sla": "N/A — WAF and DDoS protection service",
+    "limits": "Standard security policies: 40 rules max | Managed Protection Plus: advanced DDoS response, adaptive protection (ML-based), higher rule limits | Rate limiting: configurable per rule | Geo-based blocking: country-level | Preview mode: evaluate rules before enforcing",
+    "whenToUse": "WAF and DDoS protection for Cloud Load Balancing and Cloud CDN backends. Managed Protection Plus for guaranteed DDoS response SLA and bot management. Standard for basic OWASP top-10 protection and geo-blocking.",
+    "cost": "Standard policy: $5/policy/mo + $1/rule/mo + $0.75/1M requests. Managed Protection Plus: $3,000/mo per project (enterprise DDoS response guarantee). (as of Q2 2026)",
+    "costEstimate": {
+      "small": 5,
+      "medium": 30,
+      "large": 200
+    },
+    "pitfalls": [
+      "Standard Cloud Armor has no DDoS response SLA — Managed Protection Plus required for guaranteed response",
+      "Adaptive Protection (ML-based threat detection) requires Managed Protection Plus",
+      "WAF rule per-request cost adds up at high traffic — model cost before enabling on high-volume endpoints",
+      "Use preview mode to validate rules before enforcing — misconfigured rules can block legitimate traffic"
+    ]
+  },
+  "gcpmonitoring": {
+    "name": "Google Cloud Monitoring",
+    "matches": [
+      "Google Cloud Monitoring",
+      "Cloud Monitoring",
+      "Stackdriver",
+      "GCP Monitoring",
+      "Cloud Logging",
+      "Cloud Trace"
+    ],
+    "sla": "N/A — observability service",
+    "limits": "Free: 150 MB custom metrics/mo per billing account | Logs: first 50 GB/project/mo free | Trace: first 2.5M spans/mo free | Dashboards: 1,000 per project | Alert policies: 500 per project | Metrics retention: 6 weeks (free), 24 months (configurable)",
+    "whenToUse": "Full-stack observability for GCP. Cloud Monitoring for metrics and dashboards. Cloud Logging for centralised log aggregation and querying. Cloud Trace for distributed tracing. Cloud Profiler for CPU/memory profiling in production.",
+    "cost": "Logs ingestion: $0.01/GB (after 50 GB/mo free). Log storage: $0.01/GB/mo (after 30 days). Custom metrics: $0.18/metric-descriptor after free tier. Trace: $0.20/1M spans after free tier. (as of Q2 2026)",
+    "costEstimate": {
+      "small": 0,
+      "medium": 20,
+      "large": 200
+    },
+    "pitfalls": [
+      "Log ingestion above 50 GB/mo is $0.01/GB — verbose debug logging at scale creates surprise bills",
+      "Exclusion filters reduce ingestion cost — define them early for high-volume log streams",
+      "Cloud Trace sampling rate should be tuned — 100% tracing at high QPS is expensive",
+      "Log-based metrics incur both log ingestion and metrics charges — double-count in budget"
+    ]
+  },
+  "gcplb": {
+    "name": "Google Cloud Load Balancing",
+    "matches": [
+      "Google Cloud Load Balancing",
+      "Cloud Load Balancing",
+      "GCP Load Balancer",
+      "GCP GLB"
+    ],
+    "sla": "99.99% (Global HTTP(S) LB) | 99.9% (Regional LB)",
+    "limits": "Global HTTP(S) LB: anycast single IP, 100+ backend services | Forwarding rules: 15 per project (default, increasable) | SSL certificates: 100 per load balancer | Max backends per backend service: 1,000 | Regional LB: zonal scope only",
+    "whenToUse": "Global HTTP(S) LB for worldwide low-latency delivery — traffic enters Google network at nearest PoP. Internal HTTP(S) LB for service-to-service within VPC. Pair with Cloud Armor for WAF and Cloud CDN for edge caching.",
+    "cost": "Forwarding rule: $0.025/hr (~$18/mo). Ingress processed: $0.008/GB. Outbound data from LB: standard network pricing. (as of Q2 2026)",
+    "costEstimate": {
+      "small": 20,
+      "medium": 60,
+      "large": 350
+    },
+    "pitfalls": [
+      "Global LB not available in all regions for backends — check regional availability",
+      "Internal HTTP(S) LB is regional, not global — a different product from External Global LB",
+      "Forwarding rule quota (15/project) blocks fast scaling — request quota increase early",
+      "SSL certificate managed by Google rotates automatically — import custom certs for branded domains"
+    ]
+  },
+  "cloudbuild": {
+    "name": "Google Cloud Build",
+    "matches": [
+      "Google Cloud Build",
+      "Cloud Build",
+      "GCP Cloud Build",
+      "GCP CI/CD"
+    ],
+    "sla": "N/A",
+    "limits": "Free: 120 build-minutes/day (n1-standard-1 equivalent) | Max concurrent builds: 10 (default) | Max build timeout: 24 hrs | Machine types: e2-medium to n1-highcpu-32 | Build logs retained 90 days | Build triggers: GitHub, Cloud Source Repos, Bitbucket, GitLab",
+    "whenToUse": "Serverless CI/CD on GCP. Trigger builds from source pushes. Native integration with Artifact Registry, Cloud Run, GKE deployments. Use custom build steps for any language or tool. Cloud Deploy for progressive delivery (canary/blue-green).",
+    "cost": "First 120 min/day free (n1-standard-1). Standard: $0.003/build-min. High-CPU (n1-highcpu-32): $0.015/build-min. (as of Q2 2026)",
+    "costEstimate": {
+      "small": 0,
+      "medium": 20,
+      "large": 100
+    },
+    "pitfalls": [
+      "Build caches are per-worker and not shared — use Kaniko or remote caching for large Docker builds",
+      "Network egress during builds is charged at standard rates — pulling large base images adds cost",
+      "Secret Manager integration recommended for build secrets — avoid environment variable secrets in logs",
+      "Build step containers are downloaded fresh unless caching configured — increases build time"
     ]
   }
 }
