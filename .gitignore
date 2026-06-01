@@ -23,5 +23,6 @@ local/
 *.log
 npm-debug.log*
 
-# Promotion docs — private, never push to GitHub
+# Private folders — never push to GitHub
 promotion/
+confluence-extension/
