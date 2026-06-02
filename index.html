@@ -629,23 +629,43 @@ g.arrow-selected .arrow-endpoint-handle { opacity: 1; pointer-events: all; }
   --group-border: rgba(20,25,55,0.28);
   --group-bg: rgba(20,25,55,0.015);
 }
-.group-label {
+/* Full-width drag bar — spans the entire top of the group box.
+   Replaces the old small label as the move target so the whole header
+   is grabbable, not just a narrow text strip. */
+.group-header {
   position: absolute;
-  top: 8px; left: 12px;
+  top: 0; left: 0; right: 0;
+  height: 30px;
+  display: flex;
+  align-items: center;
+  padding: 0 30px 0 10px; /* right padding leaves room for the ✕ button */
+  cursor: grab;
+  pointer-events: auto;
+  border-radius: 12px 12px 0 0;
+  transition: background 0.15s;
+}
+.group-header:hover  { background: rgba(123,47,190,0.12); }
+.group-header:active { cursor: grabbing; }
+.group-node.selected .group-header { background: rgba(123,47,190,0.08); }
+
+.group-label {
   font-size: 11px;
   font-weight: 700;
   font-family: var(--font-mono);
   color: var(--text-muted);
-  opacity: 0.75;
+  opacity: 0.85;
   text-transform: uppercase;
   letter-spacing: 1px;
-  cursor: grab;
-  pointer-events: auto;
-  padding: 2px 6px;
-  border-radius: 4px;
+  pointer-events: auto;   /* allow dblclick to edit */
+  outline: none;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 20px;
+  cursor: inherit;
 }
-.group-label:hover { background: rgba(123,47,190,0.15); color: var(--text); opacity: 1; }
-.group-label[contenteditable="true"] { outline: none; background: rgba(123,47,190,0.15); border-radius: 3px; padding: 1px 4px; color: var(--text); cursor: text; }
+.group-label:focus,
+.group-label[contenteditable="true"] { color: var(--text); opacity: 1; cursor: text; outline: none; }
 .group-delete {
   position: absolute;
   top: 6px; right: 8px;
@@ -4066,7 +4086,7 @@ function renderSidebar(tab, filter = '') {
       el.draggable = true;
       el.dataset.compId = item.id;
       const iconBody = item.iconUrl
-        ? `<img src="${escHtml(item.iconUrl)}" alt="" loading="lazy" draggable="false" style="width:22px;height:22px;object-fit:contain;pointer-events:none;-webkit-user-drag:none" onerror="this.replaceWith(Object.assign(document.createElement('span'),{textContent:${JSON.stringify(item.icon || '⬜')}}))">`
+        ? `<img src="${escHtml(item.iconUrl)}" alt="" loading="lazy" draggable="false" style="width:22px;height:22px;object-fit:contain;pointer-events:none;-webkit-user-drag:none" onerror="this.replaceWith(Object.assign(document.createElement('span'),{textContent:${JSON.stringify(item.icon || '⬡')}}))">`
         : escHtml(item.icon || '');
       el.innerHTML = `
         <div class="comp-icon" style="background:${themeToColor(item.theme)}22; color:${themeToColor(item.theme)}">
@@ -5025,7 +5045,7 @@ function renderNode(node) {
   // would break the attribute quoting whenever JSON.stringify emits a `"`).
   const iconMarkup = isText ? ''
     : node.iconUrl
-      ? `<span class="node-icon" aria-hidden="true"><img src="${escHtml(node.iconUrl)}" alt="" draggable="false" data-fallback="${escHtml(node.icon || '⬜')}" style="width:28px;height:28px;object-fit:contain;display:block;pointer-events:none;-webkit-user-drag:none" onerror="this.replaceWith(Object.assign(document.createElement('span'),{textContent:this.dataset.fallback||'⬜',style:'font-size:24px'}))"></span>`
+      ? `<span class="node-icon" aria-hidden="true"><img src="${escHtml(node.iconUrl)}" alt="" draggable="false" data-fallback="${escHtml(node.icon || '⬡')}" style="width:28px;height:28px;object-fit:contain;display:block;pointer-events:none;-webkit-user-drag:none" onerror="this.replaceWith(Object.assign(document.createElement('span'),{textContent:this.dataset.fallback||'⬡',style:'font-size:24px'}))"></span>`
       : `<span class="node-icon" aria-hidden="true">${escHtml(node.icon || '')}</span>`;
   el.innerHTML = `
     ${iconMarkup}
@@ -5566,8 +5586,15 @@ function drawArrow(arrow) {
       g.appendChild(lbl);
     }
     const mid = midpointOfPolyline(routePoints);
+    // Stagger labels vertically when multiple arrows share the same from↔to pair
+    const parallels = arrows.filter(a => a.label && (
+      (a.from === arrow.from && a.to === arrow.to) ||
+      (a.from === arrow.to   && a.to === arrow.from)
+    ));
+    const pidx = parallels.findIndex(a => a.id === arrow.id);
+    const labelY = mid.y - 5 + (pidx - (parallels.length - 1) / 2) * 14;
     lbl.setAttribute('x', mid.x);
-    lbl.setAttribute('y', mid.y - 5);
+    lbl.setAttribute('y', labelY);
     lbl.textContent = arrow.label;
   } else if (lbl) {
     lbl.remove();
@@ -6207,7 +6234,9 @@ function renderGroup(grp) {
 
   const safeGid = escHtml(grp.id);
   el.innerHTML = `
-    <div class="group-label" contenteditable="false" data-gid="${safeGid}">${escHtml(grp.label || '')}</div>
+    <div class="group-header">
+      <div class="group-label" contenteditable="false" data-gid="${safeGid}">${escHtml(grp.label || '')}</div>
+    </div>
     <div class="group-delete" data-gdel="${safeGid}" title="Delete group">✕</div>
     <div class="group-resize" data-gresize="${safeGid}"></div>`;
 
@@ -6227,6 +6256,7 @@ function renderGroup(grp) {
   });
 
   // Inner listeners (label, resize handle) — rebind because innerHTML replaces them.
+  const hdrEl = el.querySelector('.group-header');
   const lblEl = el.querySelector('.group-label');
   if (lblEl) {
     lblEl.addEventListener('dblclick', (e) => {
@@ -6238,10 +6268,11 @@ function renderGroup(grp) {
       lblEl.contentEditable = 'false';
       updateGroupLabel(grp.id, lblEl.textContent);
     });
-    // Drag the group rectangle from its label. Nodes inside stay put —
-    // they're independent. To move a node, click and drag the node itself.
-    lblEl.addEventListener('pointerdown', (e) => {
-      if (lblEl.contentEditable === 'true') return;
+  }
+  // Drag the group from the full-width header bar. Nodes inside stay put.
+  if (hdrEl) {
+    hdrEl.addEventListener('pointerdown', (e) => {
+      if (lblEl && lblEl.contentEditable === 'true') return;
       e.stopPropagation();
       let moved = false;
       const sx = e.clientX, sy = e.clientY, gox = grp.x, goy = grp.y;
