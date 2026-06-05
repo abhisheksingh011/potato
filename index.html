@@ -8868,7 +8868,7 @@ function importFromAI() {
       label:       n.label || n.name || 'Node ' + (i+1),
       sublabel:    n.sublabel || n.subLabel || n.sub_label || '',
       category:    n.category || '',
-      icon:        n.icon || '⬜',
+      icon:        n.icon || '⬡',
       iconUrl:     iconUrl,
       theme:       themeOk ? n.theme : 'gray',
       description: n.description || n.desc || n.notes || '',
@@ -8959,10 +8959,20 @@ function iconUrlExistsInCatalog(path) {
   buildIconIndex();
   return _iconCatalog.has(path);
 }
+// Provider tokens that mark a component as belonging to a specific cloud.
+// We only borrow a branded SVG icon when the component's type/label names one
+// of these — a generic "API Gateway" or "Load Balancer" should fall back to an
+// emoji instead of silently wearing AWS/Azure/GCP livery.
+const PROVIDER_RE = /\b(aws|amazon|azure|microsoft|gcp|google|oci|alibaba)\b/i;
+
 function guessIconUrlFromType(typeStr) {
   if (!typeStr) return '';
   buildIconIndex();
   const key = String(typeStr).toLowerCase().trim();
+  // Gate: without an explicit provider mention, don't assign a cloud icon.
+  // This keeps non-AWS/Azure/GCP components on emojis (e.g. a generic
+  // "API Gateway" no longer grabs the Amazon API Gateway logo).
+  if (!PROVIDER_RE.test(key)) return '';
   // Direct hit on the type string.
   if (_iconByType.has(key)) return _iconByType.get(key);
   // Try a few normalizations: strip "AWS "/"Amazon "/"Azure "/"GCP " prefixes,
