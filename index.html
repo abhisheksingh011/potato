@@ -8959,29 +8959,18 @@ function iconUrlExistsInCatalog(path) {
   buildIconIndex();
   return _iconCatalog.has(path);
 }
-// Provider tokens that mark a component as belonging to a specific cloud.
-// We only borrow a branded SVG icon when the component's type/label names one
-// of these — a generic "API Gateway" or "Load Balancer" should fall back to an
-// emoji instead of silently wearing AWS/Azure/GCP livery.
-const PROVIDER_RE = /\b(aws|amazon|azure|microsoft|gcp|google|oci|alibaba)\b/i;
-
 function guessIconUrlFromType(typeStr) {
   if (!typeStr) return '';
   buildIconIndex();
   const key = String(typeStr).toLowerCase().trim();
-  // Gate: without an explicit provider mention, don't assign a cloud icon.
-  // This keeps non-AWS/Azure/GCP components on emojis (e.g. a generic
-  // "API Gateway" no longer grabs the Amazon API Gateway logo).
-  if (!PROVIDER_RE.test(key)) return '';
   // Direct hit on the type string.
   if (_iconByType.has(key)) return _iconByType.get(key);
-  // Try a few normalizations: strip "AWS "/"Amazon "/"Azure "/"GCP " prefixes,
-  // strip trailing "(Service)", trailing whitespace etc.
+  // Strip provider prefix ("AWS ", "Amazon ", "Azure ", "GCP ") and retry.
   const cleaned = key.replace(/^(aws|amazon|azure|gcp|google)\s+/i, '').trim();
   if (_iconByType.has(cleaned)) return _iconByType.get(cleaned);
-  // Fuzzy contains: pick the first catalog entry whose type contains all the
-  // significant words from the query (>=3 chars). Cheap but works for
-  // "AWS Lambda" → "Lambda Function", "S3 Bucket" → "Amazon S3", etc.
+  // Fuzzy contains: pick the first catalog entry whose type contains all
+  // significant words (>=3 chars). Handles "Lambda" → "AWS Lambda",
+  // "S3 Bucket" → "Amazon S3", "API Gateway" → "Amazon API Gateway", etc.
   const words = cleaned.split(/\s+/).filter(w => w.length >= 3);
   if (!words.length) return '';
   for (const [type, url] of _iconByType.entries()) {
