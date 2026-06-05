@@ -8850,12 +8850,12 @@ function importFromAI() {
     // a real icon instead of falling all the way back to emoji.
     let iconUrl = (n.iconUrl || n.icon_url || '').toString().trim();
     if (iconUrl && !iconUrlExistsInCatalog(iconUrl)) {
-      const guess = guessIconUrlFromType(n.type || n.label || '');
+      const guess = guessIconUrlFromType(n.type || '') || guessIconUrlFromType(n.label || '');
       if (guess) { iconUrl = guess; iconRescued++; }
       else { iconUrl = ''; }  // LLM made up a path with no match — drop it
     } else if (!iconUrl) {
       // No iconUrl at all — try to infer from type.
-      const guess = guessIconUrlFromType(n.type || n.label || '');
+      const guess = guessIconUrlFromType(n.type || '') || guessIconUrlFromType(n.label || '');
       if (guess) iconUrl = guess;
     }
     return {
