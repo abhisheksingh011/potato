@@ -8959,18 +8959,22 @@ function iconUrlExistsInCatalog(path) {
   buildIconIndex();
   return _iconCatalog.has(path);
 }
+const PROVIDER_RE = /\b(aws|amazon|azure|microsoft|gcp|google|oci|alibaba)\b/i;
+
 function guessIconUrlFromType(typeStr) {
   if (!typeStr) return '';
   buildIconIndex();
   const key = String(typeStr).toLowerCase().trim();
-  // Direct hit on the type string.
+  // Require an explicit provider name — "API Gateway" stays a generic emoji,
+  // "Amazon API Gateway" or "AWS API Gateway" gets the branded icon.
+  if (!PROVIDER_RE.test(key)) return '';
+  // Direct hit on the full type string.
   if (_iconByType.has(key)) return _iconByType.get(key);
   // Strip provider prefix ("AWS ", "Amazon ", "Azure ", "GCP ") and retry.
   const cleaned = key.replace(/^(aws|amazon|azure|gcp|google)\s+/i, '').trim();
   if (_iconByType.has(cleaned)) return _iconByType.get(cleaned);
   // Fuzzy contains: pick the first catalog entry whose type contains all
-  // significant words (>=3 chars). Handles "Lambda" → "AWS Lambda",
-  // "S3 Bucket" → "Amazon S3", "API Gateway" → "Amazon API Gateway", etc.
+  // significant words (>=3 chars).
   const words = cleaned.split(/\s+/).filter(w => w.length >= 3);
   if (!words.length) return '';
   for (const [type, url] of _iconByType.entries()) {
