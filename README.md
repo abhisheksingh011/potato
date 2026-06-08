@@ -342,6 +342,8 @@ Saved files are real interactive web pages:
 
 File size: typically 10–60 KB. No external dependencies. Works fully offline. Email-safe.
 
+> **Save as HTML. Attach to Confluence. Your team gets a fully interactive diagram — hover tooltips, Play flow, cost estimator — without installing anything.**
+
 ---
 
 ## 🛠 Tech stack
