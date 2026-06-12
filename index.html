@@ -1249,6 +1249,7 @@ kbd {
     <button class="tb-btn" onclick="openDiagram()" title="Open HTML" aria-label="Open diagram"><span class="tb-icon" aria-hidden="true">📂</span><span class="tb-label">Open</span></button>
     <button class="tb-btn" onclick="showRecentFilesModal()" title="Reopen a recently saved diagram" aria-label="Recent diagrams"><span class="tb-icon" aria-hidden="true">🕘</span><span class="tb-label">Recent</span></button>
     <button class="tb-btn" onclick="duplicateDiagram()" title="Save a copy with a new name" aria-label="Duplicate diagram"><span class="tb-icon" aria-hidden="true">🗂️</span><span class="tb-label">Duplicate</span></button>
+    <button class="tb-btn" onclick="exportPNG()" title="Export the whole diagram as a PNG image (follows the current dark/light theme)" aria-label="Export PNG"><span class="tb-icon" aria-hidden="true">🖼️</span><span class="tb-label">Export PNG</span></button>
 
     <div class="toolbar-sep"></div>
 
@@ -7691,6 +7692,82 @@ async function saveAsDiagram() {
 }
 window.saveAsDiagram = saveAsDiagram;
 
+// ===== EXPORT PNG =====
+// Renders the FULL diagram — every node, group and arrow, not just the part
+// currently on screen — to a PNG image. Theme-aware: the export is dark when
+// the dark theme is active and bright when the light theme is active.
+//
+// Why this never gets blocked by the browser: we reuse buildDiagramSVG(), which
+// produces a *native, self-contained* SVG — real rects/text/paths plus icons
+// inlined from the in-memory ICON_SVG_TEXT cache. Nothing is fetched at paint
+// time and no cross-origin pixels are involved, so the rasterizing canvas is
+// never "tainted" and toBlob()/download can't throw a SecurityError. It works
+// even when the page is opened from file://. As a final safety net, any failure
+// falls back to downloading the same diagram as a .svg, which is never blocked.
+async function exportPNG() {
+  if (!nodes.length && !groups.length) { notify('Nothing to export — the canvas is empty.', 'warning'); return; }
+  notify('Rendering PNG…', 'info');
+  try {
+    const theme = document.documentElement.getAttribute('data-theme') === 'light' ? 'light' : 'dark';
+    const svg = await buildDiagramSVG(theme);
+    if (!svg || svg.indexOf('<svg') !== 0) { notify('Nothing to export.', 'warning'); return; }
+
+    const base = (((document.getElementById('filename-input') || {}).value) || 'diagram')
+      .trim().replace(/[^\w.-]+/g, '_') || 'diagram';
+
+    // Rasterize the SVG to a 2× PNG. encodeURIComponent keeps the unicode
+    // labels/emoji valid inside the data: URI.
+    const svgUrl = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
+    let img;
+    try {
+      img = await new Promise((resolve, reject) => {
+        const im = new Image();
+        im.onload = () => resolve(im);
+        im.onerror = () => reject(new Error('image load failed'));
+        im.src = svgUrl;
+      });
+    } catch (_) {
+      return downloadSvgFallback(svg, base, 'Could not rasterize — saved as SVG instead.');
+    }
+
+    const SCALE = 2;
+    const W = img.naturalWidth || img.width, H = img.naturalHeight || img.height;
+    const canvas = document.createElement('canvas');
+    canvas.width = W * SCALE; canvas.height = H * SCALE;
+    const ctx = canvas.getContext('2d');
+    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+
+    try {
+      canvas.toBlob((blob) => {
+        if (!blob) { downloadSvgFallback(svg, base, 'PNG was blocked by the browser — saved as SVG instead.'); return; }
+        triggerDownload(URL.createObjectURL(blob), base + '.png', true);
+        notify('Exported ' + base + '.png', 'success');
+      }, 'image/png');
+    } catch (_) {
+      // A tainted canvas throws synchronously on toBlob — fall back to SVG.
+      downloadSvgFallback(svg, base, 'PNG was blocked by the browser — saved as SVG instead.');
+    }
+  } catch (err) {
+    notify('PNG export failed: ' + ((err && err.message) || err), 'error');
+  }
+}
+window.exportPNG = exportPNG;
+
+// Fire a download for a blob/object URL, optionally revoking it afterwards.
+function triggerDownload(url, filename, revoke) {
+  const a = document.createElement('a');
+  a.href = url; a.download = filename;
+  a.click();
+  if (revoke) URL.revokeObjectURL(url);
+}
+
+// Last-resort export: the diagram as a self-contained .svg. Never blocked.
+function downloadSvgFallback(svg, base, message) {
+  const url = URL.createObjectURL(new Blob([svg], { type: 'image/svg+xml' }));
+  triggerDownload(url, base + '.svg', true);
+  notify(message || ('Exported ' + base + '.svg'), 'warning');
+}
+
 // Pre-resolve KB lookups for every node so the saved viewer can show
 // limits / cost / pitfalls / whenToUse without re-implementing the matching
 // logic. Returned shape: { [nodeId]: { name, limits, whenToUse, cost, pitfalls } }
@@ -8073,10 +8150,21 @@ ${svgMarkup}
 </html>`;
 }
 
-// Build an SVG snapshot of the current diagram (used by saved HTML viewer).
-async function buildDiagramSVG() {
+// Build an SVG snapshot of the current diagram. Used by the saved HTML viewer
+// (dark, the default) and by the PNG export, which passes the active theme so
+// the image comes out dark in dark mode and bright in light mode.
+//
+// This is a *native* SVG — real rects/text/paths plus icons inlined from the
+// in-memory ICON_SVG_TEXT cache. No foreignObject, no external fetch, no canvas
+// at build time, so it renders identically everywhere and rasterizes to PNG
+// without ever tainting the canvas (works even from file://).
+async function buildDiagramSVG(theme = 'dark') {
+  // Neutrals flip with the theme; the brand accent colours stay identical.
+  const P = theme === 'light'
+    ? { bg:'#f5f6fa', nodeFill:'#ffffff', text:'#1a1e35', label:'rgba(20,25,55,0.45)', sub:'#5a6280', arrow:'rgba(20,25,55,0.5)', groupFill:'rgba(20,25,55,0.02)' }
+    : { bg:'#0d0f1a', nodeFill:'#12152a', text:'#e8eaf6', label:'rgba(255,255,255,0.35)', sub:'#7986cb', arrow:'rgba(255,255,255,0.45)', groupFill:'rgba(255,255,255,0.015)' };
   if (!nodes.length && !groups.length) {
-    return '<p style="color:#7986cb;font-family:monospace;text-align:center;padding:40px">Empty diagram.</p>';
+    return `<p style="color:${P.sub};font-family:monospace;text-align:center;padding:40px">Empty diagram.</p>`;
   }
   // Embed only the icons this diagram uses, sourced from the inlined
   // ICON_SVG_TEXT cache. Works under file:// because no disk read or canvas
@@ -8097,27 +8185,27 @@ async function buildDiagramSVG() {
   const PAD=40, ox=PAD-minX, oy=PAD-minY;
   const W=Math.ceil(maxX-minX+PAD*2), H=Math.ceil(maxY-minY+PAD*2);
   const themeColors={green:'#4caf50',orange:'#FF9900',blue:'#2E86C1',purple:'#7B2FBE',red:'#DD344C',teal:'#1ABC9C',pink:'#E91E63',yellow:'#F1C40F',cyan:'#00BCD4',gray:'#9E9E9E',gradient:'#7B2FBE'};
-  const colorMap={default:'rgba(255,255,255,0.45)',green:'#4caf50',blue:'#2E86C1',purple:'#9B59B6',red:'#DD344C',teal:'#1ABC9C',orange:'#FF9900',pink:'#E91E63',yellow:'#F1C40F'};
+  const colorMap={default:P.arrow,green:'#4caf50',blue:'#2E86C1',purple:'#9B59B6',red:'#DD344C',teal:'#1ABC9C',orange:'#FF9900',pink:'#E91E63',yellow:'#F1C40F'};
 
   let svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">
   <defs>
     <style>
-      text { font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace; fill: #e8eaf6; }
-      .node-label { font-size: 8px; fill: rgba(255,255,255,0.35); font-weight: bold; }
-      .node-name  { font-size: 12px; fill: #e8eaf6; font-weight: bold; }
-      .node-sub   { font-size: 9px; fill: #7986cb; }
-      .grp-label  { font-size: 11px; fill: rgba(255,255,255,0.35); font-weight: bold; }
+      text { font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace; fill: ${P.text}; }
+      .node-label { font-size: 8px; fill: ${P.label}; font-weight: bold; }
+      .node-name  { font-size: 12px; fill: ${P.text}; font-weight: bold; }
+      .node-sub   { font-size: 9px; fill: ${P.sub}; }
+      .grp-label  { font-size: 11px; fill: ${P.label}; font-weight: bold; }
     </style>
-    <marker id="ah" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><path d="M0,0 L0,6 L8,3 z" fill="rgba(255,255,255,0.45)"/></marker>
+    <marker id="ah" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><path d="M0,0 L0,6 L8,3 z" fill="${P.arrow}"/></marker>
     <marker id="ah-light" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><path d="M0,0 L0,6 L8,3 z" fill="rgba(30,40,80,0.55)"/></marker>
     ${Object.entries(themeColors).map(([k,v])=>`<marker id="ah-${k}" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><path d="M0,0 L0,6 L8,3 z" fill="${v}"/></marker>`).join('')}
   </defs>
-  <rect class="svg-bg" width="${W}" height="${H}" fill="#0d0f1a"/>
+  <rect class="svg-bg" width="${W}" height="${H}" fill="${P.bg}"/>
 `;
 
   groups.forEach(g => {
     const col = themeColors[g.color] || '#7B2FBE';
-    svg += `  <rect class="potato-group-rect" x="${g.x+ox}" y="${g.y+oy}" width="${g.w}" height="${g.h}" rx="12" fill="rgba(255,255,255,0.015)" stroke="${col}" stroke-width="1.5" stroke-dasharray="6,4" opacity="0.7"/>
+    svg += `  <rect class="potato-group-rect" x="${g.x+ox}" y="${g.y+oy}" width="${g.w}" height="${g.h}" rx="12" fill="${P.groupFill}" stroke="${col}" stroke-width="1.5" stroke-dasharray="6,4" opacity="0.7"/>
   <text x="${g.x+ox+12}" y="${g.y+oy+22}" class="grp-label">${escHtml((g.label||'').toUpperCase())}</text>
 `;
   });
@@ -8144,7 +8232,7 @@ async function buildDiagramSVG() {
 `;
     if (a.label) {
       const mid = midpointOfPolyline(routePts);
-      svg += `  <text class="arrow-label" x="${mid.x}" y="${mid.y-4}" text-anchor="middle" font-size="9" fill="#7986cb">${escHtml(a.label)}</text>
+      svg += `  <text class="arrow-label" x="${mid.x}" y="${mid.y-4}" text-anchor="middle" font-size="9" fill="${P.sub}">${escHtml(a.label)}</text>
 `;
     }
   });
@@ -8159,7 +8247,7 @@ async function buildDiagramSVG() {
       ? `    <image href="${iconData}" x="${nx+8}" y="${ny+8}" width="24" height="24"/>`
       : `    <text x="${nx+12}" y="${ny+24}" font-size="18">${escHtml(n.icon||'⬜')}</text>`;
     svg += `  <g class="potato-node" data-node-id="${escHtml(n.id)}" style="cursor:pointer">
-    <rect class="potato-node-rect" x="${nx}" y="${ny}" width="${nw}" height="${nh}" rx="10" fill="#12152a" stroke="${col}" stroke-width="1" opacity="0.95"/>
+    <rect class="potato-node-rect" x="${nx}" y="${ny}" width="${nw}" height="${nh}" rx="10" fill="${P.nodeFill}" stroke="${col}" stroke-width="1" opacity="0.95"/>
 ${iconMarkup}
     <text x="${nx+12}" y="${ny+39}" class="node-label">${escHtml((n.category||n.type||'').toUpperCase().slice(0,22))}</text>
     <text x="${nx+12}" y="${ny+55}" class="node-name">${escHtml((n.label||'').slice(0,20))}</text>
