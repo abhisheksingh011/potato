@@ -1682,6 +1682,10 @@ const COMPONENTS = {
       { id: 'cloud', name: 'Cloud', icon: '☁️', theme: 'cyan', type: 'cloud-shape' },
       { id: 'phone', name: 'Mobile', icon: '📱', theme: 'gray', type: 'mobile' },
       { id: 'browser', name: 'Browser', icon: '🌐', theme: 'blue', type: 'browser' },
+      // A resizable container box — the same kind AI Import draws behind a
+      // Region / VPC / Availability Zone. Drop it, then drag the corner to
+      // size it and recolour / make it transparent from the Properties panel.
+      { id: 'container', name: 'Container Box', icon: '▣', theme: 'purple', type: 'group' },
     ]},
     { cat: 'Flowchart', items: [
       { id: 'start', name: 'Start/End', icon: '⬭', theme: 'green', type: 'terminal' },
@@ -4140,6 +4144,15 @@ function themeToColor(theme) {
   return map[theme] || '#7986cb';
 }
 
+// "#7B2FBE" → "123,47,190" for building rgba() with a chosen alpha.
+function hexToRgbStr(hex) {
+  let h = String(hex || '').replace('#', '');
+  if (h.length === 3) h = h.split('').map(c => c + c).join('');
+  const int = parseInt(h, 16);
+  if (!isFinite(int)) return '123,47,190';
+  return `${(int >> 16) & 255},${(int >> 8) & 255},${int & 255}`;
+}
+
 // ===== DROP ON CANVAS =====
 canvasArea.addEventListener('dragover', (e) => { e.preventDefault(); e.dataTransfer.dropEffect = 'copy'; });
 
@@ -4993,6 +5006,9 @@ function buildAutoDescription(comp) {
 }
 
 function addNodeFromComp(comp, x, y) {
+  // The "Container Box" palette item is a group, not a node — drop it as a
+  // resizable container (like the Region/AZ boxes from AI Import).
+  if (comp.type === 'group') { addGroupAt(x - 75, y - 40, { label: 'Container', color: comp.theme || 'purple' }); return; }
   pushHistory();
   const node = {
     id: uid('n'),
@@ -6213,13 +6229,28 @@ function addTextNode(x, y) {
 
 // ===== ADD GROUP =====
 function addGroup() {
-  pushHistory();
   const cx = (canvasArea.offsetWidth/2 - panX)/zoom;
   const cy = (canvasArea.offsetHeight/2 - panY)/zoom;
-  const g = { id: uid('g'), x: Math.round(cx-150), y: Math.round(cy-100), w: 300, h: 200, label: 'Group', color: 'purple' };
+  addGroupAt(cx - 150, cy - 100);
+}
+
+// Create a container box at a given canvas position. Shared by the toolbar
+// "Add Group" button, the Shapes-palette "Container Box", and paste.
+function addGroupAt(x, y, opts = {}) {
+  pushHistory();
+  const g = {
+    id: uid('g'),
+    x: Math.round(x), y: Math.round(y),
+    w: opts.w || 300, h: opts.h || 200,
+    label: opts.label || 'Group',
+    color: opts.color || 'purple',
+    transparent: !!opts.transparent,
+  };
   groups.push(g);
   renderGroup(g);
+  selectGroup(g.id);
   markDirty();
+  return g;
 }
 
 function renderGroup(grp) {
@@ -6237,6 +6268,15 @@ function renderGroup(grp) {
   el.style.top = grp.y + 'px';
   el.style.width = grp.w + 'px';
   el.style.height = grp.h + 'px';
+
+  // Colour + transparency. Driven through CSS custom properties (not direct
+  // border-color/background) so the .selected / :hover highlight rules — which
+  // set those properties without the var — still win while the box is active.
+  // The border stays visible even when the fill is transparent, so the box
+  // remains grabbable.
+  const rgb = hexToRgbStr(themeToColor(grp.color || 'gray'));
+  el.style.setProperty('--group-border', `rgba(${rgb},0.6)`);
+  el.style.setProperty('--group-bg', grp.transparent ? 'transparent' : `rgba(${rgb},0.07)`);
 
   el.classList.toggle('selected', selectedGroup === grp.id);
 
@@ -6346,6 +6386,18 @@ function updateGroupProp(id, key, val) {
   markDirty();
 }
 
+// Like updateGroupProp, but also refreshes the panel so the active colour
+// swatch / checkbox reflects the new value. Safe for click/change handlers
+// (unlike the position inputs, which must not rebuild mid-typing).
+function updateGroupStyle(id, key, val) {
+  const g = groups.find(g => g.id === id);
+  if (!g) return;
+  g[key] = val;
+  renderGroup(g);
+  if (selectedGroup === id) renderGroupProps(g);
+  markDirty();
+}
+
 // Properties panel for a selected container box (VPC / subnet / group).
 function renderGroupProps(grp) {
   const content = document.getElementById('props-content');
@@ -6372,6 +6424,20 @@ function renderGroupProps(grp) {
         <span class="prop-label" style="width:16px">H</span>
         <input class="prop-input" type="number" value="${Math.round(grp.h)}" oninput="updateGroupProp('${grp.id}','h',+this.value)" style="width:70px">
       </div>
+      <div style="font-size:10px;color:var(--text-dim);margin-top:6px;font-family:var(--font-mono);">Drag the bottom-right corner to resize.</div>
+    </div>
+
+    <div class="prop-group">
+      <div class="prop-group-title">Color</div>
+      <div class="color-swatches">
+        ${Object.entries({gray:'#9E9E9E',blue:'#2E86C1',green:'#4caf50',orange:'#FF9900',purple:'#7B2FBE',red:'#DD344C',teal:'#1ABC9C',pink:'#E91E63',yellow:'#F1C40F',cyan:'#00BCD4'})
+          .map(([name,col]) => `<div class="swatch ${ (grp.color||'gray')===name?'active':''}" style="background:${col}" title="${name}" onclick="updateGroupStyle('${grp.id}','color','${name}')"></div>`)
+          .join('')}
+      </div>
+      <label style="display:flex;align-items:center;gap:8px;margin-top:10px;font-size:12px;color:var(--text-muted);cursor:pointer">
+        <input type="checkbox" ${grp.transparent ? 'checked' : ''} onchange="updateGroupStyle('${grp.id}','transparent',this.checked)">
+        Transparent fill (border only)
+      </label>
     </div>
 
     <div class="prop-group">
@@ -6681,19 +6747,39 @@ function copySelected() {
   const idSet = new Set(selectedIds);
   const copiedNodes  = [...idSet].map(id => getNode(id)).filter(Boolean).map(n => ({ ...n }));
   const copiedArrows = arrows.filter(a => idSet.has(a.from) && idSet.has(a.to)).map(a => ({ ...a }));
-  clipboard = { nodes: copiedNodes, arrows: copiedArrows };
-  notify(`Copied ${copiedNodes.length} node${copiedNodes.length!==1?'s':''}` +
-    (copiedArrows.length ? ` and ${copiedArrows.length} connection${copiedArrows.length!==1?'s':''}` : ''));
+  // Also copy a selected container box (including AI-imported Region/AZ boxes),
+  // so it can be pasted as a new box.
+  const selGroup = selectedGroup ? groups.find(g => g.id === selectedGroup) : null;
+  const copiedGroups = selGroup ? [{ ...selGroup }] : [];
+  if (!copiedNodes.length && !copiedGroups.length) return;
+  clipboard = { nodes: copiedNodes, arrows: copiedArrows, groups: copiedGroups };
+
+  const parts = [];
+  if (copiedNodes.length)  parts.push(`${copiedNodes.length} node${copiedNodes.length!==1?'s':''}`);
+  if (copiedGroups.length) parts.push(`${copiedGroups.length} box${copiedGroups.length!==1?'es':''}`);
+  if (copiedArrows.length) parts.push(`${copiedArrows.length} connection${copiedArrows.length!==1?'s':''}`);
+  notify('Copied ' + parts.join(', '));
 }
 
 function pasteNodes() {
   // Backwards-compat: clipboard used to be a plain array of nodes.
-  const data = Array.isArray(clipboard) ? { nodes: clipboard, arrows: [] } : clipboard;
-  if (!data || !data.nodes || !data.nodes.length) return;
+  const data = Array.isArray(clipboard) ? { nodes: clipboard, arrows: [], groups: [] } : clipboard;
+  const srcNodes  = (data && data.nodes)  || [];
+  const srcGroups = (data && data.groups) || [];
+  if (!srcNodes.length && !srcGroups.length) return;
   pushHistory();
   clearSelection();
+
+  // Container boxes first, so they paint behind the nodes.
+  const newGroups = srcGroups.map(g => {
+    const copy = { ...g, id: uid('g'), x: g.x + 40, y: g.y + 40 };
+    groups.push(copy);
+    renderGroup(copy);
+    return copy;
+  });
+
   const idMap = {};
-  const newNodes = data.nodes.map(n => {
+  const newNodes = srcNodes.map(n => {
     const newId = uid('n');
     idMap[n.id] = newId;
     const copy = { ...n, id: newId, x: n.x + 40, y: n.y + 40, zIndex: 10 + nodes.length };
@@ -6711,10 +6797,15 @@ function pasteNodes() {
     arrows.push(copy);
     drawArrow(copy);
   });
+  // If only boxes were pasted (no nodes), select the new box so it's ready to
+  // move / recolour right away.
+  if (!newNodes.length && newGroups.length) selectGroup(newGroups[newGroups.length - 1].id);
+
   // Re-prime clipboard so successive pastes step away from previous ones.
   clipboard = {
     nodes: newNodes.map(n => ({ ...n })),
-    arrows: (data.arrows || []).map(a => ({ ...a, from: idMap[a.from] || a.from, to: idMap[a.to] || a.to }))
+    arrows: (data.arrows || []).map(a => ({ ...a, from: idMap[a.from] || a.from, to: idMap[a.to] || a.to })),
+    groups: newGroups.map(g => ({ ...g }))
   };
   markDirty();
   updateStatusBar();
@@ -8213,7 +8304,10 @@ async function buildDiagramSVG(theme = 'dark') {
 
   groups.forEach(g => {
     const col = themeColors[g.color] || '#7B2FBE';
-    svg += `  <rect class="potato-group-rect" x="${g.x+ox}" y="${g.y+oy}" width="${g.w}" height="${g.h}" rx="12" fill="${P.groupFill}" stroke="${col}" stroke-width="1.5" stroke-dasharray="6,4" opacity="0.7"/>
+    // Match the live canvas: a faint tint of the box colour, or no fill when
+    // the box is set to transparent (border only).
+    const gfill = g.transparent ? 'none' : (col + '12');
+    svg += `  <rect class="potato-group-rect" x="${g.x+ox}" y="${g.y+oy}" width="${g.w}" height="${g.h}" rx="12" fill="${gfill}" stroke="${col}" stroke-width="1.5" stroke-dasharray="6,4" opacity="0.7"/>
   <text x="${g.x+ox+12}" y="${g.y+oy+22}" class="grp-label">${escHtml((g.label||'').toUpperCase())}</text>
 `;
   });
