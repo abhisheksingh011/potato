@@ -8893,15 +8893,65 @@ ARCHITECTURE QUALITY BAR (apply unless user explicitly says otherwise)
 - If the request is thin, fill gaps with sensible, defensible defaults a senior reviewer would expect — encode those choices in node descriptions and the playFlow narration.
 
 ═══════════════════════════════════════════════════════════════
-LAYOUT RULES
+LAYOUT RULES — a clean, non-overlapping diagram is part of the job
 ═══════════════════════════════════════════════════════════════
 
-- Left-to-right flow: user/client on left (x=60), backend/storage on right (x=1000+).
-- Space nodes 220px horizontally, 150px vertically. Never overlap.
-- Width=160, height=null for all nodes.
-- Choose port pairs by relative position: A left of B → fromPort right, toPort left.
-- Use groups SPARINGLY — only to highlight a real boundary. Each group wraps 2-6 related nodes max, with >=20px padding. NEVER wrap the whole diagram in one group — prefer "groups": [] if unsure.
-- icon: most fitting emoji (⚡ Lambda, 🪣 S3, 🗄️ DB, 🚪 Gateway, 🤖 agent, 👤 user, etc.)
+A professional diagram has nodes on a tidy grid, lines that don't cross
+boxes, and arrows that don't pile onto one side. Do NOT scatter nodes at
+arbitrary coordinates — an LLM cannot "eyeball" non-overlap, so place
+everything on the grid below and verify it in the LAYOUT SELF-CHECK.
+
+THE GRID (every node snaps to it — no freehand x/y):
+- Columns:  x = 60 + column * 240   (column 0,1,2,…)
+- Rows:     y = 60 + row    * 180   (row 0,1,2,…)
+- Width = 160, height = null for every node.
+- 240px column pitch leaves room for arrow labels in the gap; 180px row
+  pitch clears auto-height nodes (assume a node can be up to ~120px tall).
+
+LAYERS = COLUMNS (this is what stops arrows from crossing):
+- Assign every node a LAYER index = its depth in the flow. Ingress/user is
+  layer 0; each downstream hop is the next layer. Place all nodes of layer
+  N in column N. Data flows left-to-right across columns.
+- Within a column, stack parallel/sibling nodes down successive rows.
+- Keep a node in ONE column only — if two hops would land in the same
+  column, push the later one to the next column.
+
+WRAP BIG DIAGRAMS INTO BANDS:
+- If a flow exceeds ~6 columns, don't run off-canvas. Split into stacked
+  horizontal BANDS, each flowing left-to-right (e.g. ingestion band rows
+  0-2, processing band rows 4-6, reporting band rows 8-9). Connect bands
+  with a SINGLE vertical hop, not many long diagonal arrows.
+
+PORTS & ARROW ROUTING (pick ports from RELATIVE position):
+- Horizontal neighbor: A left of B → fromPort right, toPort left.
+- Vertical neighbor:   A above B → fromPort bottom, toPort top.
+- FAN-IN (several arrows into one node, e.g. a business-logic/aggregator
+  node): spread the sources across DIFFERENT ports of the target (left,
+  top, bottom) — never stack every arrow onto one side.
+- FAN-OUT: same idea in reverse, leave each branch from a different port.
+- BACK-EDGES / loops (a reply or arrow pointing right→left): route
+  bottom→bottom or top→top so it arcs around the boxes instead of slicing
+  through the middle of the diagram.
+
+GROUP GEOMETRY (groups cause the ugliest overlaps when sloppy):
+- Use groups SPARINGLY — only to mark a real boundary (VPC, private
+  subnet, account/region). 2-6 related nodes each. Prefer "groups": [] if
+  unsure. NEVER wrap the whole diagram in one group.
+- A group's rectangle = the bounding box of ITS members, expanded 20px on
+  every side. A group must not overlap another group and must not enclose
+  any node that isn't its member.
+
+icon: most fitting emoji (⚡ Lambda, 🪣 S3, 🗄️ DB, 🚪 Gateway, 🤖 agent, 👤 user, etc.)
+
+LAYOUT SELF-CHECK (run silently before emitting — fix any failure):
+□ Every node x = 60+240*col and y = 60+180*row (on the grid, no stray values).
+□ No two nodes overlap: in the same column they are ≥180px apart vertically;
+  no two nodes share the same (x,y).
+□ Each arrow connects ports on the FACING sides of its two nodes; fan-in /
+  fan-out / back-edges follow the port rules above.
+□ No arrow has to cut through a third node's box to reach its target.
+□ Every group is the 20px-expanded bounding box of its members, overlaps no
+  other group, and encloses only its own members.
 
 ═══════════════════════════════════════════════════════════════
 THEME GUIDANCE
