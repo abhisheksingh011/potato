@@ -8792,7 +8792,8 @@ NODE (all fields required except iconUrl):
 ARROW:
 { "id":"a_1", "from":"n_1", "to":"n_2",
   "fromPort":"right", "toPort":"left",
-  "color":"blue", "style":"solid", "label":"HTTPS", "animated":false }
+  "color":"blue", "style":"solid", "label":"1. HTTPS", "animated":false }
+  // label MUST begin with the arrow's sequence badge (see SEQUENCE NUMBERING).
 
 GROUP:
 { "id":"g_1", "x":40, "y":40, "w":700, "h":300, "label":"VPC", "color":"purple" }
@@ -8804,6 +8805,30 @@ ALLOWED VALUES:
 - arrow style: solid (sync), dashed (async/event), dotted (monitoring)
 
 ═══════════════════════════════════════════════════════════════
+SEQUENCE NUMBERING (REQUIRED — so the order is readable WITHOUT pressing Play)
+═══════════════════════════════════════════════════════════════
+
+Every arrow's \`label\` MUST start with a sequence badge that reflects the
+order of the flow, so a viewer can read the sequence visually on the static
+diagram without running the play animation.
+
+RULES:
+- Number arrows in the same order they appear in \`playFlow\` — the badge on
+  arrow a_N equals that arrow's position in the playFlow story (1, 2, 3, …).
+- Badge format: the plain number, a period, a single space, THEN the
+  connection label. Use NORMAL digits (1, 2, 3, …) — do NOT use circled
+  glyphs like ①②③, they render much smaller than the label text.
+  Examples: "1. HTTPS", "2. SQL query", "3. publish event".
+- The badge and the label are ONE continuous text string with a space
+  between them — same font size, rendered inline, never overlapping.
+- If an arrow would otherwise have no label, the label is JUST the badge
+  (e.g. "4."). Never leave label empty — the badge must always show.
+- Keep the label after the badge SHORT (1–3 words: protocol/verb/payload).
+  The full explanation belongs in \`playFlow.text\`, not on the arrow.
+- Each badge number is unique. Parallel/branching arrows still get the next
+  number in the order you want the viewer to read them.
+
+═══════════════════════════════════════════════════════════════
 ICON LIBRARY (iconUrl is optional — emoji is fallback)
 ═══════════════════════════════════════════════════════════════
 
@@ -8812,7 +8837,9 @@ Path format: icons/<provider>/<Category>/<Service>.svg where provider ∈ {aws, 
 Common AWS paths:
   icons/aws/Compute/AWS-Lambda.svg
   icons/aws/Compute/Amazon-EC2.svg
-  icons/aws/Compute/Amazon-Elastic-Container-Service.svg
+  icons/aws/Containers/Amazon-Elastic-Container-Service.svg
+  icons/aws/Containers/AWS-Fargate.svg
+  icons/aws/Containers/Amazon-Elastic-Kubernetes-Service.svg
   icons/aws/Storage/Amazon-Simple-Storage-Service.svg
   icons/aws/Databases/Amazon-RDS.svg
   icons/aws/Databases/Amazon-DynamoDB.svg
@@ -8897,6 +8924,8 @@ PLAY FLOW (REQUIRED — embed inside the JSON, never as separate prose)
 
 STYLE RULES (the most important part):
 - Each entry references an existing arrow.id.
+- The order of this array IS the sequence: the Nth entry's arrow must carry
+  the badge "N." in its label (see SEQUENCE NUMBERING). Keep them in sync.
 - "text" is a complete descriptive sentence (or two) — NOT a terse phrase.
 - ALWAYS spell out the full service name on first mention with the short name in parentheses — e.g. "Amazon Simple Storage Service (Amazon S3)", "Amazon Simple Notification Service (Amazon SNS)".
 - Name the concrete mechanism, the data that moves, and WHY — trigger (S3 event, EventBridge rule, scheduled rule), the transformation, the destination.
