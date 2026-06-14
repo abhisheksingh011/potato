@@ -8331,6 +8331,7 @@ async function buildDiagramSVG(theme = 'dark') {
 `;
   });
 
+  const arrowLabels = [];  // deferred so we can de-overlap before drawing
   arrows.forEach(a => {
     const fn=getNode(a.from), tn=getNode(a.to);
     if (!fn||!tn) return;
@@ -8353,9 +8354,35 @@ async function buildDiagramSVG(theme = 'dark') {
 `;
     if (a.label) {
       const mid = midpointOfPolyline(routePts);
-      svg += `  <text class="arrow-label" x="${mid.x}" y="${mid.y-4}" text-anchor="middle" font-size="9" fill="${P.sub}">${escHtml(a.label)}</text>
-`;
+      arrowLabels.push({ x: mid.x, y: mid.y - 4, text: a.label });
     }
+  });
+
+  // De-overlap arrow labels: parallel arrows between the same two nodes (or
+  // arrows sharing a route) place their labels at the same midpoint, which
+  // piles the text on top of itself in the exported PNG/SVG. Stack any
+  // colliding labels downward by a line height, and paint a faint backing box
+  // so each stays legible over the lines beneath it.
+  const _LH = 12, _CW = 5.4, _placed = [];
+  const _halfW = t => (t.length * _CW) / 2 + 4;
+  arrowLabels.sort((p, q) => p.y - q.y || p.x - q.x);
+  arrowLabels.forEach(lb => {
+    let y = lb.y, collision = true;
+    while (collision) {
+      collision = false;
+      for (const p of _placed) {
+        if (Math.abs(p.y - y) < _LH && Math.abs(p.x - lb.x) < _halfW(lb.text) + _halfW(p.text)) {
+          y = p.y + _LH; collision = true; break;
+        }
+      }
+    }
+    _placed.push({ x: lb.x, y, text: lb.text });
+  });
+  _placed.forEach(lb => {
+    const w = lb.text.length * _CW + 6;
+    svg += `  <rect x="${(lb.x - w / 2).toFixed(1)}" y="${(lb.y - 9).toFixed(1)}" width="${w.toFixed(1)}" height="12" rx="3" fill="${P.bg}" opacity="0.85"/>
+  <text class="arrow-label" x="${lb.x.toFixed(1)}" y="${lb.y.toFixed(1)}" text-anchor="middle" font-size="9" fill="${P.sub}">${escHtml(lb.text)}</text>
+`;
   });
 
   nodes.forEach(n => {
