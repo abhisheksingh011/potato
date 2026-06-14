@@ -9267,17 +9267,58 @@ function iconUrlExistsInCatalog(path) {
 }
 const PROVIDER_RE = /\b(aws|amazon|azure|microsoft|gcp|google|oci|alibaba)\b/i;
 
+// Acronyms / shorthand that won't substring-match the official service name
+// (e.g. "KVS" is NOT inside "Amazon Kinesis Video Streams"). Each maps to a
+// canonical type string that exists in _iconByType. Resolved BEFORE the
+// provider gate, so bare acronyms like "KDS"/"KVS" still get a branded icon.
+const ICON_ALIASES = {
+  // Kinesis family
+  'kvs':'amazon kinesis video streams', 'kinesis video':'amazon kinesis video streams',
+  'kinesis video stream':'amazon kinesis video streams', 'kinesis video streams':'amazon kinesis video streams',
+  'kds':'amazon kinesis data streams', 'kinesis data':'amazon kinesis data streams',
+  'kinesis data stream':'amazon kinesis data streams', 'kinesis data streams':'amazon kinesis data streams',
+  'kdf':'amazon data firehose', 'firehose':'amazon data firehose',
+  'kinesis firehose':'amazon data firehose', 'kinesis data firehose':'amazon data firehose',
+  // Load balancers
+  'alb':'elastic load balancing', 'nlb':'elastic load balancing', 'elb':'elastic load balancing',
+  'application load balancer':'elastic load balancing', 'network load balancer':'elastic load balancing',
+  // Containers / compute
+  'ecs':'amazon elastic container service', 'ecs fargate':'aws fargate', 'fargate':'aws fargate',
+  'eks':'amazon elastic kubernetes service', 'lambda':'aws lambda',
+  // Storage / DB / messaging
+  's3':'amazon simple storage service', 'sqs':'amazon simple queue service',
+  'sns':'amazon simple notification service', 'ddb':'amazon dynamo db', 'dynamodb':'amazon dynamo db',
+  'rds':'amazon rds', 'msk':'amazon managed streaming for apache kafka',
+  'kafka':'amazon managed streaming for apache kafka', 'elasticache':'amazon elasti cache',
+  'cloudfront':'amazon cloud front', 'apigw':'amazon api gateway',
+};
+
 function guessIconUrlFromType(typeStr) {
   if (!typeStr) return '';
   buildIconIndex();
-  const key = String(typeStr).toLowerCase().trim();
-  // Require an explicit provider name — "API Gateway" stays a generic emoji,
-  // "Amazon API Gateway" or "AWS API Gateway" gets the branded icon.
-  if (!PROVIDER_RE.test(key)) return '';
-  // Direct hit on the full type string.
+  // Normalize: lowercase, drop a parenthetical acronym like "(KVS)", collapse spaces.
+  const key = String(typeStr).toLowerCase().replace(/\([^)]*\)/g, ' ').replace(/\s+/g, ' ').trim();
+  if (!key) return '';
+  // Provider-stripped form, e.g. "aws kvs" -> "kvs", "amazon dynamodb" -> "dynamodb".
+  const cleaned = key.replace(/^(aws|amazon|azure|gcp|google|microsoft)\s+/, '').trim();
+  // 1) Acronym/shorthand aliases — resolve even without a provider word.
+  const alias = ICON_ALIASES[key] || ICON_ALIASES[cleaned];
+  if (alias && _iconByType.has(alias)) return _iconByType.get(alias);
+  // 2) No provider word ("Kinesis Data Streams" instead of "Amazon Kinesis…"):
+  // accept only a MULTI-word phrase that UNIQUELY identifies one catalog
+  // service. A single generic word ("Gateway", "Function") stays a neutral
+  // emoji; a unique multi-word name still resolves to its branded icon.
+  if (!PROVIDER_RE.test(key)) {
+    const w = key.split(/\s+/).filter(x => x.length >= 3);
+    if (w.length < 2) return '';
+    let hit = '', count = 0;
+    for (const [type, url] of _iconByType.entries()) {
+      if (w.every(x => type.includes(x))) { count++; hit = url; if (count > 1) break; }
+    }
+    return count === 1 ? hit : '';
+  }
+  // Direct hit on the full type string, then the provider-stripped form.
   if (_iconByType.has(key)) return _iconByType.get(key);
-  // Strip provider prefix ("AWS ", "Amazon ", "Azure ", "GCP ") and retry.
-  const cleaned = key.replace(/^(aws|amazon|azure|gcp|google)\s+/i, '').trim();
   if (_iconByType.has(cleaned)) return _iconByType.get(cleaned);
   // Fuzzy contains: pick the first catalog entry whose type contains all
   // significant words (>=3 chars).
