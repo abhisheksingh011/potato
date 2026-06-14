@@ -5137,7 +5137,13 @@ function bindNodeRootEvents(el, node) {
   el.addEventListener('dblclick', (e) => {
     e.stopPropagation();
     const field = e.target.closest('[data-field]');
-    if (field) startInlineEdit(field, node);
+    if (field) { startInlineEdit(field, node); return; }
+    // Double-clicking the icon (the only non-editable part of the node) opens
+    // the Properties panel for this node, rather than doing nothing.
+    if (e.target.closest('.node-icon')) {
+      selectNode(node.id, false);
+      openPropsPanel();
+    }
   });
 
   el.addEventListener('mouseenter', () => {
@@ -6398,6 +6404,7 @@ function addGroupAt(x, y, opts = {}) {
   renderGroup(g);
   selectGroup(g.id);
   markDirty();
+  updateStatusBar();
   return g;
 }
 
@@ -7679,8 +7686,10 @@ function updateStatusBar() {
   document.getElementById('status-arrows').textContent = arrows.length + ' connection' + (arrows.length!==1?'s':'');
   updateMinimap();
   // Show the empty-state hint when the canvas is blank, hide it otherwise.
+  // Container Boxes are groups (not nodes), so count those too — otherwise
+  // dropping a container leaves the overlay stuck open.
   const es = document.getElementById('empty-state');
-  if (es) es.classList.toggle('hidden', nodes.length > 0);
+  if (es) es.classList.toggle('hidden', nodes.length > 0 || groups.length > 0);
 }
 
 // First-save timestamp for the diagram currently in memory. Set on load
@@ -8800,6 +8809,13 @@ function togglePanel(panel) {
     propsPanel.classList.toggle('hidden');
     updatePropsToggleBtn();
   }
+}
+
+// Force the Properties panel open (used by double-clicking a node's icon).
+// Unlike togglePanel, this never closes an already-open panel.
+function openPropsPanel() {
+  propsPanel.classList.remove('hidden');
+  updatePropsToggleBtn();
 }
 
 // Keep the toolbar's ⚙ Properties button in sync with the panel:
