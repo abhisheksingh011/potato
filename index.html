@@ -8467,7 +8467,10 @@ async function buildDiagramSVG(theme = 'dark') {
     const fel=document.getElementById('node-'+a.from), tel=document.getElementById('node-'+a.to);
     const fw=fel?fel.offsetWidth:160, fh=fel?fel.offsetHeight:80;
     const tw2=tel?tel.offsetWidth:160, th=tel?tel.offsetHeight:80;
-    const fp=a.fromPort||'right', tp=a.toPort||'left';
+    // Match the live canvas: fall back to the geometrically best-facing port
+    // (not a hardcoded right→left) so portless AI/imported arrows export with
+    // the same route they show on screen.
+    const fp=a.fromPort||getBestPorts(a.from,a.to).fp, tp=a.toPort||getBestPorts(a.from,a.to).tp;
     const from=portPos(fn,fw,fh,fp,ox,oy), to=portPos(tn,tw2,th,tp,ox,oy);
     const obstacles = collectObstacleRects(a.from, a.to, (n) => {
       const ne = document.getElementById('node-' + n.id);
