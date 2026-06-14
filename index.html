@@ -445,6 +445,9 @@ body {
   z-index: 100;
 }
 .node:hover .port, .node.selected .port { opacity: 1; }
+/* Highlight the node an arrow endpoint is about to be dropped onto. */
+.node.drop-target { border-color: var(--teal) !important; box-shadow: 0 0 0 2px var(--teal); }
+.node.drop-target .port { opacity: 1; }
 /* One-shot port discoverability pulse — shown on the first node a new user
    hovers, so they realize ports exist and are draggable. */
 .node.port-hint .port { opacity: 1 !important; animation: port-pulse 1.1s ease-in-out 3; }
@@ -5470,13 +5473,31 @@ function startArrowEndpointDrag(arrowId, end, e) {
   preview.setAttribute('y1', fixedPt.y);
   preview.setAttribute('x2', fixedPt.x);
   preview.setAttribute('y2', fixedPt.y);
+  preview.style.pointerEvents = 'none';
   arrowsSvg.appendChild(preview);
 
   // Dim the original while dragging so the user sees the preview clearly.
+  // pointer-events:none keeps the faint arrow from stealing hit-tests below.
   const g = document.getElementById('arrow-' + arrowId);
-  if (g) g.style.opacity = '0.25';
+  if (g) { g.style.opacity = '0.25'; g.style.pointerEvents = 'none'; }
 
   document.getElementById('canvas-area').classList.add('connecting');
+
+  // Track the node under the cursor so we can highlight it and accept a drop
+  // anywhere on its body — not only on the tiny port dot.
+  let hoverEl = null;
+  const setHover = (el) => {
+    if (hoverEl === el) return;
+    if (hoverEl) hoverEl.classList.remove('drop-target');
+    hoverEl = el;
+    if (hoverEl) hoverEl.classList.add('drop-target');
+  };
+  const nodeUnder = (e2) => {
+    if (typeof e2.clientX !== 'number') return null;
+    const under = document.elementFromPoint(e2.clientX, e2.clientY);
+    const nodeEl = under ? under.closest('.node') : null;
+    return (nodeEl && nodeEl.dataset.id && nodeEl.dataset.id !== fixedNodeId) ? nodeEl : null;
+  };
 
   const onMove = (e2) => {
     const rect = canvasArea.getBoundingClientRect();
@@ -5484,22 +5505,39 @@ function startArrowEndpointDrag(arrowId, end, e) {
     const my = (e2.clientY - rect.top - panY) / zoom;
     preview.setAttribute('x2', mx);
     preview.setAttribute('y2', my);
+    setHover(nodeUnder(e2));
   };
 
   const onUp = (e2) => {
     if (preview.parentNode) preview.parentNode.removeChild(preview);
-    if (g) g.style.opacity = '';
+    if (g) { g.style.opacity = ''; g.style.pointerEvents = ''; }
+    setHover(null);
     document.getElementById('canvas-area').classList.remove('connecting');
 
-    let target = e2.target && e2.target.closest ? e2.target.closest('.port') : null;
-    if ((!target || !target.dataset.node) && typeof e2.clientX === 'number') {
+    // Resolve the drop: prefer an exact port, else fall back to the whole node
+    // under the cursor and auto-pick the port facing the fixed endpoint.
+    let newNode = null, newPort = null;
+    let portEl = e2.target && e2.target.closest ? e2.target.closest('.port') : null;
+    if ((!portEl || !portEl.dataset.node) && typeof e2.clientX === 'number') {
       const under = document.elementFromPoint(e2.clientX, e2.clientY);
-      if (under) target = under.closest('.port');
+      if (under) portEl = under.closest('.port');
     }
-    if (target && target.dataset.node && target.dataset.node !== fixedNodeId) {
+    if (portEl && portEl.dataset.node && portEl.dataset.node !== fixedNodeId) {
+      newNode = portEl.dataset.node;
+      newPort = portEl.dataset.port;
+    } else {
+      const nodeEl = nodeUnder(e2);
+      if (nodeEl) {
+        newNode = nodeEl.dataset.id;
+        const bp = getBestPorts(end === 'from' ? newNode : fixedNodeId,
+                                end === 'from' ? fixedNodeId : newNode);
+        newPort = end === 'from' ? bp.fp : bp.tp;
+      }
+    }
+    if (newNode && (newNode !== arrow[end] || newPort !== arrow[end + 'Port'])) {
       pushHistory();
-      arrow[end]            = target.dataset.node;
-      arrow[end + 'Port']   = target.dataset.port;
+      arrow[end]          = newNode;
+      arrow[end + 'Port'] = newPort;
       drawArrow(arrow);
       markDirty();
       updateStatusBar();
