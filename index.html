@@ -8478,7 +8478,12 @@ async function buildDiagramSVG(theme = 'dark') {
     });
     const efH = fp === 'left' || fp === 'right';
     const etH = tp === 'left' || tp === 'right';
-    const eManualMid = (efH && etH) ? a.midX : (!efH && !etH ? a.midY : undefined);
+    // midX/midY are stored in raw world coords; the export shifts everything by
+    // (ox, oy), so the manual midline must be shifted to match or the dragged
+    // arrow's jog lands in the wrong place and renders distorted.
+    const eManualMid = (efH && etH)
+      ? (a.midX != null ? a.midX + ox : undefined)
+      : (!efH && !etH ? (a.midY != null ? a.midY + oy : undefined) : undefined);
     const routePts = orthogonalRoute(from, fp, to, tp, obstacles, eManualMid);
     const dStr = pointsToRoundedPath(routePts);
     const stroke=colorMap[a.color]||colorMap.default;
