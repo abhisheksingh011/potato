@@ -594,6 +594,19 @@ g.arrow-selected .arrow-endpoint-handle { opacity: 1; pointer-events: all; }
 .arrow-endpoint-handle:hover { fill: var(--purple, #7B2FBE); }
 .arrow-endpoint-handle:active { cursor: grabbing; }
 
+/* Mid handle — drag the middle segment to adjust spacing without touching
+   the source/destination connection. Only shown on the selected arrow. */
+.arrow-mid-handle {
+  fill: var(--purple, #7B2FBE);
+  stroke: #fff;
+  stroke-width: 1.5;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.15s;
+}
+g.arrow-selected .arrow-mid-handle { opacity: 0.9; pointer-events: all; }
+.arrow-mid-handle:hover { fill: var(--teal, #1abc9c); }
+
 .arrow-label {
   font-family: var(--font-mono);
   font-size: 10px;
@@ -5556,7 +5569,12 @@ function drawArrow(arrow) {
     if (!el) return null;
     return { x: n.x, y: n.y, w: el.offsetWidth, h: el.offsetHeight };
   });
-  const routePoints = orthogonalRoute(from, fp, to, tp, obstacles);
+  // Manual spacing: a dragged midline is stored as midX (when both ports are
+  // horizontal — the S-bend midline is vertical) or midY (both vertical).
+  const _fromH = fp === 'left' || fp === 'right';
+  const _toH   = tp === 'left' || tp === 'right';
+  const manualMid = (_fromH && _toH) ? arrow.midX : (!_fromH && !_toH ? arrow.midY : undefined);
+  const routePoints = orthogonalRoute(from, fp, to, tp, obstacles, manualMid);
   const dStr = pointsToRoundedPath(routePoints);
 
   let g = document.getElementById('arrow-' + arrow.id);
@@ -5588,7 +5606,7 @@ function drawArrow(arrow) {
   // If this is the selected arrow, keep its (overlay) endpoint handles glued
   // to the live port centers as the node moves / the arrow reroutes.
   g.classList.toggle('arrow-selected', selectedArrow === arrow.id);
-  if (selectedArrow === arrow.id) positionEndpointHandles(from, to);
+  if (selectedArrow === arrow.id) positionEndpointHandles(from, to, midpointOfPolyline(routePoints));
   // Use inline style.stroke (not setAttribute) so CSS vars in colorConf.stroke
   // — used by the theme-aware default arrow colour — actually resolve.
   path.style.stroke = colorConf.stroke;
@@ -5749,7 +5767,12 @@ function buildOrthPath(from, fromPort, to, toPort, opts) {
 // alternative jog midpoints (S-bend) before giving up. The result is always
 // a valid orthogonal path — at worst it crosses the obstacle, which is still
 // no worse than the old straight Bezier.
-function orthogonalRoute(from, fromPort, to, toPort, obstacles) {
+function orthogonalRoute(from, fromPort, to, toPort, obstacles, manualMid) {
+  // A user-dragged midline takes priority — honour it verbatim (the point of
+  // the drag is manual control), skipping the obstacle auto-avoid pass.
+  if (manualMid != null && isFinite(manualMid)) {
+    return buildOrthPath(from, fromPort, to, toPort, { midOverride: manualMid });
+  }
   const def = buildOrthPath(from, fromPort, to, toPort);
   if (!obstacles || !obstacles.length || !pathHitsAnyRect(def, obstacles)) return def;
   // Try shifting the midline around the obstacles (S-bend variants only).
@@ -5817,11 +5840,13 @@ function clearEndpointHandles() {
   while (arrowHandlesSvg.firstChild) arrowHandlesSvg.removeChild(arrowHandlesSvg.firstChild);
 }
 
-function positionEndpointHandles(from, to) {
+function positionEndpointHandles(from, to, mid) {
   const fromH = arrowHandlesSvg.querySelector('.arrow-endpoint-handle[data-end="from"]');
   const toH   = arrowHandlesSvg.querySelector('.arrow-endpoint-handle[data-end="to"]');
   if (fromH) { fromH.setAttribute('cx', from.x); fromH.setAttribute('cy', from.y); }
   if (toH)   { toH.setAttribute('cx', to.x);     toH.setAttribute('cy', to.y); }
+  const midH = arrowHandlesSvg.querySelector('.arrow-mid-handle');
+  if (midH && mid) { midH.setAttribute('x', mid.x - 5); midH.setAttribute('y', mid.y - 5); }
 }
 
 function renderEndpointHandles(arrow) {
@@ -5848,7 +5873,71 @@ function renderEndpointHandles(arrow) {
     });
     g.appendChild(h);
   });
+  // Mid handle: drag the middle segment to adjust spacing without moving the
+  // endpoints. Only meaningful for S-bend routes (both ports on the same
+  // axis); for L-bends there is no straight midline to slide.
+  const fromHoriz = fp === 'left' || fp === 'right';
+  const toHoriz   = tp === 'left' || tp === 'right';
+  if (fromHoriz === toHoriz) {
+    const m = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+    m.setAttribute('class', 'arrow-mid-handle');
+    m.setAttribute('width', '10');
+    m.setAttribute('height', '10');
+    m.setAttribute('rx', '2');
+    m.setAttribute('x', (from.x + to.x) / 2 - 5);
+    m.setAttribute('y', (from.y + to.y) / 2 - 5);
+    m.style.cursor = fromHoriz ? 'ew-resize' : 'ns-resize';
+    m.setAttribute('title', 'Drag to space the arrow · double-click to reset');
+    m.addEventListener('pointerdown', (e) => {
+      e.stopPropagation(); e.preventDefault();
+      startArrowMidDrag(arrow.id, e);
+    });
+    m.addEventListener('dblclick', (e) => {
+      e.stopPropagation(); e.preventDefault();
+      resetArrowMid(arrow.id);
+    });
+    g.appendChild(m);
+  }
   arrowHandlesSvg.appendChild(g);
+}
+
+// Drag the middle segment of an arrow to set a manual routing midline, so the
+// user can space arrows apart without disturbing the source/destination ports.
+// Stored as midX (horizontal ports) or midY (vertical ports).
+function startArrowMidDrag(arrowId, e) {
+  const arrow = arrows.find(a => a.id === arrowId);
+  if (!arrow) return;
+  const fp = arrow.fromPort || getBestPorts(arrow.from, arrow.to).fp;
+  const horiz = fp === 'left' || fp === 'right';
+  pushHistory();
+  const onMove = (e2) => {
+    const rect = canvasArea.getBoundingClientRect();
+    const wx = (e2.clientX - rect.left - panX) / zoom;
+    const wy = (e2.clientY - rect.top  - panY) / zoom;
+    if (horiz) arrow.midX = wx; else arrow.midY = wy;
+    drawArrow(arrow);
+  };
+  const onUp = () => {
+    markDirty();
+    window.removeEventListener('pointermove', onMove);
+    window.removeEventListener('pointerup', onUp);
+    window.removeEventListener('pointercancel', onUp);
+  };
+  window.addEventListener('pointermove', onMove);
+  window.addEventListener('pointerup', onUp);
+  window.addEventListener('pointercancel', onUp);
+}
+
+// Restore an arrow to automatic routing (clears any manual midline).
+function resetArrowMid(arrowId) {
+  const arrow = arrows.find(a => a.id === arrowId);
+  if (!arrow) return;
+  pushHistory();
+  delete arrow.midX;
+  delete arrow.midY;
+  drawArrow(arrow);
+  markDirty();
+  notify('Arrow routing reset to automatic', 'info');
 }
 
 function selectArrow(id) {
@@ -5861,7 +5950,9 @@ function selectArrow(id) {
   arrowsSvg.querySelectorAll('g[id^="arrow-"]').forEach(g => {
     g.classList.toggle('arrow-selected', g.id === 'arrow-' + id);
   });
-  renderEndpointHandles(arrows.find(a => a.id === id));
+  const selA = arrows.find(a => a.id === id);
+  renderEndpointHandles(selA);
+  if (selA) drawArrow(selA);  // snaps the mid handle to the true route midpoint
   updatePropsPanel();
 }
 
@@ -8344,7 +8435,10 @@ async function buildDiagramSVG(theme = 'dark') {
       const ne = document.getElementById('node-' + n.id);
       return { x: n.x + ox, y: n.y + oy, w: ne ? ne.offsetWidth : 160, h: ne ? ne.offsetHeight : 80 };
     });
-    const routePts = orthogonalRoute(from, fp, to, tp, obstacles);
+    const efH = fp === 'left' || fp === 'right';
+    const etH = tp === 'left' || tp === 'right';
+    const eManualMid = (efH && etH) ? a.midX : (!efH && !etH ? a.midY : undefined);
+    const routePts = orthogonalRoute(from, fp, to, tp, obstacles, eManualMid);
     const dStr = pointsToRoundedPath(routePts);
     const stroke=colorMap[a.color]||colorMap.default;
     const dashArr=a.style==='dashed'?'stroke-dasharray="6 4"':a.style==='dotted'?'stroke-dasharray="2 4"':'';
