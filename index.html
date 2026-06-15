@@ -1551,7 +1551,7 @@ kbd {
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
       <div>
         <h2 id="flow-editor-title" style="font-size:17px;font-weight:800">📝 Play Sequence Editor</h2>
-        <p style="font-size:11px;color:var(--text-muted);font-family:var(--font-mono);margin-top:3px">Set the order, narration, and which connections appear in the Play animation. The LLM seeds this — edit freely.</p>
+        <p style="font-size:11px;color:var(--text-muted);font-family:var(--font-mono);margin-top:3px">Set the order, heading, and narration for each step. A step can follow a connection or be free-form (pick “no connection”). The LLM seeds this — edit freely.</p>
       </div>
       <button onclick="closeFlowEditor()" aria-label="Close" style="background:none;border:none;color:var(--text-muted);font-size:22px;cursor:pointer;line-height:1">×</button>
     </div>
@@ -6992,9 +6992,10 @@ function deleteSelected() {
     arrows.filter(a => a.from === id || a.to === id).forEach(a => removeArrowDom(a.id));
     arrows = arrows.filter(a => a.from !== id && a.to !== id);
   });
-  // Drop any playFlow steps that reference removed arrows.
+  // Drop any playFlow steps that reference removed arrows; keep free-form
+  // (connection-less) steps.
   const keepIds = new Set(arrows.map(a => a.id));
-  playFlow = playFlow.filter(s => keepIds.has(s.arrow));
+  playFlow = playFlow.filter(s => !s.arrow || keepIds.has(s.arrow));
   selectedIds.clear();
   selectedArrow = null;
   clearEndpointHandles();
@@ -7361,16 +7362,16 @@ function setPlaySpeed(ms) {
 // If `playFlow` is set (from LLM or Sequence Editor), honor that order + narration.
 // Otherwise derive an auto-order via BFS from source nodes.
 function buildPlaySteps() {
-  if (!arrows.length) return [];
-
-  // Authored sequence wins — but skip steps whose arrow is gone.
+  // Authored sequence wins — keep free-form steps and skip steps whose arrow is gone.
   if (playFlow && playFlow.length) {
     const byId = new Map(arrows.map(a => [a.id, a]));
     const authored = playFlow
-      .map(s => ({ arrow: byId.get(s.arrow), title: s.title || '', text: s.text || '' }))
-      .filter(s => s.arrow);
+      .map(s => ({ arrow: (s.arrow && byId.get(s.arrow)) || null, title: s.title || '', text: s.text || '' }))
+      .filter(s => s.arrow || s.title || s.text);
     if (authored.length) return authored;
   }
+
+  if (!arrows.length) return [];
 
   // Auto-order via BFS from source nodes.
   const inDeg = {}, outArrows = {};
@@ -7449,31 +7450,37 @@ function runPlayStep() {
   clearPlayHighlights();
   if (_playFlowIdx >= _playFlowSteps.length) { stopPlayFlow(); return; }
   const step = _playFlowSteps[_playFlowIdx];
-  const arrow = step.arrow;
+  const arrow = step.arrow;   // null for a free-form (narration-only) step
   const total = _playFlowSteps.length;
 
-  ['from', 'to'].forEach(end => {
-    const el = document.getElementById('node-' + arrow[end]);
-    if (el) el.classList.add('playing-flow');
-  });
-  const g = document.getElementById('arrow-' + arrow.id);
-  if (g) {
-    const path = g.querySelector('.arrow-path');
-    if (path) path.classList.add('playing-flow');
+  if (arrow) {
+    ['from', 'to'].forEach(end => {
+      const el = document.getElementById('node-' + arrow[end]);
+      if (el) el.classList.add('playing-flow');
+    });
+    const g = document.getElementById('arrow-' + arrow.id);
+    if (g) {
+      const path = g.querySelector('.arrow-path');
+      if (path) path.classList.add('playing-flow');
+    }
   }
 
-  const fromName = (getNode(arrow.from) || {}).label || arrow.from;
-  const toName   = (getNode(arrow.to)   || {}).label || arrow.to;
-  const arrowSummary = `${fromName} → ${toName}${arrow.label ? ' — ' + arrow.label : ''}`;
+  let arrowSummary = '';
+  if (arrow) {
+    const fromName = (getNode(arrow.from) || {}).label || arrow.from;
+    const toName   = (getNode(arrow.to)   || {}).label || arrow.to;
+    arrowSummary = `${fromName} → ${toName}${arrow.label ? ' — ' + arrow.label : ''}`;
+  }
   const counter = `Step ${_playFlowIdx + 1} / ${total}`;
+  const topLine = arrowSummary ? `${counter} · ${escHtml(arrowSummary)}` : counter;
   // Heading (if set) is the spotlight; narration sits below; both fall back to
-  // the from→to summary.
+  // the from→to summary (or just the counter for a free-form step).
   const ind = document.getElementById('play-indicator');
   ind.innerHTML = (step.title || step.text)
-    ? `<div style="font-size:10px;opacity:0.7;letter-spacing:0.5px;text-transform:uppercase">${counter} · ${escHtml(arrowSummary)}</div>
+    ? `<div style="font-size:10px;opacity:0.7;letter-spacing:0.5px;text-transform:uppercase">${topLine}</div>
        ${step.title ? `<div style="font-size:14px;font-weight:800;margin-top:4px;color:var(--text)">${escHtml(step.title)}</div>` : ''}
        ${step.text ? `<div style="font-size:13px;margin-top:${step.title ? '2' : '4'}px;color:var(--text)">${escHtml(step.text)}</div>` : ''}`
-    : `${counter} · ${escHtml(arrowSummary)}`;
+    : topLine;
 
   _playFlowIdx++;
 }
@@ -7488,13 +7495,13 @@ function clearPlayHighlights() {
 let _flowDraft = null;
 
 function showFlowEditor() {
-  if (!arrows.length) { notify('Add some connections first', 'warning'); return; }
-  // Seed the draft: if playFlow has entries, use them; otherwise materialize the auto-order
-  // so the user can edit it from a real starting point.
+  // Seed the draft: if playFlow has entries, use them; otherwise materialize the
+  // auto-order so the user can edit it from a real starting point. Steps may be
+  // free-form (no connection) — those carry an empty arrow.
   if (playFlow && playFlow.length) {
-    _flowDraft = playFlow.map(s => ({ arrow: s.arrow, title: s.title || '', text: s.text || '' }));
+    _flowDraft = playFlow.map(s => ({ arrow: s.arrow || '', title: s.title || '', text: s.text || '' }));
   } else {
-    _flowDraft = buildPlaySteps().map(s => ({ arrow: s.arrow.id, title: '', text: '' }));
+    _flowDraft = buildPlaySteps().map(s => ({ arrow: (s.arrow && s.arrow.id) || '', title: '', text: '' }));
   }
   renderFlowEditor();
   document.getElementById('flow-editor-overlay').style.display = 'flex';
@@ -7503,9 +7510,15 @@ function showFlowEditor() {
 function closeFlowEditor(save) {
   if (save) {
     pushHistory();
-    // Only keep steps that still reference an existing arrow.
+    // Keep steps that reference an existing arrow OR carry free-form content
+    // (a heading or narration). Drop blank, connection-less steps.
     const ids = new Set(arrows.map(a => a.id));
-    playFlow = _flowDraft.filter(s => ids.has(s.arrow)).map(s => ({ arrow: s.arrow, title: (s.title || '').trim(), text: (s.text || '').trim() }));
+    playFlow = _flowDraft
+      .map(s => {
+        const arrow = (s.arrow && ids.has(s.arrow)) ? s.arrow : '';
+        return { arrow, title: (s.title || '').trim(), text: (s.text || '').trim() };
+      })
+      .filter(s => s.arrow || s.title || s.text);
     markDirty();
     notify(`Saved ${playFlow.length} step${playFlow.length !== 1 ? 's' : ''}`);
   }
@@ -7514,17 +7527,16 @@ function closeFlowEditor(save) {
 }
 
 function flowEditorAddStep() {
-  // Default to the first arrow not yet in the draft, else the first arrow.
-  const usedIds = new Set(_flowDraft.map(s => s.arrow));
-  const next = arrows.find(a => !usedIds.has(a.id)) || arrows[0];
-  if (!next) return;
-  _flowDraft.push({ arrow: next.id, title: '', text: '' });
+  // Add a free-form step (no connection). The user can attach a connection from
+  // the dropdown if they want, but a heading + details alone is a valid step.
+  _flowDraft.push({ arrow: '', title: '', text: '' });
   renderFlowEditor();
 }
 
 function flowEditorResetToAuto() {
+  if (!arrows.length) { notify('No connections to derive an order from', 'warning'); return; }
   if (!confirm('Replace the current sequence with the auto-derived BFS order? Edits will be lost.')) return;
-  _flowDraft = buildPlaySteps().map(s => ({ arrow: s.arrow.id, title: '', text: '' }));
+  _flowDraft = buildPlaySteps().map(s => ({ arrow: (s.arrow && s.arrow.id) || '', title: '', text: '' }));
   renderFlowEditor();
 }
 
@@ -7545,15 +7557,21 @@ function flowEditorDownload() {
   const lines = [heading, '='.repeat(heading.length), ''];
   let n = 0;
   _flowDraft.forEach(step => {
-    const a = arrowById.get(step.arrow);
-    if (!a) return; // skip steps whose arrow was deleted
-    n++;
-    const f = (getNode(a.from) || {}).label || a.from;
-    const t = (getNode(a.to) || {}).label || a.to;
-    const hop = a.label ? `${f} → ${t} (${a.label})` : `${f} → ${t}`;
     const head = (step.title || '').trim();
-    lines.push(`${n}. ${head ? head + ' — ' : ''}${hop}`);
-    if ((step.text || '').trim()) lines.push(`   ${step.text.trim()}`);
+    const body = (step.text || '').trim();
+    const a = step.arrow ? arrowById.get(step.arrow) : null;
+    // Skip steps that are entirely empty (no connection, heading, or details).
+    if (!a && !head && !body) return;
+    n++;
+    let hop = '';
+    if (a) {
+      const f = (getNode(a.from) || {}).label || a.from;
+      const t = (getNode(a.to) || {}).label || a.to;
+      hop = a.label ? `${f} → ${t} (${a.label})` : `${f} → ${t}`;
+    }
+    const headerLine = head && hop ? `${head} — ${hop}` : (head || hop || '(step)');
+    lines.push(`${n}. ${headerLine}`);
+    if (body) lines.push(`   ${body}`);
     lines.push('');
   });
   const txt = lines.join('\n');
@@ -7592,15 +7610,21 @@ function flowEditorChangeTitle(i, title) {
 function renderFlowEditor() {
   const list = document.getElementById('flow-editor-list');
   if (!_flowDraft.length) {
-    list.innerHTML = `<p style="color:var(--text-dim);font-size:11px;font-family:var(--font-mono);text-align:center;padding:32px">No steps yet. Click <strong>+ Add step</strong> or <strong>↺ Reset to auto-order</strong> to seed from the diagram.</p>`;
+    list.innerHTML = `<p style="color:var(--text-dim);font-size:11px;font-family:var(--font-mono);text-align:center;padding:32px">No steps yet. Click <strong>+ Add step</strong> to add a free-form step${arrows.length ? ' or <strong>↺ Reset to auto-order</strong> to seed from the diagram' : ''}.</p>`;
     return;
   }
-  const arrowOptions = arrows.map(a => {
-    const f = (getNode(a.from) || {}).label || a.from;
-    const t = (getNode(a.to) || {}).label || a.to;
-    const tail = a.label ? ' — ' + a.label : '';
-    return `<option value="${escHtml(a.id)}">${escHtml(f + ' → ' + t + tail)}</option>`;
-  }).join('');
+  // Build the connection dropdown for a given step, with the "(no connection)"
+  // option first so a step can be pure narration (heading + details).
+  const optionsFor = (sel) => {
+    let html = `<option value="" ${!sel ? 'selected' : ''}>— no connection (narration only) —</option>`;
+    html += arrows.map(a => {
+      const f = (getNode(a.from) || {}).label || a.from;
+      const t = (getNode(a.to) || {}).label || a.to;
+      const tail = a.label ? ' — ' + a.label : '';
+      return `<option value="${escHtml(a.id)}" ${sel === a.id ? 'selected' : ''}>${escHtml(f + ' → ' + t + tail)}</option>`;
+    }).join('');
+    return html;
+  };
 
   list.innerHTML = _flowDraft.map((step, i) => `
     <div style="display:flex;gap:8px;align-items:flex-start;padding:8px;border:1px solid var(--border);border-radius:8px;background:var(--bg3);margin-bottom:6px">
@@ -7610,7 +7634,7 @@ function renderFlowEditor() {
         <button class="tb-btn" onclick="flowEditorMove(${i}, 1)" ${i === _flowDraft.length - 1 ? 'disabled' : ''} title="Move down" aria-label="Move down" style="padding:2px 6px;font-size:11px;line-height:1">↓</button>
       </div>
       <div style="flex:1;display:flex;flex-direction:column;gap:6px;min-width:0">
-        <select onchange="flowEditorChangeArrow(${i}, this.value)" class="prop-select" style="font-size:11px">${arrowOptions.replace(`value="${escHtml(step.arrow)}"`, `value="${escHtml(step.arrow)}" selected`)}</select>
+        <select onchange="flowEditorChangeArrow(${i}, this.value)" class="prop-select" style="font-size:11px">${optionsFor(step.arrow)}</select>
         <input type="text" oninput="flowEditorChangeTitle(${i}, this.value)" maxlength="80" placeholder="Heading for this step (e.g. 'User authentication')" value="${escHtml(step.title || '')}"
           style="width:100%;background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--text);font-family:var(--font-mono);font-size:11px;font-weight:700;padding:6px 8px">
         <textarea oninput="flowEditorChangeText(${i}, this.value)" rows="2" maxlength="280" placeholder="Narration for this step — what's happening here? (e.g. 'User logs in via Cognito; JWT is stored in browser cookie')"
@@ -8414,11 +8438,11 @@ ${svgMarkup}
   let _steps = []; // [{ arrow, text }]
 
   function buildSteps() {
-    if (!arrows.length) return [];
     if (playFlow.length) {
-      const r = playFlow.map(s => ({ arrow: arrowById.get(s.arrow), title: s.title || '', text: s.text || '' })).filter(s => s.arrow);
+      const r = playFlow.map(s => ({ arrow: (s.arrow && arrowById.get(s.arrow)) || null, title: s.title || '', text: s.text || '' })).filter(s => s.arrow || s.title || s.text);
       if (r.length) return r;
     }
+    if (!arrows.length) return [];
     // Fallback: BFS from nodes without incoming arrows.
     const inDeg = {}, outArrows = {};
     nodes.forEach(n => { inDeg[n.id] = 0; outArrows[n.id] = []; });
@@ -8443,15 +8467,17 @@ ${svgMarkup}
   function tick() {
     clearHi();
     if (_idx >= _steps.length) { stopPlay(); return; }
-    const step = _steps[_idx], a = step.arrow;
-    document.querySelector('[data-node-id="' + a.from + '"]')?.classList.add('playing-flow');
-    document.querySelector('[data-node-id="' + a.to   + '"]')?.classList.add('playing-flow');
-    document.querySelector('[data-arrow-id="' + a.id + '"]')?.classList.add('playing-flow');
-
-    const fromN = nodeById.get(a.from), toN = nodeById.get(a.to);
-    const summary = (fromN ? fromN.label : a.from) + ' → ' + (toN ? toN.label : a.to) + (a.label ? ' — ' + a.label : '');
+    const step = _steps[_idx], a = step.arrow;   // a is null for a free-form step
+    let summary = '';
+    if (a) {
+      document.querySelector('[data-node-id="' + a.from + '"]')?.classList.add('playing-flow');
+      document.querySelector('[data-node-id="' + a.to   + '"]')?.classList.add('playing-flow');
+      document.querySelector('[data-arrow-id="' + a.id + '"]')?.classList.add('playing-flow');
+      const fromN = nodeById.get(a.from), toN = nodeById.get(a.to);
+      summary = (fromN ? fromN.label : a.from) + ' → ' + (toN ? toN.label : a.to) + (a.label ? ' — ' + a.label : '');
+    }
     const ind = document.getElementById('potato-step-text');
-    ind.innerHTML = '<div class="counter">Step ' + (_idx + 1) + ' / ' + _steps.length + ' · ' + esc(summary) + '</div>'
+    ind.innerHTML = '<div class="counter">Step ' + (_idx + 1) + ' / ' + _steps.length + (summary ? ' · ' + esc(summary) : '') + '</div>'
       + (step.title ? '<div class="narration" style="font-weight:800">' + esc(step.title) + '</div>' : '')
       + (step.text ? '<div class="narration">' + esc(step.text) + '</div>' : '');
     ind.classList.add('show');
@@ -8715,8 +8741,11 @@ function loadDiagramData(data) {
   // Validate playFlow: keep only entries that reference an arrow we actually have.
   playFlow = Array.isArray(data.playFlow)
     ? data.playFlow
-        .filter(s => s && typeof s.arrow === 'string' && arrows.some(a => a.id === s.arrow))
-        .map(s => ({ arrow: s.arrow, title: String(s.title || '').slice(0, 80), text: String(s.text || '').slice(0, 280) }))
+        .map(s => {
+          const arrow = (typeof s.arrow === 'string' && arrows.some(a => a.id === s.arrow)) ? s.arrow : '';
+          return { arrow, title: String(s.title || '').slice(0, 80), text: String(s.text || '').slice(0, 280) };
+        })
+        .filter(s => s.arrow || s.title || s.text)
     : [];
   selectedIds.clear();
   selectedArrow = null;
@@ -9540,8 +9569,11 @@ function importFromAI() {
   const arrowIds = new Set(data.arrows.map(a => a.id));
   data.playFlow = Array.isArray(data.playFlow)
     ? data.playFlow
-        .filter(s => s && typeof s.arrow === 'string' && arrowIds.has(s.arrow))
-        .map(s => ({ arrow: s.arrow, text: String(s.text || '').slice(0, 280) }))
+        .map(s => {
+          const arrow = (s && typeof s.arrow === 'string' && arrowIds.has(s.arrow)) ? s.arrow : '';
+          return { arrow, title: String((s && s.title) || '').slice(0, 80), text: String((s && s.text) || '').slice(0, 280) };
+        })
+        .filter(s => s.arrow || s.title || s.text)
     : [];
 
   closeAiModal();
