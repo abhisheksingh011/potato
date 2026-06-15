@@ -8114,8 +8114,8 @@ async function exportPNG() {
     const base = (((document.getElementById('filename-input') || {}).value) || 'diagram')
       .trim().replace(/[^\w.-]+/g, '_') || 'diagram';
 
-    // Rasterize the SVG to a 2× PNG. encodeURIComponent keeps the unicode
-    // labels/emoji valid inside the data: URI.
+    // Rasterize the SVG to a high-resolution PNG (scale computed below).
+    // encodeURIComponent keeps the unicode labels/emoji valid in the data: URI.
     const svgUrl = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
     let img;
     try {
@@ -8129,23 +8129,46 @@ async function exportPNG() {
       return downloadSvgFallback(svg, base, 'Could not rasterize — saved as SVG instead.');
     }
 
-    const SCALE = 2;
     const W = img.naturalWidth || img.width, H = img.naturalHeight || img.height;
-    const canvas = document.createElement('canvas');
-    canvas.width = W * SCALE; canvas.height = H * SCALE;
-    const ctx = canvas.getContext('2d');
-    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+    // Maximise resolution: scale the diagram up as far as the browser's canvas
+    // limits allow so the exported PNG stays crisp when zoomed in, while still
+    // covering the whole diagram. Adaptive instead of a flat 2× — small diagrams
+    // get sharper, and very large ones are clamped so the export never fails.
+    const MAX_DIM  = 16384;               // hard per-side canvas limit (Chrome/FF)
+    const MAX_AREA = 256 * 1024 * 1024;   // ~268M px total-area ceiling
+    const TARGET_EDGE = 8192;             // aim for a crisp long edge
+    let SCALE = TARGET_EDGE / Math.max(W, H);
+    SCALE = Math.max(SCALE, 2);                                  // never below the old 2×
+    SCALE = Math.min(SCALE, MAX_DIM / W, MAX_DIM / H,            // fit per-side cap
+                     Math.sqrt(MAX_AREA / (W * H)));             // fit total-area cap
+    if (!isFinite(SCALE) || SCALE <= 0) SCALE = 1;
 
-    try {
-      canvas.toBlob((blob) => {
-        if (!blob) { downloadSvgFallback(svg, base, 'PNG was blocked by the browser — saved as SVG instead.'); return; }
-        triggerDownload(URL.createObjectURL(blob), base + '.png', true);
-        notify('Exported ' + base + '.png', 'success');
-      }, 'image/png');
-    } catch (_) {
-      // A tainted canvas throws synchronously on toBlob — fall back to SVG.
-      downloadSvgFallback(svg, base, 'PNG was blocked by the browser — saved as SVG instead.');
+    // Rasterize at SCALE; if the browser rejects the canvas (Safari/iOS have far
+    // smaller limits than the constants above), step the scale down and retry
+    // before giving up and saving an SVG.
+    const rasterAt = (scale) => new Promise((resolve) => {
+      try {
+        const canvas = document.createElement('canvas');
+        canvas.width  = Math.max(1, Math.round(W * scale));
+        canvas.height = Math.max(1, Math.round(H * scale));
+        const ctx = canvas.getContext('2d');
+        ctx.imageSmoothingEnabled = true;
+        ctx.imageSmoothingQuality = 'high';
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+        canvas.toBlob((blob) => resolve(blob || null), 'image/png');
+      } catch (_) {
+        resolve(null);   // tainted/oversized canvas throws synchronously
+      }
+    });
+
+    let blob = null, used = SCALE;
+    for (let scale = SCALE; scale >= 1; scale = (scale > 2 ? scale * 0.6 : scale - 0.5)) {
+      blob = await rasterAt(scale);
+      if (blob) { used = scale; break; }
     }
+    if (!blob) { downloadSvgFallback(svg, base, 'PNG was blocked by the browser — saved as SVG instead.'); return; }
+    triggerDownload(URL.createObjectURL(blob), base + '.png', true);
+    notify(`Exported ${base}.png (${Math.round(W * used)}×${Math.round(H * used)})`, 'success');
   } catch (err) {
     notify('PNG export failed: ' + ((err && err.message) || err), 'error');
   }
