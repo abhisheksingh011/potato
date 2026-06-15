@@ -463,14 +463,20 @@ body {
   50%      { transform: scale(1.6) translateY(-50%); box-shadow: 0 0 0 8px rgba(123,47,190,0); }
 }
 .port:hover { transform: scale(1.4); background: var(--teal); }
-.port.top    { top: -5px;    left: 50%; transform: translateX(-50%); }
-.port.bottom { bottom: -5px; left: 50%; transform: translateX(-50%); }
-.port.left   { left: -5px;  top: 50%; transform: translateY(-50%); }
-.port.right  { right: -5px; top: 50%; transform: translateY(-50%); }
-.port.top:hover    { top: -5px;    left: 50%; transform: translateX(-50%) scale(1.4); }
-.port.bottom:hover { bottom: -5px; left: 50%; transform: translateX(-50%) scale(1.4); }
-.port.left:hover   { left: -5px;  top: 50%; transform: translateY(-50%) scale(1.4); }
-.port.right:hover  { right: -5px; top: 50%; transform: translateY(-50%) scale(1.4); }
+/* 3 connection points per side (12 total). The side class sets the edge offset
+   and centring transform; the .pos-* class sets the position along that edge. */
+.port.top    { top: -5px;    transform: translateX(-50%); }
+.port.bottom { bottom: -5px; transform: translateX(-50%); }
+.port.left   { left: -5px;   transform: translateY(-50%); }
+.port.right  { right: -5px;  transform: translateY(-50%); }
+.port.top.pos-1,  .port.bottom.pos-1 { left: 25%; }
+.port.top.pos-2,  .port.bottom.pos-2 { left: 50%; }
+.port.top.pos-3,  .port.bottom.pos-3 { left: 75%; }
+.port.left.pos-1, .port.right.pos-1  { top: 25%; }
+.port.left.pos-2, .port.right.pos-2  { top: 50%; }
+.port.left.pos-3, .port.right.pos-3  { top: 75%; }
+.port.top:hover, .port.bottom:hover  { transform: translateX(-50%) scale(1.4); }
+.port.left:hover, .port.right:hover  { transform: translateY(-50%) scale(1.4); }
 
 /* Resize handle */
 .node-resize {
@@ -5093,10 +5099,18 @@ function renderNode(node) {
     <div class="node-name" data-field="label">${escHtml(node.label || '')}</div>
     ${isText ? '' : `<div class="node-sub" data-field="sublabel">${escHtml(node.sublabel || '')}</div>`}
     <div class="node-ports" aria-hidden="true">
-      <div class="port top"    data-node="${safeId}" data-port="top"></div>
-      <div class="port bottom" data-node="${safeId}" data-port="bottom"></div>
-      <div class="port left"   data-node="${safeId}" data-port="left"></div>
-      <div class="port right"  data-node="${safeId}" data-port="right"></div>
+      <div class="port top pos-1"    data-node="${safeId}" data-port="top-1"></div>
+      <div class="port top pos-2"    data-node="${safeId}" data-port="top"></div>
+      <div class="port top pos-3"    data-node="${safeId}" data-port="top-2"></div>
+      <div class="port bottom pos-1" data-node="${safeId}" data-port="bottom-1"></div>
+      <div class="port bottom pos-2" data-node="${safeId}" data-port="bottom"></div>
+      <div class="port bottom pos-3" data-node="${safeId}" data-port="bottom-2"></div>
+      <div class="port left pos-1"   data-node="${safeId}" data-port="left-1"></div>
+      <div class="port left pos-2"   data-node="${safeId}" data-port="left"></div>
+      <div class="port left pos-3"   data-node="${safeId}" data-port="left-2"></div>
+      <div class="port right pos-1"  data-node="${safeId}" data-port="right-1"></div>
+      <div class="port right pos-2"  data-node="${safeId}" data-port="right"></div>
+      <div class="port right pos-3"  data-node="${safeId}" data-port="right-2"></div>
     </div>
     <div class="node-resize" data-resize="${safeId}" aria-hidden="true"></div>
   `;
@@ -5559,6 +5573,22 @@ function startArrowEndpointDrag(arrowId, end, e) {
   window.addEventListener('pointercancel', onUp);
 }
 
+// A node exposes 3 connection points per side (12 total). A port id is the
+// side name, optionally suffixed -1 / -2 for the two off-centre points; the
+// bare side name is the centre point (kept so older saved diagrams still load).
+function portSide(port) {
+  const p = port || '';
+  const i = p.indexOf('-');
+  return i < 0 ? p : p.slice(0, i);
+}
+// Fraction along the side's edge: 0.25 (-1), 0.5 (centre), 0.75 (-2).
+function portFrac(port) {
+  const i = (port || '').indexOf('-');
+  if (i < 0) return 0.5;
+  const s = port.slice(i + 1);
+  return s === '1' ? 0.25 : s === '2' ? 0.75 : 0.5;
+}
+
 function getPortCenter(nodeId, port) {
   const n = getNode(nodeId);
   const el = document.getElementById('node-' + nodeId);
@@ -5567,10 +5597,11 @@ function getPortCenter(nodeId, port) {
   const h = el.offsetHeight;
   const cx = n.x + w / 2;
   const cy = n.y + h / 2;
-  if (port === 'top')    return { x: cx, y: n.y };
-  if (port === 'bottom') return { x: cx, y: n.y + h };
-  if (port === 'left')   return { x: n.x, y: cy };
-  if (port === 'right')  return { x: n.x + w, y: cy };
+  const side = portSide(port), f = portFrac(port);
+  if (side === 'top')    return { x: n.x + w * f, y: n.y };
+  if (side === 'bottom') return { x: n.x + w * f, y: n.y + h };
+  if (side === 'left')   return { x: n.x, y: n.y + h * f };
+  if (side === 'right')  return { x: n.x + w, y: n.y + h * f };
   return { x: cx, y: cy };
 }
 
@@ -5615,8 +5646,8 @@ function drawArrow(arrow) {
   });
   // Manual spacing: a dragged midline is stored as midX (when both ports are
   // horizontal — the S-bend midline is vertical) or midY (both vertical).
-  const _fromH = fp === 'left' || fp === 'right';
-  const _toH   = tp === 'left' || tp === 'right';
+  const _fromH = portSide(fp) === 'left' || portSide(fp) === 'right';
+  const _toH   = portSide(tp) === 'left' || portSide(tp) === 'right';
   const manualMid = (_fromH && _toH) ? arrow.midX : (!_fromH && !_toH ? arrow.midY : undefined);
   const routePoints = orthogonalRoute(from, fp, to, tp, obstacles, manualMid);
   const dStr = pointsToRoundedPath(routePoints);
@@ -5725,10 +5756,11 @@ const ORTH_OBSTACLE_PAD = 12;   // extra clearance around node rects
 const ORTH_CORNER_RADIUS = 8;   // rounded-corner radius for rendering
 
 function portOffsetPoint(pt, port, d) {
-  if (port === 'right')  return { x: pt.x + d, y: pt.y };
-  if (port === 'left')   return { x: pt.x - d, y: pt.y };
-  if (port === 'bottom') return { x: pt.x, y: pt.y + d };
-  if (port === 'top')    return { x: pt.x, y: pt.y - d };
+  const side = portSide(port);
+  if (side === 'right')  return { x: pt.x + d, y: pt.y };
+  if (side === 'left')   return { x: pt.x - d, y: pt.y };
+  if (side === 'bottom') return { x: pt.x, y: pt.y + d };
+  if (side === 'top')    return { x: pt.x, y: pt.y - d };
   return { x: pt.x + d, y: pt.y };
 }
 
@@ -5782,8 +5814,8 @@ function buildOrthPath(from, fromPort, to, toPort, opts) {
   opts = opts || {};
   const exit  = portOffsetPoint(from, fromPort, ORTH_STUB);
   const entry = portOffsetPoint(to,   toPort,   ORTH_STUB);
-  const fromH = fromPort === 'left' || fromPort === 'right';
-  const toH   = toPort   === 'left' || toPort   === 'right';
+  const fromH = portSide(fromPort) === 'left' || portSide(fromPort) === 'right';
+  const toH   = portSide(toPort)   === 'left' || portSide(toPort)   === 'right';
   const pts = [from, exit];
 
   if (fromH && toH) {
@@ -5820,8 +5852,8 @@ function orthogonalRoute(from, fromPort, to, toPort, obstacles, manualMid) {
   const def = buildOrthPath(from, fromPort, to, toPort);
   if (!obstacles || !obstacles.length || !pathHitsAnyRect(def, obstacles)) return def;
   // Try shifting the midline around the obstacles (S-bend variants only).
-  const fromH = fromPort === 'left' || fromPort === 'right';
-  const toH   = toPort   === 'left' || toPort   === 'right';
+  const fromH = portSide(fromPort) === 'left' || portSide(fromPort) === 'right';
+  const toH   = portSide(toPort)   === 'left' || portSide(toPort)   === 'right';
   if (fromH === toH) {
     // Gather candidate midlines: the outer edges of every obstacle ± pad.
     const candidates = [];
@@ -5920,8 +5952,8 @@ function renderEndpointHandles(arrow) {
   // Mid handle: drag the middle segment to adjust spacing without moving the
   // endpoints. Only meaningful for S-bend routes (both ports on the same
   // axis); for L-bends there is no straight midline to slide.
-  const fromHoriz = fp === 'left' || fp === 'right';
-  const toHoriz   = tp === 'left' || tp === 'right';
+  const fromHoriz = portSide(fp) === 'left' || portSide(fp) === 'right';
+  const toHoriz   = portSide(tp) === 'left' || portSide(tp) === 'right';
   if (fromHoriz === toHoriz) {
     const m = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
     m.setAttribute('class', 'arrow-mid-handle');
@@ -5952,7 +5984,7 @@ function startArrowMidDrag(arrowId, e) {
   const arrow = arrows.find(a => a.id === arrowId);
   if (!arrow) return;
   const fp = arrow.fromPort || getBestPorts(arrow.from, arrow.to).fp;
-  const horiz = fp === 'left' || fp === 'right';
+  const horiz = portSide(fp) === 'left' || portSide(fp) === 'right';
   pushHistory();
   const onMove = (e2) => {
     const rect = canvasArea.getBoundingClientRect();
@@ -8485,8 +8517,8 @@ async function buildDiagramSVG(theme = 'dark') {
       const ne = document.getElementById('node-' + n.id);
       return { x: n.x + ox, y: n.y + oy, w: ne ? ne.offsetWidth : 160, h: ne ? ne.offsetHeight : 80 };
     });
-    const efH = fp === 'left' || fp === 'right';
-    const etH = tp === 'left' || tp === 'right';
+    const efH = portSide(fp) === 'left' || portSide(fp) === 'right';
+    const etH = portSide(tp) === 'left' || portSide(tp) === 'right';
     // midX/midY are stored in raw world coords; the export shifts everything by
     // (ox, oy), so the manual midline must be shifted to match or the dragged
     // arrow's jog lands in the wrong place and renders distorted.
@@ -8670,18 +8702,20 @@ function buildIconDataUrlsForNodes(nodeList) {
 
 function portPos(n, nw, nh, port, ox, oy) {
   const cx = n.x + nw/2 + ox, cy = n.y + nh/2 + oy;
-  if (port==='top')    return {x:cx, y:n.y+oy};
-  if (port==='bottom') return {x:cx, y:n.y+nh+oy};
-  if (port==='left')   return {x:n.x+ox, y:cy};
-  if (port==='right')  return {x:n.x+nw+ox, y:cy};
+  const side = portSide(port), f = portFrac(port);
+  if (side==='top')    return {x:n.x+nw*f+ox, y:n.y+oy};
+  if (side==='bottom') return {x:n.x+nw*f+ox, y:n.y+nh+oy};
+  if (side==='left')   return {x:n.x+ox, y:n.y+nh*f+oy};
+  if (side==='right')  return {x:n.x+nw+ox, y:n.y+nh*f+oy};
   return {x:cx, y:cy};
 }
 
 function portOffset(pt, port, dist) {
-  if (port==='right')  return {x:pt.x+dist, y:pt.y};
-  if (port==='left')   return {x:pt.x-dist, y:pt.y};
-  if (port==='bottom') return {x:pt.x, y:pt.y+dist};
-  if (port==='top')    return {x:pt.x, y:pt.y-dist};
+  const side = portSide(port);
+  if (side==='right')  return {x:pt.x+dist, y:pt.y};
+  if (side==='left')   return {x:pt.x-dist, y:pt.y};
+  if (side==='bottom') return {x:pt.x, y:pt.y+dist};
+  if (side==='top')    return {x:pt.x, y:pt.y-dist};
   return {x:pt.x+dist, y:pt.y};
 }
 
@@ -9324,7 +9358,9 @@ function importFromAI() {
   // Validate and sanitize nodes — count how many fields had to be coerced
   // so we can warn the user rather than silently rewriting their data.
   const validThemes = ['green','orange','blue','purple','red','teal','pink','yellow','cyan','gray','gradient'];
-  const validPorts  = ['top','bottom','left','right'];
+  const validPorts  = ['top','bottom','left','right',
+                       'top-1','top-2','bottom-1','bottom-2',
+                       'left-1','left-2','right-1','right-2'];
   const validColors = ['default','green','blue','purple','red','teal','orange','pink','yellow'];
   const validStyles = ['solid','dashed','dotted'];
   let sanitized = 0;
