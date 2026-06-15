@@ -5712,6 +5712,7 @@ function drawArrow(arrow) {
     const labelY = mid.y - 5 + (pidx - (parallels.length - 1) / 2) * 14;
     lbl.setAttribute('x', mid.x);
     lbl.setAttribute('y', labelY);
+    lbl.setAttribute('font-weight', arrow.bold ? '700' : '400');
     lbl.textContent = arrow.label;
   } else if (lbl) {
     lbl.remove();
@@ -6792,6 +6793,12 @@ function renderArrowProps(arrow) {
           <option value="dashed" ${arrow.style==='dashed'?'selected':''}>Dashed</option>
           <option value="dotted" ${arrow.style==='dotted'?'selected':''}>Dotted</option>
         </select>
+      </div>
+      <div class="prop-row">
+        <label class="prop-checkbox">
+          <input type="checkbox" ${arrow.bold?'checked':''} onchange="updateArrowProp('${arrow.id}','bold',this.checked)">
+          Bold label
+        </label>
       </div>
       <div class="prop-row">
         <label class="prop-checkbox">
@@ -8535,7 +8542,7 @@ async function buildDiagramSVG(theme = 'dark') {
 `;
     if (a.label) {
       const mid = midpointOfPolyline(routePts);
-      arrowLabels.push({ x: mid.x, y: mid.y - 4, text: a.label });
+      arrowLabels.push({ x: mid.x, y: mid.y - 4, text: a.label, bold: !!a.bold });
     }
   });
 
@@ -8557,12 +8564,12 @@ async function buildDiagramSVG(theme = 'dark') {
         }
       }
     }
-    _placed.push({ x: lb.x, y, text: lb.text });
+    _placed.push({ x: lb.x, y, text: lb.text, bold: lb.bold });
   });
   _placed.forEach(lb => {
     const w = lb.text.length * _CW + 6;
     svg += `  <rect x="${(lb.x - w / 2).toFixed(1)}" y="${(lb.y - 9).toFixed(1)}" width="${w.toFixed(1)}" height="12" rx="3" fill="${P.bg}" opacity="0.85"/>
-  <text class="arrow-label" x="${lb.x.toFixed(1)}" y="${lb.y.toFixed(1)}" text-anchor="middle" font-size="9" fill="${P.sub}">${escHtml(lb.text)}</text>
+  <text class="arrow-label" x="${lb.x.toFixed(1)}" y="${lb.y.toFixed(1)}" text-anchor="middle" font-size="9" font-weight="${lb.bold ? '700' : '400'}" fill="${P.sub}">${escHtml(lb.text)}</text>
 `;
   });
 
@@ -9420,6 +9427,7 @@ function importFromAI() {
       color:     colorOk    ? a.color    : 'default',
       style:     styleOk    ? a.style    : 'solid',
       label:     a.label || '',
+      bold:      !!a.bold,
       animated:  !!a.animated,
     };
   }).filter(a => {
