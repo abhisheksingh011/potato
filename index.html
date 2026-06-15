@@ -5627,6 +5627,9 @@ function getBestPorts(fromId, toId) {
 }
 
 // ===== DRAW ARROWS =====
+// Transient cache (not persisted) of each arrow's geometric route midpoint,
+// so a dragged label can be stored as an offset relative to it.
+const arrowLabelMids = new Map();
 // Reuses existing SVG elements when possible — only attributes are updated
 // during drag/resize, dramatically cutting GC pressure on large diagrams.
 function drawArrow(arrow) {
@@ -5700,17 +5703,32 @@ function drawArrow(arrow) {
       lbl = document.createElementNS('http://www.w3.org/2000/svg', 'text');
       lbl.setAttribute('class', 'arrow-label');
       lbl.setAttribute('text-anchor', 'middle');
+      // The label is draggable: grab it to reposition, double-click to edit
+      // the text, and the context menu resets it to the auto midpoint.
+      lbl.style.pointerEvents = 'all';
+      lbl.style.cursor = 'move';
+      lbl.addEventListener('pointerdown', (e) => {
+        e.stopPropagation(); e.preventDefault();
+        startArrowLabelDrag(arrow.id, e, e.currentTarget);
+      });
+      lbl.addEventListener('dblclick', (e) => { e.stopPropagation(); promptArrowLabel(arrow.id, e); });
+      lbl.addEventListener('contextmenu', (e) => { e.preventDefault(); selectArrow(arrow.id); showArrowContextMenu(e, arrow.id); });
       g.appendChild(lbl);
     }
     const mid = midpointOfPolyline(routePoints);
+    // Cache the geometric midpoint so a manual drag can store the label as an
+    // offset relative to it — that way the label follows when nodes move.
+    arrowLabelMids.set(arrow.id, { x: mid.x, y: mid.y });
     // Stagger labels vertically when multiple arrows share the same from↔to pair
     const parallels = arrows.filter(a => a.label && (
       (a.from === arrow.from && a.to === arrow.to) ||
       (a.from === arrow.to   && a.to === arrow.from)
     ));
     const pidx = parallels.findIndex(a => a.id === arrow.id);
-    const labelY = mid.y - 5 + (pidx - (parallels.length - 1) / 2) * 14;
-    lbl.setAttribute('x', mid.x);
+    const hasManual = (arrow.labelDx != null && arrow.labelDy != null);
+    const labelX = hasManual ? mid.x + arrow.labelDx : mid.x;
+    const labelY = hasManual ? mid.y + arrow.labelDy : (mid.y - 5 + (pidx - (parallels.length - 1) / 2) * 14);
+    lbl.setAttribute('x', labelX);
     lbl.setAttribute('y', labelY);
     lbl.setAttribute('font-weight', arrow.bold ? '700' : '400');
     lbl.textContent = arrow.label;
@@ -6017,6 +6035,53 @@ function resetArrowMid(arrowId) {
   notify('Arrow routing reset to automatic', 'info');
 }
 
+// Drag an arrow's label to reposition it. Stored as labelDx/labelDy — an offset
+// from the route's geometric midpoint (cached in arrowLabelMids during draw)
+// so the label keeps its relative placement as the arrow reroutes.
+function startArrowLabelDrag(arrowId, e, lbl) {
+  const arrow = arrows.find(a => a.id === arrowId);
+  if (!arrow || !lbl) return;
+  pushHistory();
+  selectArrow(arrowId);
+  const rect0 = canvasArea.getBoundingClientRect();
+  const startWx = (e.clientX - rect0.left - panX) / zoom;
+  const startWy = (e.clientY - rect0.top  - panY) / zoom;
+  // Offset between the cursor and the label's current position, so the label
+  // doesn't jump to centre on the cursor when grabbed.
+  const grabX = (parseFloat(lbl.getAttribute('x')) || 0) - startWx;
+  const grabY = (parseFloat(lbl.getAttribute('y')) || 0) - startWy;
+  const onMove = (e2) => {
+    const rect = canvasArea.getBoundingClientRect();
+    const wx = (e2.clientX - rect.left - panX) / zoom;
+    const wy = (e2.clientY - rect.top  - panY) / zoom;
+    const base = arrowLabelMids.get(arrow.id) || { x: wx, y: wy };
+    arrow.labelDx = (wx + grabX) - base.x;
+    arrow.labelDy = (wy + grabY) - base.y;
+    drawArrow(arrow);
+  };
+  const onUp = () => {
+    markDirty();
+    window.removeEventListener('pointermove', onMove);
+    window.removeEventListener('pointerup', onUp);
+    window.removeEventListener('pointercancel', onUp);
+  };
+  window.addEventListener('pointermove', onMove);
+  window.addEventListener('pointerup', onUp);
+  window.addEventListener('pointercancel', onUp);
+}
+
+// Restore an arrow's label to its automatic midpoint position.
+function resetArrowLabelPos(arrowId) {
+  const arrow = arrows.find(a => a.id === arrowId);
+  if (!arrow) return;
+  pushHistory();
+  delete arrow.labelDx;
+  delete arrow.labelDy;
+  drawArrow(arrow);
+  markDirty();
+  notify('Label position reset', 'info');
+}
+
 function selectArrow(id) {
   clearSelection();
   selectedArrow = id;
@@ -6046,8 +6111,12 @@ function promptArrowLabel(arrowId, e) {
   const tw = tel ? tel.offsetWidth : 160, th = tel ? tel.offsetHeight : 80;
   const from = getPortCenter(arrow.from, arrow.fromPort || 'right');
   const to   = getPortCenter(arrow.to,   arrow.toPort   || 'left');
-  const mx = (from.x + to.x) / 2;
-  const my = (from.y + to.y) / 2;
+  // Prefer the route midpoint cached during draw; apply any manual label offset
+  // so the editor opens right over the label wherever the user dragged it.
+  const _lm = arrowLabelMids.get(arrow.id);
+  let mx = _lm ? _lm.x : (from.x + to.x) / 2;
+  let my = _lm ? _lm.y : (from.y + to.y) / 2;
+  if (arrow.labelDx != null && arrow.labelDy != null) { mx += arrow.labelDx; my += arrow.labelDy; }
   const rect = canvasArea.getBoundingClientRect();
   const screenX = rect.left + mx * zoom + panX;
   const screenY = rect.top  + my * zoom + panY;
@@ -7144,9 +7213,12 @@ function canvasCtx(action) {
 
 function showArrowContextMenu(e, id) {
   ctxTargetId = id;
+  const arrow = arrows.find(a => a.id === id);
+  const moved = arrow && arrow.labelDx != null && arrow.labelDy != null;
   const menu = document.getElementById('context-menu');
   menu.innerHTML = `
     <div class="ctx-item" onclick="promptArrowLabel('${id}',null)">✏️ Edit Label</div>
+    ${moved ? `<div class="ctx-item" onclick="document.getElementById('context-menu').style.display='none';resetArrowLabelPos('${id}')">↔️ Reset Label Position</div>` : ''}
     <div class="ctx-sep"></div>
     <div class="ctx-item danger" onclick="deleteArrow('${id}')">🗑️ Delete Connection</div>`;
   menu.style.display = 'block';
@@ -8542,7 +8614,9 @@ async function buildDiagramSVG(theme = 'dark') {
 `;
     if (a.label) {
       const mid = midpointOfPolyline(routePts);
-      arrowLabels.push({ x: mid.x, y: mid.y - 4, text: a.label, bold: !!a.bold });
+      const lx = (a.labelDx != null) ? mid.x + a.labelDx : mid.x;
+      const ly = (a.labelDy != null) ? mid.y + a.labelDy : mid.y - 4;
+      arrowLabels.push({ x: lx, y: ly, text: a.label, bold: !!a.bold });
     }
   });
 
@@ -9429,6 +9503,8 @@ function importFromAI() {
       label:     a.label || '',
       bold:      !!a.bold,
       animated:  !!a.animated,
+      ...(typeof a.labelDx === 'number' ? { labelDx: a.labelDx } : {}),
+      ...(typeof a.labelDy === 'number' ? { labelDy: a.labelDy } : {}),
     };
   }).filter(a => {
     if (!a.from || !a.to) { droppedArrows.push(a.id); return false; }
