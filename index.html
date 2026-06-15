@@ -9412,8 +9412,11 @@ function importFromAI() {
       id:        a.id || ('a_import_' + i),
       from:      a.from || a.source || a.fromId || '',
       to:        a.to   || a.target || a.toId   || '',
-      fromPort:  fromPortOk ? a.fromPort : 'right',
-      toPort:    toPortOk   ? a.toPort   : 'left',
+      // Leave un-specified ports null so distributeImportPorts() can spread
+      // multiple connections on a node across its 12 points instead of
+      // stacking them all on right/left.
+      fromPort:  fromPortOk ? a.fromPort : null,
+      toPort:    toPortOk   ? a.toPort   : null,
       color:     colorOk    ? a.color    : 'default',
       style:     styleOk    ? a.style    : 'solid',
       label:     a.label || '',
@@ -9423,6 +9426,10 @@ function importFromAI() {
     if (!a.from || !a.to) { droppedArrows.push(a.id); return false; }
     return true;
   });
+
+  // Spread each node's connections across its 12 ports so arrows don't all
+  // stack on a single point. AI-specified ports are honoured & reserved.
+  distributeImportPorts(data.nodes, data.arrows);
 
   data.groups = (data.groups || data.swimlanes || []).map((g, i) => ({
     id:    g.id || ('g_import_' + i),
@@ -9450,6 +9457,79 @@ function importFromAI() {
   if (sanitized) notify(`⚠️ ${sanitized} invalid value(s) auto-corrected. Check colors/ports/themes.`, 'warning');
   if (droppedArrows.length) notify(`⚠️ Dropped ${droppedArrows.length} connection(s) with missing endpoints.`, 'warning');
   if (iconRescued) notify(`🔧 ${iconRescued} icon path(s) didn't match our catalog — rescued from node type.`, 'info');
+}
+
+// When an AI diagram is imported, multiple arrows touching the same node would
+// otherwise all land on one port (right/left), overlapping badly. This spreads
+// each node's connections across its 12 ports: for every endpoint it picks the
+// geometrically-facing side toward the other node, then takes the next free
+// point on that side (centre → 25% → 75%), overflowing to the other sides so
+// all 12 distinct points are used before any point repeats.
+function distributeImportPorts(nodes, arrows) {
+  if (!Array.isArray(nodes) || !Array.isArray(arrows)) return;
+  const nodeById = new Map(nodes.map(n => [n.id, n]));
+  const centerOf = (n) => ({
+    x: (n.x || 0) + (n.w || 160) / 2,
+    y: (n.y || 0) + (n.h || 80) / 2,
+  });
+  const SIDE_PORTS = {
+    top:    ['top',    'top-1',    'top-2'],
+    bottom: ['bottom', 'bottom-1', 'bottom-2'],
+    left:   ['left',   'left-1',   'left-2'],
+    right:  ['right',  'right-1',  'right-2'],
+  };
+  const ALL_SIDES = ['right', 'left', 'bottom', 'top'];
+  // Full 12-port preference order for a given facing side: that side's 3 points
+  // first, then the remaining sides' points.
+  const orderFor = (side) => [
+    ...SIDE_PORTS[side],
+    ...ALL_SIDES.filter(s => s !== side).flatMap(s => SIDE_PORTS[s]),
+  ];
+  const sideToward = (a, b) => {
+    const dx = b.x - a.x, dy = b.y - a.y;
+    if (Math.abs(dx) >= Math.abs(dy)) return dx >= 0 ? 'right' : 'left';
+    return dy >= 0 ? 'bottom' : 'top';
+  };
+
+  const used   = new Map(); // nodeId -> Set of ports already taken
+  const counts = new Map(); // nodeId -> total endpoints assigned (for overflow)
+  const reserve = (nodeId, port) => {
+    if (!nodeId || !port) return;
+    if (!used.has(nodeId)) used.set(nodeId, new Set());
+    used.get(nodeId).add(port);
+  };
+  const assign = (nodeId, side) => {
+    if (!used.has(nodeId)) used.set(nodeId, new Set());
+    const u = used.get(nodeId);
+    const c = counts.get(nodeId) || 0;
+    counts.set(nodeId, c + 1);
+    const seq = orderFor(side);
+    for (const p of seq) {
+      if (!u.has(p)) { u.add(p); return p; }
+    }
+    // All 12 points taken — repeat, round-robin by assignment count.
+    return seq[c % seq.length];
+  };
+
+  // Pass 1: reserve any ports the AI explicitly set, so auto-assignment avoids
+  // them and starts fresh on the remaining free points.
+  for (const a of arrows) {
+    if (a.fromPort) reserve(a.from, a.fromPort);
+    if (a.toPort)   reserve(a.to,   a.toPort);
+  }
+
+  // Pass 2: fill the un-specified endpoints, facing toward the opposite node.
+  for (const a of arrows) {
+    const fn = nodeById.get(a.from), tn = nodeById.get(a.to);
+    if (!a.fromPort) {
+      const side = (fn && tn) ? sideToward(centerOf(fn), centerOf(tn)) : 'right';
+      a.fromPort = assign(a.from, side);
+    }
+    if (!a.toPort) {
+      const side = (fn && tn) ? sideToward(centerOf(tn), centerOf(fn)) : 'left';
+      a.toPort = assign(a.to, side);
+    }
+  }
 }
 
 function showAiError(msg) {
