@@ -1637,7 +1637,7 @@ kbd {
 let nodes = [];       // { id, x, y, w, h, type, label, sublabel, category, icon, theme, zIndex }
 let arrows = [];      // { id, from, to, fromPort, toPort, color, style, label, animated }
 let groups = [];      // { id, x, y, w, h, label, color }
-let playFlow = [];    // OPTIONAL ordered narration: [{ arrow: arrowId, text: "User opens app..." }, ...]
+let playFlow = [];    // OPTIONAL ordered narration: [{ arrow: arrowId, title: "Auth", text: "User opens app..." }, ...]
 let selectedIds = new Set();
 let selectedArrow = null;
 let selectedGroup = null;
@@ -7367,7 +7367,7 @@ function buildPlaySteps() {
   if (playFlow && playFlow.length) {
     const byId = new Map(arrows.map(a => [a.id, a]));
     const authored = playFlow
-      .map(s => ({ arrow: byId.get(s.arrow), text: s.text || '' }))
+      .map(s => ({ arrow: byId.get(s.arrow), title: s.title || '', text: s.text || '' }))
       .filter(s => s.arrow);
     if (authored.length) return authored;
   }
@@ -7466,11 +7466,13 @@ function runPlayStep() {
   const toName   = (getNode(arrow.to)   || {}).label || arrow.to;
   const arrowSummary = `${fromName} → ${toName}${arrow.label ? ' — ' + arrow.label : ''}`;
   const counter = `Step ${_playFlowIdx + 1} / ${total}`;
-  // Narration if present takes the spotlight; fall back to from→to summary.
+  // Heading (if set) is the spotlight; narration sits below; both fall back to
+  // the from→to summary.
   const ind = document.getElementById('play-indicator');
-  ind.innerHTML = step.text
+  ind.innerHTML = (step.title || step.text)
     ? `<div style="font-size:10px;opacity:0.7;letter-spacing:0.5px;text-transform:uppercase">${counter} · ${escHtml(arrowSummary)}</div>
-       <div style="font-size:13px;margin-top:4px;color:var(--text)">${escHtml(step.text)}</div>`
+       ${step.title ? `<div style="font-size:14px;font-weight:800;margin-top:4px;color:var(--text)">${escHtml(step.title)}</div>` : ''}
+       ${step.text ? `<div style="font-size:13px;margin-top:${step.title ? '2' : '4'}px;color:var(--text)">${escHtml(step.text)}</div>` : ''}`
     : `${counter} · ${escHtml(arrowSummary)}`;
 
   _playFlowIdx++;
@@ -7490,9 +7492,9 @@ function showFlowEditor() {
   // Seed the draft: if playFlow has entries, use them; otherwise materialize the auto-order
   // so the user can edit it from a real starting point.
   if (playFlow && playFlow.length) {
-    _flowDraft = playFlow.map(s => ({ arrow: s.arrow, text: s.text || '' }));
+    _flowDraft = playFlow.map(s => ({ arrow: s.arrow, title: s.title || '', text: s.text || '' }));
   } else {
-    _flowDraft = buildPlaySteps().map(s => ({ arrow: s.arrow.id, text: '' }));
+    _flowDraft = buildPlaySteps().map(s => ({ arrow: s.arrow.id, title: '', text: '' }));
   }
   renderFlowEditor();
   document.getElementById('flow-editor-overlay').style.display = 'flex';
@@ -7503,7 +7505,7 @@ function closeFlowEditor(save) {
     pushHistory();
     // Only keep steps that still reference an existing arrow.
     const ids = new Set(arrows.map(a => a.id));
-    playFlow = _flowDraft.filter(s => ids.has(s.arrow)).map(s => ({ arrow: s.arrow, text: (s.text || '').trim() }));
+    playFlow = _flowDraft.filter(s => ids.has(s.arrow)).map(s => ({ arrow: s.arrow, title: (s.title || '').trim(), text: (s.text || '').trim() }));
     markDirty();
     notify(`Saved ${playFlow.length} step${playFlow.length !== 1 ? 's' : ''}`);
   }
@@ -7516,13 +7518,13 @@ function flowEditorAddStep() {
   const usedIds = new Set(_flowDraft.map(s => s.arrow));
   const next = arrows.find(a => !usedIds.has(a.id)) || arrows[0];
   if (!next) return;
-  _flowDraft.push({ arrow: next.id, text: '' });
+  _flowDraft.push({ arrow: next.id, title: '', text: '' });
   renderFlowEditor();
 }
 
 function flowEditorResetToAuto() {
   if (!confirm('Replace the current sequence with the auto-derived BFS order? Edits will be lost.')) return;
-  _flowDraft = buildPlaySteps().map(s => ({ arrow: s.arrow.id, text: '' }));
+  _flowDraft = buildPlaySteps().map(s => ({ arrow: s.arrow.id, title: '', text: '' }));
   renderFlowEditor();
 }
 
@@ -7549,7 +7551,8 @@ function flowEditorDownload() {
     const f = (getNode(a.from) || {}).label || a.from;
     const t = (getNode(a.to) || {}).label || a.to;
     const hop = a.label ? `${f} → ${t} (${a.label})` : `${f} → ${t}`;
-    lines.push(`${n}. ${hop}`);
+    const head = (step.title || '').trim();
+    lines.push(`${n}. ${head ? head + ' — ' : ''}${hop}`);
     if ((step.text || '').trim()) lines.push(`   ${step.text.trim()}`);
     lines.push('');
   });
@@ -7582,6 +7585,9 @@ function flowEditorChangeArrow(i, arrowId) {
 function flowEditorChangeText(i, text) {
   _flowDraft[i].text = String(text || '').slice(0, 280);
 }
+function flowEditorChangeTitle(i, title) {
+  _flowDraft[i].title = String(title || '').slice(0, 80);
+}
 
 function renderFlowEditor() {
   const list = document.getElementById('flow-editor-list');
@@ -7605,6 +7611,8 @@ function renderFlowEditor() {
       </div>
       <div style="flex:1;display:flex;flex-direction:column;gap:6px;min-width:0">
         <select onchange="flowEditorChangeArrow(${i}, this.value)" class="prop-select" style="font-size:11px">${arrowOptions.replace(`value="${escHtml(step.arrow)}"`, `value="${escHtml(step.arrow)}" selected`)}</select>
+        <input type="text" oninput="flowEditorChangeTitle(${i}, this.value)" maxlength="80" placeholder="Heading for this step (e.g. 'User authentication')" value="${escHtml(step.title || '')}"
+          style="width:100%;background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--text);font-family:var(--font-mono);font-size:11px;font-weight:700;padding:6px 8px">
         <textarea oninput="flowEditorChangeText(${i}, this.value)" rows="2" maxlength="280" placeholder="Narration for this step — what's happening here? (e.g. 'User logs in via Cognito; JWT is stored in browser cookie')"
           style="width:100%;background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--text);font-family:var(--font-mono);font-size:11px;padding:6px 8px;resize:vertical;line-height:1.5">${escHtml(step.text || '')}</textarea>
       </div>
@@ -8408,7 +8416,7 @@ ${svgMarkup}
   function buildSteps() {
     if (!arrows.length) return [];
     if (playFlow.length) {
-      const r = playFlow.map(s => ({ arrow: arrowById.get(s.arrow), text: s.text || '' })).filter(s => s.arrow);
+      const r = playFlow.map(s => ({ arrow: arrowById.get(s.arrow), title: s.title || '', text: s.text || '' })).filter(s => s.arrow);
       if (r.length) return r;
     }
     // Fallback: BFS from nodes without incoming arrows.
@@ -8443,7 +8451,9 @@ ${svgMarkup}
     const fromN = nodeById.get(a.from), toN = nodeById.get(a.to);
     const summary = (fromN ? fromN.label : a.from) + ' → ' + (toN ? toN.label : a.to) + (a.label ? ' — ' + a.label : '');
     const ind = document.getElementById('potato-step-text');
-    ind.innerHTML = '<div class="counter">Step ' + (_idx + 1) + ' / ' + _steps.length + ' · ' + esc(summary) + '</div>' + (step.text ? '<div class="narration">' + esc(step.text) + '</div>' : '');
+    ind.innerHTML = '<div class="counter">Step ' + (_idx + 1) + ' / ' + _steps.length + ' · ' + esc(summary) + '</div>'
+      + (step.title ? '<div class="narration" style="font-weight:800">' + esc(step.title) + '</div>' : '')
+      + (step.text ? '<div class="narration">' + esc(step.text) + '</div>' : '');
     ind.classList.add('show');
     _idx++;
   }
@@ -8706,7 +8716,7 @@ function loadDiagramData(data) {
   playFlow = Array.isArray(data.playFlow)
     ? data.playFlow
         .filter(s => s && typeof s.arrow === 'string' && arrows.some(a => a.id === s.arrow))
-        .map(s => ({ arrow: s.arrow, text: String(s.text || '').slice(0, 280) }))
+        .map(s => ({ arrow: s.arrow, title: String(s.title || '').slice(0, 80), text: String(s.text || '').slice(0, 280) }))
     : [];
   selectedIds.clear();
   selectedArrow = null;
@@ -9266,12 +9276,13 @@ PLAY FLOW (REQUIRED — embed inside the JSON, never as separate prose)
 ═══════════════════════════════════════════════════════════════
 
 "playFlow": [
-  { "arrow": "a_1", "text": "Using SFTP connectors with AWS Transfer Family, invoices are uploaded to an Amazon Simple Storage Service (Amazon S3) bucket." },
-  { "arrow": "a_2", "text": "The upload generates an S3 event into an Amazon EventBridge bus, and an EventBridge rule invokes the AWS Step Functions workflow..." }
+  { "arrow": "a_1", "title": "Invoice upload", "text": "Using SFTP connectors with AWS Transfer Family, invoices are uploaded to an Amazon Simple Storage Service (Amazon S3) bucket." },
+  { "arrow": "a_2", "title": "Workflow trigger", "text": "The upload generates an S3 event into an Amazon EventBridge bus, and an EventBridge rule invokes the AWS Step Functions workflow..." }
 ]
 
 STYLE RULES (the most important part):
 - Each entry references an existing arrow.id.
+- "title" is an OPTIONAL short heading (2-4 words) summarizing the step; it shows as the bold heading above the narration during Play.
 - The order of this array IS the sequence: the Nth entry's arrow must carry
   the badge "N." in its label (see SEQUENCE NUMBERING). Keep them in sync.
 - "text" is a complete descriptive sentence (or two) — NOT a terse phrase.
