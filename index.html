@@ -7601,10 +7601,10 @@ function flowEditorChangeArrow(i, arrowId) {
   renderFlowEditor();
 }
 function flowEditorChangeText(i, text) {
-  _flowDraft[i].text = String(text || '').slice(0, 280);
+  _flowDraft[i].text = String(text || '');
 }
 function flowEditorChangeTitle(i, title) {
-  _flowDraft[i].title = String(title || '').slice(0, 80);
+  _flowDraft[i].title = String(title || '');
 }
 
 function renderFlowEditor() {
@@ -7635,9 +7635,9 @@ function renderFlowEditor() {
       </div>
       <div style="flex:1;display:flex;flex-direction:column;gap:6px;min-width:0">
         <select onchange="flowEditorChangeArrow(${i}, this.value)" class="prop-select" style="font-size:11px">${optionsFor(step.arrow)}</select>
-        <input type="text" oninput="flowEditorChangeTitle(${i}, this.value)" maxlength="80" placeholder="Heading for this step (e.g. 'User authentication')" value="${escHtml(step.title || '')}"
+        <input type="text" oninput="flowEditorChangeTitle(${i}, this.value)" placeholder="Heading for this step (e.g. 'User authentication')" value="${escHtml(step.title || '')}"
           style="width:100%;background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--text);font-family:var(--font-mono);font-size:11px;font-weight:700;padding:6px 8px">
-        <textarea oninput="flowEditorChangeText(${i}, this.value)" rows="2" maxlength="280" placeholder="Narration for this step — what's happening here? (e.g. 'User logs in via Cognito; JWT is stored in browser cookie')"
+        <textarea oninput="flowEditorChangeText(${i}, this.value)" rows="2" placeholder="Narration for this step — what's happening here? (e.g. 'User logs in via Cognito; JWT is stored in browser cookie')"
           style="width:100%;background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--text);font-family:var(--font-mono);font-size:11px;padding:6px 8px;resize:vertical;line-height:1.5">${escHtml(step.text || '')}</textarea>
       </div>
       <button class="tb-btn danger" onclick="flowEditorRemove(${i})" title="Remove step" aria-label="Remove step" style="padding:4px 8px;font-size:13px;line-height:1">×</button>
@@ -8766,7 +8766,7 @@ function loadDiagramData(data) {
     ? data.playFlow
         .map(s => {
           const arrow = (typeof s.arrow === 'string' && arrows.some(a => a.id === s.arrow)) ? s.arrow : '';
-          return { arrow, title: String(s.title || '').slice(0, 80), text: String(s.text || '').slice(0, 280) };
+          return { arrow, title: String(s.title || ''), text: String(s.text || '') };
         })
         .filter(s => s.arrow || s.title || s.text)
     : [];
@@ -9594,7 +9594,7 @@ function importFromAI() {
     ? data.playFlow
         .map(s => {
           const arrow = (s && typeof s.arrow === 'string' && arrowIds.has(s.arrow)) ? s.arrow : '';
-          return { arrow, title: String((s && s.title) || '').slice(0, 80), text: String((s && s.text) || '').slice(0, 280) };
+          return { arrow, title: String((s && s.title) || ''), text: String((s && s.text) || '') };
         })
         .filter(s => s.arrow || s.title || s.text)
     : [];
