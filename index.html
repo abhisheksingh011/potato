@@ -5630,6 +5630,14 @@ function getBestPorts(fromId, toId) {
 // Transient cache (not persisted) of each arrow's geometric route midpoint,
 // so a dragged label can be stored as an offset relative to it.
 const arrowLabelMids = new Map();
+// Per-arrow label font size, stored on arrow.labelSize as a named tier. The
+// value is a multiplier over the base label size (10px on canvas, 9px in the
+// exported SVG/viewer), so a label scales identically in both. Missing /
+// unknown → normal (1×).
+const ARROW_LABEL_SIZES = { small: 0.85, normal: 1, large: 1.4, xlarge: 1.9 };
+function arrowLabelMult(arrow) {
+  return ARROW_LABEL_SIZES[arrow && arrow.labelSize] || 1;
+}
 // Reuses existing SVG elements when possible — only attributes are updated
 // during drag/resize, dramatically cutting GC pressure on large diagrams.
 function drawArrow(arrow) {
@@ -5731,6 +5739,9 @@ function drawArrow(arrow) {
     lbl.setAttribute('x', labelX);
     lbl.setAttribute('y', labelY);
     lbl.setAttribute('font-weight', arrow.bold ? '700' : '400');
+    // Inline style overrides the .arrow-label CSS (presentation attributes lose
+    // to the class rule, an inline style wins). 10px is the class default.
+    lbl.style.fontSize = (10 * arrowLabelMult(arrow)).toFixed(1) + 'px';
     lbl.textContent = arrow.label;
   } else if (lbl) {
     lbl.remove();
@@ -6861,6 +6872,15 @@ function renderArrowProps(arrow) {
           <option value="solid" ${arrow.style==='solid'?'selected':''}>Solid</option>
           <option value="dashed" ${arrow.style==='dashed'?'selected':''}>Dashed</option>
           <option value="dotted" ${arrow.style==='dotted'?'selected':''}>Dotted</option>
+        </select>
+      </div>
+      <div class="prop-row">
+        <span class="prop-label">Label size</span>
+        <select class="prop-select" onchange="updateArrowProp('${arrow.id}','labelSize',this.value)">
+          <option value="small" ${arrow.labelSize==='small'?'selected':''}>Small</option>
+          <option value="normal" ${(!arrow.labelSize||arrow.labelSize==='normal')?'selected':''}>Normal</option>
+          <option value="large" ${arrow.labelSize==='large'?'selected':''}>Large</option>
+          <option value="xlarge" ${arrow.labelSize==='xlarge'?'selected':''}>X-Large</option>
         </select>
       </div>
       <div class="prop-row">
@@ -8675,7 +8695,7 @@ async function buildDiagramSVG(theme = 'dark') {
       const mid = midpointOfPolyline(routePts);
       const lx = (a.labelDx != null) ? mid.x + a.labelDx : mid.x;
       const ly = (a.labelDy != null) ? mid.y + a.labelDy : mid.y - 4;
-      arrowLabels.push({ x: lx, y: ly, text: a.label, bold: !!a.bold });
+      arrowLabels.push({ x: lx, y: ly, text: a.label, bold: !!a.bold, mult: arrowLabelMult(a) });
     }
   });
 
@@ -8684,25 +8704,29 @@ async function buildDiagramSVG(theme = 'dark') {
   // piles the text on top of itself in the exported PNG/SVG. Stack any
   // colliding labels downward by a line height, and paint a faint backing box
   // so each stays legible over the lines beneath it.
-  const _LH = 12, _CW = 5.4, _placed = [];
-  const _halfW = t => (t.length * _CW) / 2 + 4;
+  // Base metrics for normal (1×) labels; each label scales them by its own
+  // mult so larger labels reserve proportionally more room when de-overlapping.
+  const _LH0 = 12, _CW0 = 5.4, _placed = [];
+  const _halfW = t => (t.text.length * _CW0 * t.mult) / 2 + 4;
   arrowLabels.sort((p, q) => p.y - q.y || p.x - q.x);
   arrowLabels.forEach(lb => {
     let y = lb.y, collision = true;
     while (collision) {
       collision = false;
       for (const p of _placed) {
-        if (Math.abs(p.y - y) < _LH && Math.abs(p.x - lb.x) < _halfW(lb.text) + _halfW(p.text)) {
-          y = p.y + _LH; collision = true; break;
+        const gap = _LH0 * Math.max(lb.mult, p.mult);
+        if (Math.abs(p.y - y) < gap && Math.abs(p.x - lb.x) < _halfW(lb) + _halfW(p)) {
+          y = p.y + gap; collision = true; break;
         }
       }
     }
-    _placed.push({ x: lb.x, y, text: lb.text, bold: lb.bold });
+    _placed.push({ x: lb.x, y, text: lb.text, bold: lb.bold, mult: lb.mult });
   });
   _placed.forEach(lb => {
-    const w = lb.text.length * _CW + 6;
-    svg += `  <rect x="${(lb.x - w / 2).toFixed(1)}" y="${(lb.y - 9).toFixed(1)}" width="${w.toFixed(1)}" height="12" rx="3" fill="${P.bg}" opacity="0.85"/>
-  <text class="arrow-label" x="${lb.x.toFixed(1)}" y="${lb.y.toFixed(1)}" text-anchor="middle" font-size="9" font-weight="${lb.bold ? '700' : '400'}" fill="${P.sub}">${escHtml(lb.text)}</text>
+    const fs = 9 * lb.mult;
+    const w = lb.text.length * _CW0 * lb.mult + 6;
+    svg += `  <rect x="${(lb.x - w / 2).toFixed(1)}" y="${(lb.y - fs).toFixed(1)}" width="${w.toFixed(1)}" height="${(fs * 1.34).toFixed(1)}" rx="3" fill="${P.bg}" opacity="0.85"/>
+  <text class="arrow-label" x="${lb.x.toFixed(1)}" y="${lb.y.toFixed(1)}" text-anchor="middle" font-size="${fs.toFixed(1)}" font-weight="${lb.bold ? '700' : '400'}" fill="${P.sub}">${escHtml(lb.text)}</text>
 `;
   });
 
@@ -9570,6 +9594,7 @@ function importFromAI() {
       label:     a.label || '',
       bold:      !!a.bold,
       animated:  !!a.animated,
+      ...(ARROW_LABEL_SIZES[a.labelSize] && a.labelSize !== 'normal' ? { labelSize: a.labelSize } : {}),
       ...(typeof a.labelDx === 'number' ? { labelDx: a.labelDx } : {}),
       ...(typeof a.labelDy === 'number' ? { labelDy: a.labelDy } : {}),
     };
