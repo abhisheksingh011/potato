@@ -9301,6 +9301,12 @@ Common GCP paths:
 
 If unsure of the exact path, OMIT iconUrl. Potato falls back to the emoji.
 
+Match the icon to the EXACT service the user named — never to a similarly
+spelled but different one. If a named service isn't in this library, OMIT
+iconUrl; do not borrow the closest-looking icon. Watch near-name collisions:
+"APIC" is IBM API Connect, NOT Amazon "API Gateway"; "Apigee" is Google's, not
+Amazon's. A neutral emoji is better than a confidently wrong brand icon.
+
 ═══════════════════════════════════════════════════════════════
 ARCHITECTURE QUALITY BAR (apply unless user explicitly says otherwise)
 ═══════════════════════════════════════════════════════════════
