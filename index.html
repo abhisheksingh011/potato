@@ -1312,6 +1312,13 @@ kbd {
     <button id="btn-grid-snap" class="tb-btn" onclick="toggleGridSnap()" title="Toggle snap to 20px grid" aria-label="Toggle grid snap" aria-pressed="false"><span class="tb-icon" aria-hidden="true">⌗</span><span class="tb-label">Snap</span></button>
     <button id="btn-edit-flow" class="tb-btn" onclick="showFlowEditor()" title="Edit the play sequence and narration" aria-label="Edit play sequence"><span class="tb-icon" aria-hidden="true">📝</span><span class="tb-label">Sequence</span></button>
 
+    <div class="toolbar-sep"></div>
+
+    <span class="row-label">Arrow text</span>
+    <button class="tool-mode-btn" onclick="bumpArrowLabelScale(-1)" title="Decrease arrow label text size (all arrows)" aria-label="Decrease arrow text size">A−</button>
+    <button class="zoom-display" id="arrow-text-scale-label" onclick="resetArrowLabelScale()" title="Arrow label text size for all arrows — click to reset to 100%" aria-label="Arrow text size">100%</button>
+    <button class="tool-mode-btn" onclick="bumpArrowLabelScale(1)" title="Increase arrow label text size (all arrows)" aria-label="Increase arrow text size">A+</button>
+
     <div style="flex:1;"></div>
     <button id="btn-props-toggle" class="tb-btn" onclick="togglePanel('props')" title="Show / hide the Properties panel — edit the selected item's label, colour, icon & notes" aria-label="Toggle properties panel" aria-pressed="false"><span class="tb-icon" aria-hidden="true">⚙</span><span class="tb-label">Properties</span></button>
   </div>
@@ -5635,8 +5642,36 @@ const arrowLabelMids = new Map();
 // exported SVG/viewer), so a label scales identically in both. Missing /
 // unknown → normal (1×).
 const ARROW_LABEL_SIZES = { small: 0.85, normal: 1, large: 1.4, xlarge: 1.9 };
+// Diagram-wide multiplier applied ON TOP of each arrow's own labelSize tier, so
+// the toolbar "Arrow text −/+" control scales every label at once. Persisted on
+// meta.arrowLabelScale. It is a view/document-level setting (like zoom), so it
+// is intentionally NOT part of undo history. Effective size for a label is
+// base(10px canvas / 9px export) × arrowLabelScale × per-arrow tier.
+let arrowLabelScale = 1;
+const ARROW_SCALE_STEPS = [0.5, 0.6, 0.75, 0.85, 1, 1.25, 1.5, 1.75, 2, 2.5, 3];
 function arrowLabelMult(arrow) {
-  return ARROW_LABEL_SIZES[arrow && arrow.labelSize] || 1;
+  return arrowLabelScale * (ARROW_LABEL_SIZES[arrow && arrow.labelSize] || 1);
+}
+function _nearestArrowScaleIndex(s) {
+  let best = 0, bd = Infinity;
+  ARROW_SCALE_STEPS.forEach((v, i) => { const d = Math.abs(v - s); if (d < bd) { bd = d; best = i; } });
+  return best;
+}
+// Step the global arrow-text scale up (dir +1) or down (dir −1) the ladder.
+function bumpArrowLabelScale(dir) {
+  const idx = Math.max(0, Math.min(ARROW_SCALE_STEPS.length - 1, _nearestArrowScaleIndex(arrowLabelScale) + dir));
+  setArrowLabelScale(ARROW_SCALE_STEPS[idx]);
+}
+function resetArrowLabelScale() { setArrowLabelScale(1); }
+function setArrowLabelScale(s) {
+  arrowLabelScale = Math.max(0.3, Math.min(4, +s || 1));
+  updateArrowScaleLabel();
+  arrows.forEach(a => drawArrow(a));
+  markDirty();
+}
+function updateArrowScaleLabel() {
+  const el = document.getElementById('arrow-text-scale-label');
+  if (el) el.textContent = Math.round(arrowLabelScale * 100) + '%';
 }
 // Reuses existing SVG elements when possible — only attributes are updated
 // during drag/resize, dramatically cutting GC pressure on large diagrams.
@@ -7870,7 +7905,8 @@ function getDiagramData() {
       version: '1.0',
       created: _diagramCreatedAt,
       updated: now,
-      name: document.getElementById('filename-input').value
+      name: document.getElementById('filename-input').value,
+      arrowLabelScale
     }
   };
 }
@@ -8782,6 +8818,10 @@ function loadDiagramData(data) {
   // Carry the original creation timestamp through so future saves don't
   // overwrite it. Falls back to null → first save sets it to "now".
   _diagramCreatedAt = (data && data.meta && data.meta.created) || null;
+  // Diagram-wide arrow-label scale (defaults to 100% for older files).
+  arrowLabelScale = (data && data.meta && +data.meta.arrowLabelScale) || 1;
+  if (!(arrowLabelScale > 0)) arrowLabelScale = 1;
+  updateArrowScaleLabel();
   nodes = data.nodes || [];
   arrows = data.arrows || [];
   groups = data.groups || [];
@@ -8818,6 +8858,7 @@ function newDiagram() {
   selectedIds.clear(); selectedArrow = null; selectedGroup = null;
   historyStack = []; redoStack = [];
   _diagramCreatedAt = null;
+  arrowLabelScale = 1; updateArrowScaleLabel();
   canvasViewport.querySelectorAll('.node').forEach(el => el.remove());
   canvasViewport.querySelectorAll('.group-node').forEach(el => el.remove());
   arrowsSvg.querySelectorAll('g').forEach(el => el.remove());
