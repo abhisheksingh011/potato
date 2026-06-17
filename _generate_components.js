@@ -89,7 +89,7 @@ const html = fs.readFileSync(HTML, 'utf8');
 // Preserve the shapes: block — it's hand-curated decorative geometry.
 // Anchor only against actual provider keys; "cloud" is a legacy alias we
 // never wrote and matching it silently would mask a real corruption.
-const shapesMatch = html.match(/shapes:\s*\[([\s\S]*?)\n\s*\],\n\s*(aws|azure|gcp):/);
+const shapesMatch = html.match(/shapes:\s*\[([\s\S]*?)\r?\n\s*\],\r?\n\s*(aws|azure|gcp):/);
 if (!shapesMatch) { console.error('Could not find existing shapes: block to preserve.'); process.exit(1); }
 const shapesBlock = '[' + shapesMatch[1] + '\n  ]';
 
@@ -146,7 +146,11 @@ function gatherSvgs(provider) {
     }
   }
 }
-['aws','azure','gcp'].forEach(gatherSvgs);
+// 'generic' holds provider-neutral architecture icons. Their COMPONENTS entries
+// live in the hand-curated shapes block (preserved above), but their SVG text
+// still needs inlining here so saved .potato.html / PNG exports keep the icons
+// under file:// where disk reads are blocked.
+['aws','azure','gcp','generic'].forEach(gatherSvgs);
 out += 'const ICON_SVG_TEXT = {\n';
 out += allIcons.map(([url, text]) => `  ${JSON.stringify(url)}: '${escSvgForJsString(text)}'`).join(',\n');
 out += '\n};';
