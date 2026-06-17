@@ -477,6 +477,19 @@ body {
 .port.left.pos-3, .port.right.pos-3  { top: 75%; }
 .port.top:hover, .port.bottom:hover  { transform: translateX(-50%) scale(1.4); }
 .port.left:hover, .port.right:hover  { transform: translateY(-50%) scale(1.4); }
+/* 1 connection point at each corner (4 total) — sits exactly on the corner, no
+   centring transform. Brings the per-node total to 16. */
+.port.tl { top: -5px;    left: -5px;  }
+.port.tr { top: -5px;    right: -5px; }
+.port.bl { bottom: -5px; left: -5px;  }
+.port.br { bottom: -5px; right: -5px; }
+.port.tl:hover, .port.tr:hover, .port.bl:hover, .port.br:hover { transform: scale(1.4); }
+@keyframes port-pulse-corner {
+  0%, 100% { transform: scale(1);   box-shadow: 0 0 0 0 rgba(123,47,190,0.55); }
+  50%      { transform: scale(1.6); box-shadow: 0 0 0 8px rgba(123,47,190,0); }
+}
+.node.port-hint .port.tl, .node.port-hint .port.tr,
+.node.port-hint .port.bl, .node.port-hint .port.br { animation: port-pulse-corner 1.1s ease-in-out 3; }
 
 /* Resize handle */
 .node-resize {
@@ -5197,6 +5210,10 @@ function renderNode(node) {
       <div class="port right pos-1"  data-node="${safeId}" data-port="right-1"></div>
       <div class="port right pos-2"  data-node="${safeId}" data-port="right"></div>
       <div class="port right pos-3"  data-node="${safeId}" data-port="right-2"></div>
+      <div class="port corner tl"    data-node="${safeId}" data-port="tl"></div>
+      <div class="port corner tr"    data-node="${safeId}" data-port="tr"></div>
+      <div class="port corner bl"    data-node="${safeId}" data-port="bl"></div>
+      <div class="port corner br"    data-node="${safeId}" data-port="br"></div>
     </div>
     <div class="node-resize" data-resize="${safeId}" aria-hidden="true"></div>
   `;
@@ -5659,9 +5676,10 @@ function startArrowEndpointDrag(arrowId, end, e) {
   window.addEventListener('pointercancel', onUp);
 }
 
-// A node exposes 3 connection points per side (12 total). A port id is the
-// side name, optionally suffixed -1 / -2 for the two off-centre points; the
-// bare side name is the centre point (kept so older saved diagrams still load).
+// A node exposes 3 connection points per side plus 1 at each corner (16 total).
+// A port id is the side name, optionally suffixed -1 / -2 for the two off-centre
+// points; the bare side name is the centre point (kept so older saved diagrams
+// still load). The four corners are 'tl' / 'tr' / 'bl' / 'br'.
 function portSide(port) {
   const p = port || '';
   const i = p.indexOf('-');
@@ -5688,6 +5706,10 @@ function getPortCenter(nodeId, port) {
   if (side === 'bottom') return { x: n.x + w * f, y: n.y + h };
   if (side === 'left')   return { x: n.x, y: n.y + h * f };
   if (side === 'right')  return { x: n.x + w, y: n.y + h * f };
+  if (side === 'tl')     return { x: n.x,     y: n.y };
+  if (side === 'tr')     return { x: n.x + w, y: n.y };
+  if (side === 'bl')     return { x: n.x,     y: n.y + h };
+  if (side === 'br')     return { x: n.x + w, y: n.y + h };
   return { x: cx, y: cy };
 }
 
@@ -5905,6 +5927,12 @@ function portOffsetPoint(pt, port, d) {
   if (side === 'left')   return { x: pt.x - d, y: pt.y };
   if (side === 'bottom') return { x: pt.x, y: pt.y + d };
   if (side === 'top')    return { x: pt.x, y: pt.y - d };
+  // Corners exit diagonally (45°) away from the node.
+  const D = d * 0.7071;
+  if (side === 'tl')     return { x: pt.x - D, y: pt.y - D };
+  if (side === 'tr')     return { x: pt.x + D, y: pt.y - D };
+  if (side === 'bl')     return { x: pt.x - D, y: pt.y + D };
+  if (side === 'br')     return { x: pt.x + D, y: pt.y + D };
   return { x: pt.x + d, y: pt.y };
 }
 
@@ -9074,6 +9102,10 @@ function portPos(n, nw, nh, port, ox, oy) {
   if (side==='bottom') return {x:n.x+nw*f+ox, y:n.y+nh+oy};
   if (side==='left')   return {x:n.x+ox, y:n.y+nh*f+oy};
   if (side==='right')  return {x:n.x+nw+ox, y:n.y+nh*f+oy};
+  if (side==='tl')     return {x:n.x+ox,    y:n.y+oy};
+  if (side==='tr')     return {x:n.x+nw+ox, y:n.y+oy};
+  if (side==='bl')     return {x:n.x+ox,    y:n.y+nh+oy};
+  if (side==='br')     return {x:n.x+nw+ox, y:n.y+nh+oy};
   return {x:cx, y:cy};
 }
 
@@ -9083,6 +9115,11 @@ function portOffset(pt, port, dist) {
   if (side==='left')   return {x:pt.x-dist, y:pt.y};
   if (side==='bottom') return {x:pt.x, y:pt.y+dist};
   if (side==='top')    return {x:pt.x, y:pt.y-dist};
+  const D = dist * 0.7071;
+  if (side==='tl')     return {x:pt.x-D, y:pt.y-D};
+  if (side==='tr')     return {x:pt.x+D, y:pt.y-D};
+  if (side==='bl')     return {x:pt.x-D, y:pt.y+D};
+  if (side==='br')     return {x:pt.x+D, y:pt.y+D};
   return {x:pt.x+dist, y:pt.y};
 }
 
@@ -9738,7 +9775,8 @@ function importFromAI() {
   const validThemes = ['green','orange','blue','purple','red','teal','pink','yellow','cyan','gray','gradient'];
   const validPorts  = ['top','bottom','left','right',
                        'top-1','top-2','bottom-1','bottom-2',
-                       'left-1','left-2','right-1','right-2'];
+                       'left-1','left-2','right-1','right-2',
+                       'tl','tr','bl','br'];
   const validColors = ['default','green','blue','purple','red','teal','orange','pink','yellow'];
   const validStyles = ['solid','dashed','dotted'];
   let sanitized = 0;
@@ -9809,7 +9847,7 @@ function importFromAI() {
     return true;
   });
 
-  // Spread each node's connections across its 12 ports so arrows don't all
+  // Spread each node's connections across its 16 ports so arrows don't all
   // stack on a single point. AI-specified ports are honoured & reserved.
   distributeImportPorts(data.nodes, data.arrows);
 
@@ -9846,10 +9884,10 @@ function importFromAI() {
 
 // When an AI diagram is imported, multiple arrows touching the same node would
 // otherwise all land on one port (right/left), overlapping badly. This spreads
-// each node's connections across its 12 ports: for every endpoint it picks the
+// each node's connections across its 16 ports: for every endpoint it picks the
 // geometrically-facing side toward the other node, then takes the next free
-// point on that side (centre → 25% → 75%), overflowing to the other sides so
-// all 12 distinct points are used before any point repeats.
+// point on that side (centre → 25% → 75% → its two corners), overflowing to the
+// other sides so all 16 distinct points are used before any point repeats.
 function distributeImportPorts(nodes, arrows) {
   if (!Array.isArray(nodes) || !Array.isArray(arrows)) return;
   const nodeById = new Map(nodes.map(n => [n.id, n]));
@@ -9863,13 +9901,30 @@ function distributeImportPorts(nodes, arrows) {
     left:   ['left',   'left-1',   'left-2'],
     right:  ['right',  'right-1',  'right-2'],
   };
+  // Each corner belongs to two sides — listed under both so a facing side can
+  // spill onto its own corners before jumping to the opposite edge.
+  const SIDE_CORNERS = {
+    top:    ['tl', 'tr'],
+    bottom: ['bl', 'br'],
+    left:   ['tl', 'bl'],
+    right:  ['tr', 'br'],
+  };
   const ALL_SIDES = ['right', 'left', 'bottom', 'top'];
-  // Full 12-port preference order for a given facing side: that side's 3 points
-  // first, then the remaining sides' points.
-  const orderFor = (side) => [
-    ...SIDE_PORTS[side],
-    ...ALL_SIDES.filter(s => s !== side).flatMap(s => SIDE_PORTS[s]),
-  ];
+  // Full 16-port preference order for a given facing side: that side's 3 edge
+  // points, then its 2 corners, then the remaining sides' points and corners.
+  // De-duped (corners are shared) so every one of the 16 points appears once —
+  // assign() walks this list and only repeats a point once all 16 are taken.
+  const orderFor = (side) => {
+    const seq = [];
+    const push = (p) => { if (!seq.includes(p)) seq.push(p); };
+    SIDE_PORTS[side].forEach(push);
+    SIDE_CORNERS[side].forEach(push);
+    ALL_SIDES.filter(s => s !== side).forEach(s => {
+      SIDE_PORTS[s].forEach(push);
+      SIDE_CORNERS[s].forEach(push);
+    });
+    return seq;
+  };
   const sideToward = (a, b) => {
     const dx = b.x - a.x, dy = b.y - a.y;
     if (Math.abs(dx) >= Math.abs(dy)) return dx >= 0 ? 'right' : 'left';
@@ -9878,10 +9933,16 @@ function distributeImportPorts(nodes, arrows) {
 
   const used   = new Map(); // nodeId -> Set of ports already taken
   const counts = new Map(); // nodeId -> total endpoints assigned (for overflow)
+  // Returns false when the port is already taken on this node — the caller then
+  // drops the duplicate so Pass 2 can move it to a free point. This is what
+  // guarantees no two endpoints share a point until all 16 are used.
   const reserve = (nodeId, port) => {
-    if (!nodeId || !port) return;
+    if (!nodeId || !port) return true;
     if (!used.has(nodeId)) used.set(nodeId, new Set());
-    used.get(nodeId).add(port);
+    const u = used.get(nodeId);
+    if (u.has(port)) return false;
+    u.add(port);
+    return true;
   };
   const assign = (nodeId, side) => {
     if (!used.has(nodeId)) used.set(nodeId, new Set());
@@ -9892,15 +9953,17 @@ function distributeImportPorts(nodes, arrows) {
     for (const p of seq) {
       if (!u.has(p)) { u.add(p); return p; }
     }
-    // All 12 points taken — repeat, round-robin by assignment count.
+    // All 16 points taken — repeat, round-robin by assignment count.
     return seq[c % seq.length];
   };
 
   // Pass 1: reserve any ports the AI explicitly set, so auto-assignment avoids
-  // them and starts fresh on the remaining free points.
+  // them and starts fresh on the remaining free points. If two endpoints claim
+  // the same point on a node, the later one is dropped to null and re-spread in
+  // Pass 2 — so explicit collisions don't survive as overlaps either.
   for (const a of arrows) {
-    if (a.fromPort) reserve(a.from, a.fromPort);
-    if (a.toPort)   reserve(a.to,   a.toPort);
+    if (a.fromPort && !reserve(a.from, a.fromPort)) a.fromPort = null;
+    if (a.toPort   && !reserve(a.to,   a.toPort))   a.toPort   = null;
   }
 
   // Pass 2: fill the un-specified endpoints, facing toward the opposite node.
