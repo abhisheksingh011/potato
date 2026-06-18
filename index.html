@@ -1496,7 +1496,7 @@ kbd {
 <div id="notifications" role="status" aria-live="polite" aria-atomic="false"></div>
 
 <!-- Hidden file input -->
-<input type="file" id="file-input" accept=".html,.potato.html" style="display:none" onchange="loadDiagramFile(event)">
+<input type="file" id="file-input" accept=".html,.potato.html,.drawio,.xml" style="display:none" onchange="loadDiagramFile(event)">
 
 
 <!-- RECENT FILES MODAL -->
@@ -1643,7 +1643,7 @@ kbd {
         <span style="display:inline-flex;align-items:center;justify-content:center;width:20px;height:20px;border-radius:50%;background:var(--purple);color:#fff;font-size:11px;font-weight:700">3</span>
         <strong style="font-size:13px">Paste the LLM's full Potato-format HTML output here, then Import</strong>
       </div>
-      <p style="font-size:11px;color:var(--text-muted);font-family:ui-monospace,Menlo,Consolas,monospace;line-height:1.5;margin:0">The whole reply — from <code style="color:var(--text)">&lt;!DOCTYPE html&gt;</code> through <code style="color:var(--text)">&lt;/html&gt;</code>. Raw JSON works too if the LLM skipped the wrapper.</p>
+      <p style="font-size:11px;color:var(--text-muted);font-family:ui-monospace,Menlo,Consolas,monospace;line-height:1.5;margin:0">The whole reply — from <code style="color:var(--text)">&lt;!DOCTYPE html&gt;</code> through <code style="color:var(--text)">&lt;/html&gt;</code>. Raw JSON works too if the LLM skipped the wrapper. <strong style="color:var(--text)">draw.io / diagrams.net XML</strong> also works — paste the <code style="color:var(--text)">&lt;mxGraphModel&gt;</code> (Extras → Edit Diagram) and it's converted offline.</p>
       <textarea id="ai-paste-input" placeholder="Paste the LLM HTML output here...
 
 &lt;!DOCTYPE html&gt;
@@ -8989,6 +8989,17 @@ function loadDiagramFile(e) {
   reader.onload = (ev) => {
     try {
       const html = ev.target.result;
+      // draw.io / diagrams.net file (.drawio / .xml, or any content that is
+      // mxGraph XML) — convert offline into a Potato diagram.
+      const isDrawioFile = /\.drawio$|\.xml$/i.test(file.name) || looksLikeDrawio(html);
+      if (isDrawioFile && !/id="potato-data"/.test(html)) {
+        const data = parseDrawioXml(html);
+        loadDiagramData(data);
+        if (data.meta?.name) document.getElementById('filename-input').value = data.meta.name;
+        setTimeout(fitToContent, 100);
+        notify(`Imported ${data.nodes.length} nodes, ${data.arrows.length} connections from draw.io ✅`);
+        return;
+      }
       const match = html.match(/<script[^>]+id="potato-data"[^>]*>([\s\S]*?)<\/script>/);
       if (!match) { notify('No Potato data found in this file', 'error'); return; }
       const data = JSON.parse(match[1]);
@@ -9724,6 +9735,303 @@ function closeAiModal() {
   document.getElementById('ai-modal-overlay').style.display = 'none';
 }
 
+// ===== DRAW.IO (diagrams.net) IMPORT =====
+// Fully offline: parses draw.io / diagrams.net mxGraph XML into a Potato
+// diagram object (the same shape importFromAI() produces) using the browser's
+// built-in DOMParser — no network, no external libraries. Handles nested
+// containers (Region > VPC > AZ > subnet) by flattening every cell to absolute
+// canvas coordinates, then routing through the normal sanitize+load pipeline.
+
+// True when the pasted/opened text is mxGraph XML rather than Potato HTML/JSON.
+function looksLikeDrawio(raw) {
+  if (!raw) return false;
+  return /<\s*mxGraphModel[\s>]/i.test(raw) || /<\s*mxfile[\s>]/i.test(raw)
+      || /<\s*mxCell[\s>]/i.test(raw);
+}
+
+// draw.io compressed files wrap the XML in deflated+base64 inside <diagram>.
+// We only support the uncompressed form (Extras > Edit Diagram, or files saved
+// with compression off). Detect the compressed case so we can tell the user.
+function isCompressedDrawio(raw) {
+  // Uncompressed diagrams contain <mxGraphModel; compressed ones have a
+  // <diagram>…base64…</diagram> with no inner XML tags.
+  if (/<\s*mxGraphModel[\s>]/i.test(raw)) return false;
+  return /<\s*diagram[^>]*>\s*[A-Za-z0-9+/=]{40,}\s*<\/\s*diagram>/i.test(raw);
+}
+
+// Map an mxGraph hex fillColor (resource-icon tint) to the closest Potato theme.
+function drawioThemeFromFill(hex) {
+  const map = {
+    '#8C4FFF': 'purple', '#ED7100': 'orange', '#C925D1': 'pink',
+    '#7AA116': 'green',  '#248814': 'green',  '#147EBA': 'blue',
+    '#1BA9C7': 'cyan',   '#01A88D': 'teal',   '#2E73B8': 'blue',
+    '#B0084D': 'red',    '#DD344C': 'red',    '#E7157B': 'pink',
+    '#232F3E': 'gray',   '#D45B07': 'orange', '#3334B9': 'purple',
+  };
+  return map[(hex || '').toUpperCase()] || null;
+}
+
+// Map an mxGraph hex strokeColor (edge / group border) to a Potato color name.
+function drawioColorFromStroke(hex) {
+  const map = {
+    '#232F3E': 'default', '#248814': 'green',  '#7AA116': 'green',
+    '#9012B5': 'purple',  '#147EBA': 'blue',   '#ED7100': 'orange',
+    '#C925D1': 'pink',    '#DD344C': 'red',    '#01A88D': 'teal',
+    '#1BA9C7': 'cyan',    '#8C4FFF': 'purple',
+  };
+  return map[(hex || '').toUpperCase()] || null;
+}
+
+// Parse "k=v;k2=v2;..." mxGraph style strings into a plain object.
+function parseDrawioStyle(style) {
+  const out = {};
+  (style || '').split(';').forEach(part => {
+    if (!part) return;
+    const eq = part.indexOf('=');
+    if (eq === -1) { out[part.trim()] = true; }
+    else { out[part.slice(0, eq).trim()] = part.slice(eq + 1).trim(); }
+  });
+  return out;
+}
+
+// Turn a draw.io cell value (may contain HTML, <br>, &#10; newlines, entities)
+// into clean text lines.
+function drawioValueToLines(val) {
+  if (!val) return [];
+  let s = String(val)
+    .replace(/<\s*br\s*\/?\s*>/gi, '\n')
+    .replace(/<[^>]+>/g, '')          // strip any other HTML tags
+    .replace(/&nbsp;/gi, ' ')
+    .replace(/&amp;/gi, '&')
+    .replace(/&lt;/gi, '<')
+    .replace(/&gt;/gi, '>')
+    .replace(/&#10;|&#xA;/gi, '\n');
+  return s.split('\n').map(l => l.trim()).filter(Boolean);
+}
+
+// Prettify an mxGraph resIcon token ("application_load_balancer") into a type
+// string ("Application Load Balancer") used for icon lookup + the node type.
+function drawioResIconToType(resIcon) {
+  if (!resIcon) return '';
+  return resIcon
+    .replace(/^mxgraph\.aws4\./i, '')
+    .replace(/^mxgraph\.[a-z0-9]+\./i, '')
+    .replace(/_/g, ' ')
+    .replace(/\b\w/g, c => c.toUpperCase())
+    .trim();
+}
+
+// Bare mxGraph aws4 resIcon token (e.g. "ec2", "route_53") -> a catalog icon
+// path. The short tokens draw.io uses don't survive guessIconUrlFromType()'s
+// name-based matching, so we map the common shapes directly. Every path here is
+// validated against the live catalog at resolve time, so a stale entry just
+// falls through to the name-based guess (and then to an emoji) — never a 404.
+const DRAWIO_RESICON_ICON = {
+  // Networking / edge
+  route_53: 'icons/aws/Networking-Content-Delivery/Amazon-Route-53.svg',
+  cloudfront: 'icons/aws/Networking-Content-Delivery/Amazon-CloudFront.svg',
+  application_load_balancer: 'icons/aws/Networking-Content-Delivery/Elastic-Load-Balancing.svg',
+  elastic_load_balancing: 'icons/aws/Networking-Content-Delivery/Elastic-Load-Balancing.svg',
+  network_load_balancer: 'icons/aws/Networking-Content-Delivery/Elastic-Load-Balancing.svg',
+  classic_load_balancer: 'icons/aws/Networking-Content-Delivery/Elastic-Load-Balancing.svg',
+  api_gateway: 'icons/aws/Networking-Content-Delivery/Amazon-API-Gateway.svg',
+  transit_gateway: 'icons/aws/Networking-Content-Delivery/AWS-Transit-Gateway.svg',
+  // No dedicated AWS NAT/Internet-gateway icon in the catalog — use the
+  // provider-neutral router glyph rather than a wrong brand icon.
+  nat_gateway: 'icons/generic/Architecture/Router.svg',
+  internet_gateway: 'icons/generic/Architecture/Router.svg',
+  // Compute
+  ec2: 'icons/aws/Compute/Amazon-EC2.svg',
+  ec2_instance: 'icons/aws/Compute/Amazon-EC2.svg',
+  auto_scaling2: 'icons/aws/Compute/Amazon-EC2-Auto-Scaling.svg',
+  auto_scaling: 'icons/aws/Compute/Amazon-EC2-Auto-Scaling.svg',
+  lambda: 'icons/aws/Compute/AWS-Lambda.svg',
+  lambda_function: 'icons/aws/Compute/AWS-Lambda.svg',
+  // Containers
+  fargate: 'icons/aws/Containers/AWS-Fargate.svg',
+  elastic_container_service: 'icons/aws/Containers/Amazon-Elastic-Container-Service.svg',
+  elastic_kubernetes_service: 'icons/aws/Containers/Amazon-Elastic-Kubernetes-Service.svg',
+  // Databases
+  aurora: 'icons/aws/Databases/Amazon-Aurora.svg',
+  aurora_instance: 'icons/aws/Databases/Amazon-Aurora.svg',
+  rds: 'icons/aws/Databases/Amazon-RDS.svg',
+  rds_instance: 'icons/aws/Databases/Amazon-RDS.svg',
+  dynamodb: 'icons/aws/Databases/Amazon-DynamoDB.svg',
+  elasticache: 'icons/aws/Databases/Amazon-ElastiCache.svg',
+  // Storage
+  s3: 'icons/aws/Storage/Amazon-Simple-Storage-Service.svg',
+  simple_storage_service: 'icons/aws/Storage/Amazon-Simple-Storage-Service.svg',
+  // App integration / messaging
+  sqs: 'icons/aws/Application-Integration/Amazon-Simple-Queue-Service.svg',
+  simple_queue_service: 'icons/aws/Application-Integration/Amazon-Simple-Queue-Service.svg',
+  sns: 'icons/aws/Application-Integration/Amazon-Simple-Notification-Service.svg',
+  simple_notification_service: 'icons/aws/Application-Integration/Amazon-Simple-Notification-Service.svg',
+  eventbridge: 'icons/aws/Application-Integration/Amazon-EventBridge.svg',
+  // Security / identity
+  identity_and_access_management: 'icons/aws/Security-Identity/AWS-Identity-and-Access-Management.svg',
+  cognito: 'icons/aws/Security-Identity/Amazon-Cognito.svg',
+  waf: 'icons/aws/Security-Identity/AWS-WAF.svg',
+  // Management / monitoring
+  cloudwatch: 'icons/aws/Management-Tools/Amazon-CloudWatch.svg',
+  // Generic actors
+  users: 'icons/generic/Architecture/User.svg',
+  user: 'icons/generic/Architecture/User.svg',
+  client: 'icons/generic/Architecture/User.svg',
+};
+
+// A few emoji fallbacks so a node still reads correctly when no SVG matches.
+const DRAWIO_RESICON_EMOJI = {
+  users: '👤', user: '👤', client: '👤',
+  internet_gateway: '🌐', nat_gateway: '🔀', route_53: '🛣️', cloudfront: '🌐',
+  application_load_balancer: '⚖️', ec2: '🖥️', lambda: '⚡', s3: '🪣',
+  aurora_instance: '🗄️', rds: '🗄️', dynamodb: '🗄️', sqs: '📩', sns: '📣',
+  auto_scaling2: '📈', cloudwatch: '📊',
+};
+
+// Resolve the best icon for a draw.io shape: bare resIcon map first (validated
+// against the live catalog), then the catalog's name-based guesser on the
+// resIcon-derived type, then the label. Returns '' when nothing fits (emoji).
+function drawioResolveIcon(resIcon, type, label) {
+  const token = (resIcon || '')
+    .replace(/^mxgraph\.aws4\./i, '')
+    .replace(/^mxgraph\.[a-z0-9]+\./i, '')
+    .toLowerCase().trim();
+  // The direct map is hand-verified against the icons/ tree, so trust it even
+  // when a path isn't registered in the picker catalog (e.g. the generic
+  // User/Router glyphs). renderNode()'s onerror still falls back to the emoji
+  // if a path is ever wrong, so this can't render a broken image.
+  const direct = DRAWIO_RESICON_ICON[token];
+  if (direct) return direct;
+  return guessIconUrlFromType(type || '') || guessIconUrlFromType(label || '') || '';
+}
+
+// Main converter: mxGraph XML string -> Potato data object {meta,nodes,arrows,groups}.
+// Throws on unparseable / non-mxGraph input so the caller can show an error.
+function parseDrawioXml(raw) {
+  if (isCompressedDrawio(raw)) {
+    throw new Error('This .drawio file is compressed. In draw.io, turn off compression (Extras → Edit Diagram shows the raw XML) or use File → Export As → XML with "Compressed" unchecked, then import again.');
+  }
+  const doc = new DOMParser().parseFromString(raw, 'text/xml');
+  if (doc.getElementsByTagName('parsererror').length) {
+    throw new Error('The XML could not be parsed. Make sure you pasted the full draw.io XML.');
+  }
+  const cells = Array.from(doc.getElementsByTagName('mxCell'));
+  if (!cells.length) throw new Error('No mxCell elements found — this does not look like a draw.io diagram.');
+
+  // Index every cell by id and read its geometry (relative to its parent).
+  const byId = new Map();
+  cells.forEach(c => {
+    const geo = c.getElementsByTagName('mxGeometry')[0];
+    byId.set(c.getAttribute('id'), {
+      el: c,
+      parent: c.getAttribute('parent'),
+      isVertex: c.getAttribute('vertex') === '1',
+      isEdge: c.getAttribute('edge') === '1',
+      style: c.getAttribute('style') || '',
+      value: c.getAttribute('value') || '',
+      x: geo ? parseFloat(geo.getAttribute('x')) || 0 : 0,
+      y: geo ? parseFloat(geo.getAttribute('y')) || 0 : 0,
+      w: geo ? parseFloat(geo.getAttribute('width')) || 0 : 0,
+      h: geo ? parseFloat(geo.getAttribute('height')) || 0 : 0,
+    });
+  });
+
+  // Resolve a cell's absolute origin by summing all vertex ancestors' offsets.
+  const absCache = new Map();
+  function absOrigin(id) {
+    if (absCache.has(id)) return absCache.get(id);
+    const c = byId.get(id);
+    if (!c) return { x: 0, y: 0 };
+    const p = byId.get(c.parent);
+    let base = { x: 0, y: 0 };
+    if (p && p.isVertex) base = absOrigin(c.parent);   // skip the root cells 0/1
+    const pos = { x: base.x + c.x, y: base.y + c.y };
+    absCache.set(id, pos);
+    return pos;
+  }
+
+  // Spread the typically-tight draw.io icon spacing so Potato's wider labelled
+  // nodes (160px) don't overlap. Scaling all coords + group sizes by the same
+  // factor preserves the relative layout exactly.
+  const SCALE = 2.2;
+  const NODE_W = 160;
+
+  const nodes = [], groups = [];
+  cells.forEach(c => {
+    const cell = byId.get(c.getAttribute('id'));
+    if (!cell || !cell.isVertex) return;
+    const st = parseDrawioStyle(cell.style);
+    const isContainer = st.container === '1'
+      || /group/i.test(st.shape || '')
+      || (st.grIcon != null);
+    const origin = absOrigin(c.getAttribute('id'));
+    const lines = drawioValueToLines(cell.value);
+
+    if (isContainer) {
+      groups.push({
+        id: c.getAttribute('id'),
+        x: origin.x * SCALE,
+        y: origin.y * SCALE,
+        w: cell.w * SCALE,
+        h: cell.h * SCALE,
+        label: lines.join(' — '),
+        color: drawioColorFromStroke(st.strokeColor)
+            || drawioThemeFromFill(st.fillColor) || 'gray',
+      });
+      return;
+    }
+
+    // A resource node. Centre the Potato node where the draw.io icon's centre
+    // was, so it stays inside whatever container it belonged to.
+    const cx = (origin.x + cell.w / 2) * SCALE;
+    const cy = (origin.y + cell.h / 2) * SCALE;
+    const type = drawioResIconToType(st.resIcon) || (lines[0] || 'Component');
+    const token = (st.resIcon || '').replace(/^mxgraph\.[a-z0-9]+\./i, '').toLowerCase().trim();
+    nodes.push({
+      id: c.getAttribute('id'),
+      x: cx - NODE_W / 2,
+      y: cy - 40,
+      w: NODE_W,
+      h: null,
+      type,
+      label: lines[0] || type,
+      sublabel: lines.slice(1).join(' '),
+      theme: drawioThemeFromFill(st.fillColor) || 'gray',
+      iconUrl: drawioResolveIcon(st.resIcon, type, lines[0] || ''),
+      icon: DRAWIO_RESICON_EMOJI[token] || '⬡',
+    });
+  });
+
+  // Edges -> arrows. Endpoints reference cell ids (global), so they map 1:1.
+  // Drop edges whose endpoints aren't both real nodes (e.g. dangling labels).
+  const nodeIds = new Set(nodes.map(n => n.id));
+  const arrows = [];
+  cells.forEach(c => {
+    const cell = byId.get(c.getAttribute('id'));
+    if (!cell || !cell.isEdge) return;
+    const from = c.getAttribute('source'), to = c.getAttribute('target');
+    if (!nodeIds.has(from) || !nodeIds.has(to)) return;
+    const st = parseDrawioStyle(cell.style);
+    let style = 'solid';
+    if (st.dashed === '1') style = (st.dashPattern || '').includes('1 ') ? 'dotted' : 'dashed';
+    arrows.push({
+      id: c.getAttribute('id'),
+      from, to,
+      fromPort: null, toPort: null,   // let distributeImportPorts() spread them
+      color: drawioColorFromStroke(st.strokeColor) || 'default',
+      style,
+      label: drawioValueToLines(cell.value).join(' '),
+    });
+  });
+
+  const diagEl = doc.getElementsByTagName('diagram')[0];
+  const name = (diagEl && diagEl.getAttribute('name')) || 'Imported from draw.io';
+  return {
+    meta: { version: '1.0', name, created: new Date().toISOString() },
+    nodes, arrows, groups, playFlow: [],
+  };
+}
+
 function importFromAI() {
   const raw = document.getElementById('ai-paste-input').value.trim();
   const errEl = document.getElementById('ai-import-error');
@@ -9736,8 +10044,18 @@ function importFromAI() {
 
   let data = null;
 
+  // Try 0: draw.io / diagrams.net XML (offline conversion).
+  if (looksLikeDrawio(raw)) {
+    try {
+      data = parseDrawioXml(raw);
+    } catch (e) {
+      showAiError(e.message);
+      return;
+    }
+  }
+
   // Try 1: raw JSON object
-  if (raw.startsWith('{')) {
+  if (!data && raw.startsWith('{')) {
     try { data = JSON.parse(raw); } catch(e) {}
   }
 
