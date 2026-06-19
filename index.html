@@ -1258,6 +1258,7 @@ kbd {
 
     <button class="tb-btn" onclick="showTemplatesModal()" title="Start from a template" aria-label="Templates"><span class="tb-icon" aria-hidden="true">✨</span><span class="tb-label">Templates</span></button>
     <button class="tb-btn" onclick="showPasteModal()" title="Paste LLM output (JSON or HTML)" aria-label="AI Import"><span class="tb-icon" aria-hidden="true">🤖</span><span class="tb-label">AI Import</span></button>
+    <button class="tb-btn" onclick="openDeployModal()" title="Generate a deployment runbook from this diagram" aria-label="Deploy Guide"><span class="tb-icon" aria-hidden="true">🚀</span><span class="tb-label">Deploy Guide</span></button>
     <button class="tb-btn primary" onclick="saveDiagram()" title="Save diagram (Ctrl+S)" aria-label="Save diagram"><span class="tb-icon" aria-hidden="true">💾</span><span class="tb-label">Save</span></button>
     <button class="tb-btn" onclick="saveAsDiagram()" title="Save As… — choose a new file location (Ctrl+Shift+S)" aria-label="Save diagram as"><span class="tb-icon" aria-hidden="true">📁</span><span class="tb-label">Save As</span></button>
 
@@ -1662,6 +1663,80 @@ kbd {
     <div style="display:flex;gap:8px;margin-top:14px;justify-content:flex-end">
       <button class="tb-btn" onclick="closeAiModal()">Cancel</button>
       <button class="tb-btn primary" onclick="importFromAI()">⬇️ Import Diagram</button>
+    </div>
+  </div>
+</div>
+
+<!-- DEPLOY GUIDE MODAL — turns the current diagram into a deployment runbook -->
+<div id="deploy-modal-overlay" role="dialog" aria-modal="true" aria-labelledby="deploy-modal-title" style="position:fixed;inset:0;background:var(--shadow-strong);z-index:8500;display:none;align-items:center;justify-content:center;backdrop-filter:blur(4px)">
+  <div style="background:var(--bg2);border:1px solid var(--border);border-radius:14px;padding:24px;width:680px;max-width:95vw;max-height:90vh;display:flex;flex-direction:column;box-shadow:0 24px 80px var(--shadow-strong);overflow-y:auto">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
+      <div>
+        <h2 id="deploy-modal-title" style="font-size:17px;font-weight:800">🚀 Deploy Guide — turn this diagram into a runbook</h2>
+        <p style="font-size:11px;color:var(--text-muted);font-family:ui-monospace,Menlo,Consolas,monospace;margin-top:3px">Pick your targets, copy, paste into any LLM, follow the numbered steps it returns.</p>
+      </div>
+      <button onclick="closeDeployModal()" aria-label="Close" style="background:none;border:none;color:var(--text-muted);font-size:22px;cursor:pointer;line-height:1">×</button>
+    </div>
+
+    <!-- SELECTORS -->
+    <div style="margin-top:14px;padding:12px 14px;background:var(--bg3);border:1px solid var(--border);border-radius:10px;display:flex;flex-wrap:wrap;gap:14px;align-items:flex-end">
+      <label style="display:flex;flex-direction:column;gap:4px;font-size:11px;color:var(--text-muted);font-family:ui-monospace,Menlo,Consolas,monospace">
+        Cloud provider <span id="deploy-detected" style="color:var(--text-dim)"></span>
+        <select id="deploy-provider" onchange="updateDeployPreview()" style="background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--text);padding:6px 8px;font-size:12px;min-width:150px">
+          <option value="AWS">AWS</option>
+          <option value="Azure">Azure</option>
+          <option value="Google Cloud">Google Cloud (GCP)</option>
+          <option value="multi-cloud">Multi-cloud</option>
+          <option value="the platform shown">Generic / other</option>
+        </select>
+      </label>
+      <label style="display:flex;flex-direction:column;gap:4px;font-size:11px;color:var(--text-muted);font-family:ui-monospace,Menlo,Consolas,monospace">
+        Output
+        <select id="deploy-output" onchange="onDeployOutputChange()" style="background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--text);padding:6px 8px;font-size:12px;min-width:170px">
+          <option value="runbook">Runbook only (table)</option>
+          <option value="iac">Runbook + IaC code</option>
+          <option value="console">Runbook + console steps</option>
+          <option value="all">All (table + IaC + console)</option>
+        </select>
+      </label>
+      <label id="deploy-iac-wrap" style="display:none;flex-direction:column;gap:4px;font-size:11px;color:var(--text-muted);font-family:ui-monospace,Menlo,Consolas,monospace">
+        IaC flavor
+        <select id="deploy-iac-flavor" onchange="updateDeployPreview()" style="background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--text);padding:6px 8px;font-size:12px;min-width:150px">
+          <option value="Terraform">Terraform</option>
+          <option value="AWS CDK (TypeScript)">AWS CDK (TypeScript)</option>
+          <option value="AWS CloudFormation (YAML)">CloudFormation (YAML)</option>
+          <option value="Azure Bicep">Azure Bicep</option>
+          <option value="Pulumi (TypeScript)">Pulumi (TypeScript)</option>
+        </select>
+      </label>
+    </div>
+
+    <!-- INCLUDE TOGGLES -->
+    <div style="margin-top:10px;padding:10px 14px;background:var(--bg3);border:1px solid var(--border);border-radius:10px;display:flex;flex-wrap:wrap;gap:14px;font-size:12px;color:var(--text)">
+      <span style="font-size:11px;color:var(--text-muted);font-family:ui-monospace,Menlo,Consolas,monospace">Include:</span>
+      <label style="display:flex;align-items:center;gap:5px;cursor:pointer"><input type="checkbox" id="deploy-inc-iam" checked onchange="updateDeployPreview()"> IAM least-privilege</label>
+      <label style="display:flex;align-items:center;gap:5px;cursor:pointer"><input type="checkbox" id="deploy-inc-obs" checked onchange="updateDeployPreview()"> Observability</label>
+      <label style="display:flex;align-items:center;gap:5px;cursor:pointer"><input type="checkbox" id="deploy-inc-rollback" checked onchange="updateDeployPreview()"> Rollback steps</label>
+      <label style="display:flex;align-items:center;gap:5px;cursor:pointer"><input type="checkbox" id="deploy-inc-cost" checked onchange="updateDeployPreview()"> Cost notes</label>
+    </div>
+
+    <!-- STEPS -->
+    <div style="margin-top:10px;padding:12px 14px;background:var(--bg3);border:1px solid var(--border);border-radius:10px;display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+      <div style="display:flex;align-items:center;gap:6px;font-size:12px"><span style="display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;border-radius:50%;background:var(--purple);color:#fff;font-size:10px;font-weight:700">1</span><strong>Copy</strong></div>
+      <button type="button" class="tb-btn primary" id="deploy-copy-btn" onclick="copyDeployPrompt(this)" style="font-size:11px">📋 Copy prompt + architecture</button>
+      <span style="font-size:11px;color:var(--text-dim);font-family:ui-monospace,Menlo,Consolas,monospace">→</span>
+      <div style="display:flex;align-items:center;gap:6px;font-size:12px"><span style="display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;border-radius:50%;background:var(--purple);color:#fff;font-size:10px;font-weight:700">2</span><strong>Paste into ChatGPT / Claude / Gemini and follow the steps</strong></div>
+    </div>
+
+    <div id="deploy-empty-warn" style="display:none;color:var(--red);font-size:11px;font-family:ui-monospace,Menlo,Consolas,monospace;margin-top:10px;padding:8px 12px;background:rgba(221,52,76,0.1);border-radius:6px;border:1px solid rgba(221,52,76,0.3)">Add some nodes to the canvas first — there's no architecture to deploy yet.</div>
+
+    <details style="margin-top:12px">
+      <summary style="font-size:11px;color:var(--text-muted);font-family:ui-monospace,Menlo,Consolas,monospace;cursor:pointer">👁 Preview prompt</summary>
+      <pre id="deploy-preview" style="margin-top:8px;max-height:240px;overflow:auto;background:var(--bg);border:1px solid var(--border);border-radius:8px;color:var(--text-dim);font-family:ui-monospace,Menlo,Consolas,monospace;font-size:10px;line-height:1.5;padding:12px;white-space:pre-wrap;word-break:break-word"></pre>
+    </details>
+
+    <div style="display:flex;gap:8px;margin-top:14px;justify-content:flex-end">
+      <button class="tb-btn" onclick="closeDeployModal()">Close</button>
     </div>
   </div>
 </div>
@@ -9652,6 +9727,140 @@ function copyLlmPrompt(btn) {
   });
 }
 
+// ===== DEPLOY GUIDE =====
+// Turns the current diagram into a copy-paste prompt that asks any LLM for a
+// production-grade deployment runbook (tabular) + optional IaC / console steps.
+// Same bring-your-own-LLM model as AI Import, but the reverse direction.
+
+// Guess the target cloud from node iconUrl paths / type strings, so the
+// provider dropdown opens on the right default. Returns one of the <option>
+// values, or '' when nothing matches (diagram is generic).
+function detectDeployProvider() {
+  let aws = 0, azure = 0, gcp = 0;
+  for (const n of nodes) {
+    const hay = ((n.iconUrl || '') + ' ' + (n.type || '') + ' ' + (n.category || '')).toLowerCase();
+    if (/icons\/aws\/|\bamazon\b|\baws\b|lambda|dynamodb|\bec2\b|\bs3\b|cloudfront|\bsqs\b|\bsns\b|cognito|bedrock/.test(hay)) aws++;
+    if (/icons\/azure\/|\bazure\b|\bvnet\b|cosmos|\bbicep\b|app service/.test(hay)) azure++;
+    if (/icons\/gcp\/|google cloud|\bgcp\b|bigquery|\bgke\b|cloud run|vertex|\bgcs\b/.test(hay)) gcp++;
+  }
+  if (aws === 0 && azure === 0 && gcp === 0) return '';
+  if (aws >= azure && aws >= gcp) return 'AWS';
+  if (azure >= gcp) return 'Azure';
+  return 'Google Cloud';
+}
+
+function openDeployModal() {
+  const detected = detectDeployProvider();
+  const sel = document.getElementById('deploy-provider');
+  if (detected) sel.value = detected;
+  document.getElementById('deploy-detected').textContent =
+    detected ? '(detected: ' + detected + ')' : '(none detected)';
+
+  // Empty-diagram guard — nothing to deploy without nodes.
+  const empty = nodes.length === 0;
+  document.getElementById('deploy-empty-warn').style.display = empty ? 'block' : 'none';
+  document.getElementById('deploy-copy-btn').disabled = empty;
+  document.getElementById('deploy-copy-btn').style.opacity = empty ? '0.5' : '';
+  document.getElementById('deploy-copy-btn').style.pointerEvents = empty ? 'none' : '';
+
+  onDeployOutputChange();
+  document.getElementById('deploy-modal-overlay').style.display = 'flex';
+}
+
+function closeDeployModal() {
+  document.getElementById('deploy-modal-overlay').style.display = 'none';
+}
+
+// Show the IaC-flavor dropdown only when the chosen output includes IaC.
+function onDeployOutputChange() {
+  const out = document.getElementById('deploy-output').value;
+  const wantIac = out === 'iac' || out === 'all';
+  document.getElementById('deploy-iac-wrap').style.display = wantIac ? 'flex' : 'none';
+  updateDeployPreview();
+}
+
+// Assemble the exact text the Copy button puts on the clipboard:
+// a tuned deployment prompt followed by the diagram JSON.
+function buildDeployPrompt() {
+  const provider  = document.getElementById('deploy-provider').value;
+  const out       = document.getElementById('deploy-output').value;
+  const iacFlavor = document.getElementById('deploy-iac-flavor').value;
+  const wantIac     = out === 'iac' || out === 'all';
+  const wantConsole = out === 'console' || out === 'all';
+
+  const inc = [];
+  if (document.getElementById('deploy-inc-iam').checked)      inc.push('least-privilege IAM / identity for every component');
+  if (document.getElementById('deploy-inc-obs').checked)      inc.push('observability — logs, metrics, traces and alarms');
+  if (document.getElementById('deploy-inc-rollback').checked) inc.push('a rollback / teardown note on each step where it applies');
+  if (document.getElementById('deploy-inc-cost').checked)     inc.push('a short cost note (main pricing driver) for each paid service');
+
+  let artifacts = '';
+  if (wantIac) artifacts += '\n- AFTER the table, output the complete ' + iacFlavor + ' to provision this architecture, split into code blocks each labelled with the step number(s) it implements. It must be production-grade: parameterised inputs, tagged resources, no hard-coded secrets, and remote state / a proper module layout where the tool supports it.';
+  if (wantConsole) artifacts += '\n- AFTER the table, output click-by-click ' + provider + ' console instructions, grouped under headings labelled by step number.';
+  if (!wantIac && !wantConsole) artifacts = '\n- Output ONLY the runbook table — no IaC code and no console walkthrough.';
+
+  const d = getDiagramData();
+  const json = JSON.stringify(
+    { meta: { name: d.meta.name }, nodes: d.nodes, arrows: d.arrows, groups: d.groups, playFlow: d.playFlow },
+    null, 2
+  );
+
+  return 'You are a Principal Cloud Engineer. Produce a PRODUCTION-GRADE deployment runbook for the architecture described in the JSON at the end of this message. A competent cloud engineer should be able to follow it end to end and reach a working, production-ready deployment.\n\n' +
+    'OUTPUT FORMAT — READ FIRST (so every model replies the same way)\n' +
+    '- Reply in plain GitHub-flavored Markdown TEXT only, written directly in the chat.\n' +
+    '- The runbook MUST be a literal Markdown table (rows of "| ... | ... |"). Do NOT render it as anything else.\n' +
+    '- Do NOT build an app, website, interactive artifact, canvas, document, React/HTML/JS component, filter UI, or downloadable file. Do NOT use any tools, web search, code execution, or browsing — answer from your own knowledge.\n' +
+    '- No preamble, no "I\'ll build…", no closing summary. Start the reply with the table.\n\n' +
+    'TARGET\n' +
+    '- Cloud provider: ' + provider + '\n' +
+    '- Deliverables: ' + deployDeliverablesLabel(out, iacFlavor) + '\n\n' +
+    'RUNBOOK TABLE (always first, required)\n' +
+    'Return the runbook as a Markdown table with EXACTLY these columns:\n' +
+    '| # | Depends on | Service | Task | Instruction | Why needed |\n' +
+    '- "#": step number starting at 1, ordered so every prerequisite comes before the step that needs it.\n' +
+    '- "Depends on": the step numbers this step requires ("—" if none). Steps sharing the same dependencies may run in parallel.\n' +
+    '- "Service": the concrete managed service being configured — use ' + provider + "'s real product name, never a generic word like \"database\".\n" +
+    '- "Task": a short imperative summary (3–6 words).\n' +
+    '- "Instruction": the concrete action — CLI command, key resource settings, or console path.\n' +
+    '- "Why needed": one clause on the architectural reason (security, reliability, scale, decoupling, cost).\n\n' +
+    'Cover the FULL production lifecycle in dependency order: networking (VPC/VNet, subnets), identity & least-privilege roles, security (encryption, secrets, WAF/firewall), the data tier, the compute tier, integration/eventing, edge/CDN, then observability. Add a validation / health-check step after each major tier.' +
+    (inc.length ? ' Also include: ' + inc.join('; ') + '.' : '') + '\n\n' +
+    'ADDITIONAL DELIVERABLES' + artifacts + '\n\n' +
+    'RULES\n' +
+    '- Be specific to ' + provider + ': real service names, real settings.\n' +
+    '- Ground every step in the architecture below — use the node labels, descriptions and the playFlow narration as the source of truth. Do not invent components it does not imply, but DO add the supporting infrastructure a real production deployment needs (networking, IAM, secrets, monitoring) even if not drawn.\n' +
+    '- Output the table first, then any code/console sections. No preamble, no closing summary.\n\n' +
+    '--- ARCHITECTURE (Potato diagram JSON) ---\n' + json;
+}
+
+function deployDeliverablesLabel(out, iacFlavor) {
+  if (out === 'runbook') return 'a tabular runbook only';
+  if (out === 'iac')     return 'a tabular runbook + ' + iacFlavor + ' code';
+  if (out === 'console') return 'a tabular runbook + console click-by-click steps';
+  return 'a tabular runbook + ' + iacFlavor + ' code + console click-by-click steps';
+}
+
+function updateDeployPreview() {
+  const pre = document.getElementById('deploy-preview');
+  if (!pre) return;
+  try { pre.textContent = nodes.length ? buildDeployPrompt() : '(add nodes to the canvas to generate a prompt)'; }
+  catch (e) { pre.textContent = '(preview unavailable)'; }
+}
+
+function copyDeployPrompt(btn) {
+  if (nodes.length === 0) { notify('Add some nodes first', 'error'); return; }
+  navigator.clipboard.writeText(buildDeployPrompt()).then(() => {
+    if (btn) {
+      const original = btn.textContent;
+      btn.textContent = '✅ Copied — paste into any LLM';
+      setTimeout(() => { btn.textContent = original; }, 2500);
+    }
+    notify('Deploy prompt + architecture copied to clipboard');
+  }).catch(() => {
+    notify('Copy failed — copy it from the preview instead', 'error');
+  });
+}
+
 // ===== CONNECTION CANCEL (Escape during drag-to-connect) =====
 function cancelConnecting() {
   if (!isConnecting) return;
@@ -10402,6 +10611,9 @@ function guessIconUrlFromType(typeStr) {
 document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('ai-modal-overlay').addEventListener('click', (e) => {
     if (e.target === e.currentTarget) closeAiModal();
+  });
+  document.getElementById('deploy-modal-overlay').addEventListener('click', (e) => {
+    if (e.target === e.currentTarget) closeDeployModal();
   });
 });
 
