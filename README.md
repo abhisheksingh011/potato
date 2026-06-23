@@ -204,7 +204,7 @@ A diagram tool stops at the picture. **Potato keeps going** — it's where you *
 
 > **The picture is the cheap part.** The value is everything Potato wraps around it: the operational knowledge baked into every node, the animated walkthrough, the downloadable runbook, and the monthly cost. A box labelled "Lambda" is a drawing. A Lambda node that tells you its 15-minute ceiling, its cold-start pitfall, its SLA, and its monthly cost — and narrates how a request flows through it — is architecture intelligence.
 
-If you're choosing Potato, you're not choosing it *over* draw.io. You're choosing a different category.
+If you're choosing Potato, you're not choosing it *over* a drawing tool. You're choosing a different category.
 
 ---
 
@@ -226,7 +226,7 @@ If you're choosing Potato, you're not choosing it *over* draw.io. You're choosin
 
 ## 🆚 Drawing tools draw. Potato does the other 80%.
 
-| | **Potato** | draw.io | Excalidraw | Mermaid | Lucidchart |
+| | **Potato** | Diagram tools | Excalidraw | Mermaid | Lucidchart |
 |---|---|---|---|---|---|
 | **Service knowledge** (SLA · limits · pitfalls) on every node | ✅ | ❌ | ❌ | ❌ | ❌ |
 | **Monthly cost estimator** | ✅ | ❌ | ❌ | ❌ | ❌ |
