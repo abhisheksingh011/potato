@@ -588,6 +588,61 @@ body {
   min-width: 30px;
 }
 
+/* ===== Draw.io-style geometric shapes ===== */
+/* The node box itself is just an invisible bounds — the geometry is drawn by an
+   SVG that fills it, and the label sits centred on top, editable in place. */
+.node.is-shape {
+  background: transparent;
+  border: none;
+  padding: 0;
+  border-radius: 0;
+  min-width: 48px;
+  max-width: none;
+}
+.node.is-shape:hover { box-shadow: none; }
+.node.is-shape.selected {
+  box-shadow: none !important;
+  outline: 2px solid var(--purple);
+  outline-offset: 3px;
+  border-radius: 3px;
+}
+.shape-geom {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+.shape-geom svg { width: 100%; height: 100%; display: block; overflow: visible; }
+.node.is-shape .shape-text {
+  position: relative;   /* sit above .shape-geom */
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  box-sizing: border-box;
+  padding: 6px 10px;
+  text-align: center;
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.25;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+/* Geometry colour follows the node theme (consumed via currentColor in the SVG). */
+.node.is-shape.theme-green  { color: var(--green); }
+.node.is-shape.theme-orange { color: var(--orange); }
+.node.is-shape.theme-blue   { color: var(--blue); }
+.node.is-shape.theme-purple { color: var(--purple); }
+.node.is-shape.theme-red    { color: var(--red); }
+.node.is-shape.theme-teal   { color: var(--teal); }
+.node.is-shape.theme-pink   { color: var(--pink); }
+.node.is-shape.theme-yellow { color: var(--yellow); }
+.node.is-shape.theme-cyan   { color: var(--cyan); }
+.node.is-shape.theme-gray   { color: #9aa0b5; }
+.node.is-shape.theme-gradient { color: var(--purple); }
+
 /* Arrow SVG styles */
 .arrow-path {
   fill: none;
@@ -1806,11 +1861,11 @@ function uid(prefix) {
 const COMPONENTS = {
   shapes: [
     { cat: 'Basic Shapes', items: [
-      { id: 'rect', name: 'Rectangle', icon: '▭', theme: 'gray', type: 'shape' },
-      { id: 'rounded', name: 'Rounded Box', icon: '⬜', theme: 'blue', type: 'shape' },
-      { id: 'diamond', name: 'Decision', icon: '◇', theme: 'orange', type: 'shape' },
-      { id: 'circle', name: 'Circle', icon: '⬤', theme: 'teal', type: 'shape' },
-      { id: 'cylinder', name: 'Database', icon: '🗄️', theme: 'blue', type: 'db' },
+      { id: 'rect', name: 'Rectangle', icon: '▭', theme: 'gray', type: 'shape', shape: 'rectangle' },
+      { id: 'rounded', name: 'Rounded Box', icon: '⬜', theme: 'blue', type: 'shape', shape: 'rounded' },
+      { id: 'diamond', name: 'Decision', icon: '◇', theme: 'orange', type: 'shape', shape: 'diamond' },
+      { id: 'circle', name: 'Circle', icon: '⬤', theme: 'teal', type: 'shape', shape: 'ellipse' },
+      { id: 'cylinder', name: 'Database', icon: '🗄️', theme: 'blue', type: 'db', shape: 'cylinder' },
       { id: 'text', name: 'Text / Note', icon: '📝', theme: 'yellow', type: 'text' },
       { id: 'actor', name: 'Actor/User', icon: '👤', theme: 'gray', type: 'actor' },
       { id: 'process', name: 'Process', icon: '⚙️', theme: 'blue', type: 'process' },
@@ -1824,12 +1879,12 @@ const COMPONENTS = {
       { id: 'container', name: 'Container Box', icon: '▣', theme: 'purple', type: 'group' },
     ]},
     { cat: 'Flowchart', items: [
-      { id: 'start', name: 'Start/End', icon: '⬭', theme: 'green', type: 'terminal' },
-      { id: 'step', name: 'Step', icon: '▭', theme: 'blue', type: 'step' },
-      { id: 'decision', name: 'Decision', icon: '◇', theme: 'orange', type: 'decision' },
-      { id: 'io', name: 'Input/Output', icon: '⬡', theme: 'purple', type: 'io' },
-      { id: 'doc', name: 'Document', icon: '📃', theme: 'teal', type: 'document' },
-      { id: 'loop', name: 'Loop', icon: '🔄', theme: 'pink', type: 'loop' },
+      { id: 'start', name: 'Start/End', icon: '⬭', theme: 'green', type: 'terminal', shape: 'stadium' },
+      { id: 'step', name: 'Step', icon: '▭', theme: 'blue', type: 'step', shape: 'rectangle' },
+      { id: 'decision', name: 'Decision', icon: '◇', theme: 'orange', type: 'decision', shape: 'diamond' },
+      { id: 'io', name: 'Input/Output', icon: '⬡', theme: 'purple', type: 'io', shape: 'parallelogram' },
+      { id: 'doc', name: 'Document', icon: '📃', theme: 'teal', type: 'document', shape: 'document' },
+      { id: 'loop', name: 'Loop', icon: '🔄', theme: 'pink', type: 'loop', shape: 'hexagon' },
     ]},
     { cat: 'Architecture (generic)', items: [
       { id: 'gen_server', name: 'Server', icon: '🖥️', iconUrl: 'icons/generic/Architecture/Server.svg', theme: 'blue', type: 'Server', cat: 'Architecture' },
@@ -2166,6 +2221,7 @@ const COMPONENTS = {
       { id: "aws_networking_content_delivery_aws_global_accelerator", name: "AWS Global Accelerator", icon: "⬜", iconUrl: "icons/aws/Networking-Content-Delivery/AWS-Global-Accelerator.svg", theme: "purple", type: "AWS Global Accelerator", cat: "Networking Content Delivery" },
       { id: "aws_networking_content_delivery_aws_interconnect", name: "AWS Interconnect", icon: "⬜", iconUrl: "icons/aws/Networking-Content-Delivery/AWS-Interconnect.svg", theme: "purple", type: "AWS Interconnect", cat: "Networking Content Delivery" },
       { id: "aws_networking_content_delivery_aws_privatelink", name: "AWS Private Link", icon: "⬜", iconUrl: "icons/aws/Networking-Content-Delivery/AWS-PrivateLink.svg", theme: "purple", type: "AWS Private Link", cat: "Networking Content Delivery" },
+      { id: "aws_networking_content_delivery_vpc_endpoint", name: "VPC Endpoint", icon: "🔌", iconUrl: "icons/aws/Networking-Content-Delivery/AWS-PrivateLink.svg", theme: "purple", type: "VPC Endpoint", cat: "Networking Content Delivery" },
       { id: "aws_networking_content_delivery_aws_rtb_fabric", name: "AWS RTB Fabric", icon: "⬜", iconUrl: "icons/aws/Networking-Content-Delivery/AWS-RTB-Fabric.svg", theme: "purple", type: "AWS RTB Fabric", cat: "Networking Content Delivery" },
       { id: "aws_networking_content_delivery_aws_site_to_site_vpn", name: "AWS Site to Site VPN", icon: "⬜", iconUrl: "icons/aws/Networking-Content-Delivery/AWS-Site-to-Site-VPN.svg", theme: "purple", type: "AWS Site to Site VPN", cat: "Networking Content Delivery" },
       { id: "aws_networking_content_delivery_aws_transit_gateway", name: "AWS Transit Gateway", icon: "⬜", iconUrl: "icons/aws/Networking-Content-Delivery/AWS-Transit-Gateway.svg", theme: "purple", type: "AWS Transit Gateway", cat: "Networking Content Delivery" },
@@ -5206,27 +5262,96 @@ function addNodeFromComp(comp, x, y) {
   // resizable container (like the Region/AZ boxes from AI Import).
   if (comp.type === 'group') { addGroupAt(x - 75, y - 40, { label: 'Container', color: comp.theme || 'purple' }); return; }
   pushHistory();
+  // Generic geometric primitives (Rectangle, Decision, Database, …) drop as
+  // draw.io-style shapes: a plain outlined box you type into, not an icon card.
+  const isShape = !!comp.shape;
+  const [sw, sh] = SHAPE_SIZE[comp.shape] || [140, 70];
   const node = {
     id: uid('n'),
     x: Math.round(x),
     y: Math.round(y),
-    w: 160,
-    h: null, // auto
+    w: isShape ? sw : 160,
+    h: isShape ? sh : null, // auto
     type: comp.type,
+    shape: comp.shape || '',
     label: comp.name,
-    sublabel: comp.type,
-    category: comp.cat || '',
+    sublabel: isShape ? '' : comp.type,
+    category: isShape ? '' : (comp.cat || ''),
     icon: comp.icon,
     iconUrl: comp.iconUrl || '',
     theme: comp.theme,
-    description: buildAutoDescription(comp),
+    description: isShape ? '' : buildAutoDescription(comp),
     zIndex: 10 + nodes.length,
   };
   nodes.push(node);
   renderNode(node);
   markDirty();
   updateStatusBar();
+  // Drop a shape ready to write in: select it and open the inline text editor
+  // with the placeholder name selected, so the user can immediately type a label.
+  if (isShape) {
+    setTimeout(() => {
+      selectNode(node.id);
+      const el = document.getElementById('node-' + node.id);
+      const txt = el && el.querySelector('.shape-text');
+      if (txt) startInlineEdit(txt, node);
+    }, 0);
+  }
   return node;
+}
+
+// Default width/height for each draw.io-style shape kind when dropped.
+const SHAPE_SIZE = {
+  rectangle: [140, 70], rounded: [140, 70], ellipse: [110, 110], stadium: [150, 60],
+  diamond: [140, 100], parallelogram: [150, 80], hexagon: [150, 80],
+  document: [140, 90], cylinder: [120, 90],
+};
+
+// Inline SVG outline for a draw.io-style shape. Fills the node box
+// (preserveAspectRatio="none"); the stroke stays crisp via non-scaling-stroke,
+// and both fill + stroke inherit the node's theme colour through currentColor.
+function shapeSvg(kind) {
+  const a = 'vector-effect="non-scaling-stroke" fill="currentColor" fill-opacity="0.10" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"';
+  let inner;
+  switch (kind) {
+    case 'rectangle':     inner = `<rect x="0.75" y="0.75" width="98.5" height="98.5" ${a}/>`; break;
+    case 'rounded':       inner = `<rect x="0.75" y="0.75" width="98.5" height="98.5" rx="9" ${a}/>`; break;
+    case 'ellipse':       inner = `<ellipse cx="50" cy="50" rx="49" ry="49" ${a}/>`; break;
+    case 'stadium':       inner = `<rect x="0.75" y="0.75" width="98.5" height="98.5" rx="49" ry="49" ${a}/>`; break;
+    case 'diamond':       inner = `<path d="M50 1 L99 50 L50 99 L1 50 Z" ${a}/>`; break;
+    case 'parallelogram': inner = `<path d="M22 1 L99 1 L78 99 L1 99 Z" ${a}/>`; break;
+    case 'hexagon':       inner = `<path d="M24 1 L76 1 L99 50 L76 99 L24 99 L1 50 Z" ${a}/>`; break;
+    case 'document':      inner = `<path d="M1 1 L99 1 L99 84 C74 99 26 70 1 84 Z" ${a}/>`; break;
+    case 'cylinder':      inner = `<path d="M1 14 C1 6 99 6 99 14 L99 86 C99 94 1 94 1 86 Z" ${a}/>`
+                                + `<path d="M1 14 C1 22 99 22 99 14" fill="none" vector-effect="non-scaling-stroke" stroke="currentColor" stroke-width="1.5"/>`; break;
+    default:              inner = `<rect x="0.75" y="0.75" width="98.5" height="98.5" rx="9" ${a}/>`;
+  }
+  return `<svg viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">${inner}</svg>`;
+}
+
+// Absolute-coordinate SVG outline for a shape node, used by the export/saved
+// viewer so it matches the live canvas. `fill` is a faint tint of the theme col.
+function exportShapeGeom(kind, x, y, w, h, col) {
+  const a = `fill="${col}1f" stroke="${col}" stroke-width="1.5" stroke-linejoin="round"`;
+  const X = x, Y = y, R = x + w, B = y + h, MX = x + w / 2, MY = y + h / 2;
+  const sk = Math.min(w * 0.18, 26);   // parallelogram skew
+  const cut = Math.min(w * 0.16, 26);  // hexagon end cut
+  switch (kind) {
+    case 'rectangle':     return `    <rect x="${X}" y="${Y}" width="${w}" height="${h}" ${a}/>`;
+    case 'rounded':       return `    <rect x="${X}" y="${Y}" width="${w}" height="${h}" rx="10" ${a}/>`;
+    case 'ellipse':       return `    <ellipse cx="${MX}" cy="${MY}" rx="${w/2}" ry="${h/2}" ${a}/>`;
+    case 'stadium':       return `    <rect x="${X}" y="${Y}" width="${w}" height="${h}" rx="${h/2}" ${a}/>`;
+    case 'diamond':       return `    <path d="M${MX} ${Y} L${R} ${MY} L${MX} ${B} L${X} ${MY} Z" ${a}/>`;
+    case 'parallelogram': return `    <path d="M${X+sk} ${Y} L${R} ${Y} L${R-sk} ${B} L${X} ${B} Z" ${a}/>`;
+    case 'hexagon':       return `    <path d="M${X+cut} ${Y} L${R-cut} ${Y} L${R} ${MY} L${R-cut} ${B} L${X+cut} ${B} L${X} ${MY} Z" ${a}/>`;
+    case 'document':      return `    <path d="M${X} ${Y} L${R} ${Y} L${R} ${B-h*0.16} C${X+w*0.75} ${B} ${X+w*0.25} ${B-h*0.3} ${X} ${B-h*0.16} Z" ${a}/>`;
+    case 'cylinder': {
+      const e = Math.min(h * 0.16, 14);
+      return `    <path d="M${X} ${Y+e} C${X} ${Y-e*0.7} ${R} ${Y-e*0.7} ${R} ${Y+e} L${R} ${B-e} C${R} ${B+e*0.7} ${X} ${B+e*0.7} ${X} ${B-e} Z" ${a}/>`
+           + `\n    <path d="M${X} ${Y+e} C${X} ${Y+e*2.7} ${R} ${Y+e*2.7} ${R} ${Y+e}" fill="none" stroke="${col}" stroke-width="1.5"/>`;
+    }
+    default:              return `    <rect x="${X}" y="${Y}" width="${w}" height="${h}" rx="10" ${a}/>`;
+  }
 }
 
 // ===== RENDER NODE =====
@@ -5249,7 +5374,9 @@ function renderNode(node) {
   el.style.zIndex = node.zIndex || 10;
   if (node.h) el.style.height = node.h + 'px'; else el.style.height = '';
 
-  el.className = `node theme-${node.theme}`;
+  el.className = node.shape
+    ? `node is-shape shape-${escHtml(node.shape)} theme-${node.theme}`
+    : `node theme-${node.theme}`;
   if (selectedIds.has(node.id)) el.classList.add('selected');
   el.setAttribute('aria-label', `${node.type || 'node'}: ${node.label || ''}`);
 
@@ -5260,18 +5387,7 @@ function renderNode(node) {
   // rewrite — only the position/class needs to change.
   if (el.querySelector('[contenteditable="true"]')) return;
 
-  // Fallback emoji is stashed in data-fallback so the onerror handler can
-  // read it without inlining a JS string into the attribute value (which
-  // would break the attribute quoting whenever JSON.stringify emits a `"`).
-  const iconMarkup = isText ? ''
-    : node.iconUrl
-      ? `<span class="node-icon" aria-hidden="true"><img src="${escHtml(node.iconUrl)}" alt="" draggable="false" data-fallback="${escHtml(node.icon || '⬡')}" style="width:28px;height:28px;object-fit:contain;display:block;pointer-events:none;-webkit-user-drag:none" onerror="this.replaceWith(Object.assign(document.createElement('span'),{textContent:this.dataset.fallback||'⬡',style:'font-size:24px'}))"></span>`
-      : `<span class="node-icon" aria-hidden="true">${escHtml(node.icon || '')}</span>`;
-  el.innerHTML = `
-    ${iconMarkup}
-    ${isText ? '' : `<div class="node-label" data-field="category">${escHtml(node.category || node.type || '')}</div>`}
-    <div class="node-name" data-field="label">${escHtml(node.label || '')}</div>
-    ${isText ? '' : `<div class="node-sub" data-field="sublabel">${escHtml(node.sublabel || '')}</div>`}
+  const portsHtml = `
     <div class="node-ports" aria-hidden="true">
       <div class="port top pos-1"    data-node="${safeId}" data-port="top-1"></div>
       <div class="port top pos-2"    data-node="${safeId}" data-port="top"></div>
@@ -5290,7 +5406,34 @@ function renderNode(node) {
       <div class="port corner bl"    data-node="${safeId}" data-port="bl"></div>
       <div class="port corner br"    data-node="${safeId}" data-port="br"></div>
     </div>
-    <div class="node-resize" data-resize="${safeId}" aria-hidden="true"></div>
+    <div class="node-resize" data-resize="${safeId}" aria-hidden="true"></div>`;
+
+  // Draw.io-style geometric shape: an outlined box with centred, editable text —
+  // no emoji icon, category, or sublabel. Drop it and write straight into it.
+  if (node.shape) {
+    el.innerHTML = `
+      <div class="shape-geom">${shapeSvg(node.shape)}</div>
+      <div class="node-name shape-text" data-field="label">${escHtml(node.label || '')}</div>
+      ${portsHtml}
+    `;
+    bindNodeInnerEvents(el, node);
+    if (isNew) bindNodeRootEvents(el, node);
+    return;
+  }
+
+  // Fallback emoji is stashed in data-fallback so the onerror handler can
+  // read it without inlining a JS string into the attribute value (which
+  // would break the attribute quoting whenever JSON.stringify emits a `"`).
+  const iconMarkup = isText ? ''
+    : node.iconUrl
+      ? `<span class="node-icon" aria-hidden="true"><img src="${escHtml(node.iconUrl)}" alt="" draggable="false" data-fallback="${escHtml(node.icon || '⬡')}" style="width:28px;height:28px;object-fit:contain;display:block;pointer-events:none;-webkit-user-drag:none" onerror="this.replaceWith(Object.assign(document.createElement('span'),{textContent:this.dataset.fallback||'⬡',style:'font-size:24px'}))"></span>`
+      : `<span class="node-icon" aria-hidden="true">${escHtml(node.icon || '')}</span>`;
+  el.innerHTML = `
+    ${iconMarkup}
+    ${isText ? '' : `<div class="node-label" data-field="category">${escHtml(node.category || node.type || '')}</div>`}
+    <div class="node-name" data-field="label">${escHtml(node.label || '')}</div>
+    ${isText ? '' : `<div class="node-sub" data-field="sublabel">${escHtml(node.sublabel || '')}</div>`}
+    ${portsHtml}
   `;
 
   // Re-bind inner element listeners (ports + resize handle change each innerHTML).
@@ -7004,6 +7147,7 @@ function updatePropsPanel() {
         <span class="prop-label">Label</span>
         <input class="prop-input" value="${escHtml(node.label)}" oninput="updateNodeProp('${id}','label',this.value)">
       </div>
+      ${node.shape ? '' : `
       <div class="prop-row">
         <span class="prop-label">Sub-label</span>
         <input class="prop-input" value="${escHtml(node.sublabel||'')}" oninput="updateNodeProp('${id}','sublabel',this.value)">
@@ -7017,7 +7161,7 @@ function updatePropsPanel() {
         <input class="prop-input" value="${node.icon||''}" oninput="updateNodeProp('${id}','icon',this.value)" placeholder="emoji or text">
       </div>
       <button class="prop-btn" onclick="openIconPicker('${id}')">🖼 Replace icon…</button>
-      ${node.iconUrl ? `<div style="font-size:10px;color:var(--text-dim);margin-top:4px;font-family:var(--font-mono);word-break:break-all">${escHtml(node.iconUrl.replace(/^icons\//,'').replace(/\.svg$/,''))}</div>` : ''}
+      ${node.iconUrl ? `<div style="font-size:10px;color:var(--text-dim);margin-top:4px;font-family:var(--font-mono);word-break:break-all">${escHtml(node.iconUrl.replace(/^icons\//,'').replace(/\.svg$/,''))}</div>` : ''}`}
     </div>
 
     <div class="prop-group">
@@ -9036,6 +9180,16 @@ async function buildDiagramSVG(theme = 'dark') {
     const nw=el?el.offsetWidth:160, nh=el?el.offsetHeight:80;
     const nx=n.x+ox, ny=n.y+oy;
     const col=themeColors[n.theme]||'#7986cb';
+    // Draw.io-style geometric shape: outlined form with centred text, no icon card.
+    if (n.shape) {
+      const geom = exportShapeGeom(n.shape, nx, ny, nw, nh, col);
+      svg += `  <g class="potato-node" data-node-id="${escHtml(n.id)}" style="cursor:pointer">
+${geom}
+    <text x="${nx+nw/2}" y="${ny+nh/2}" class="node-name" text-anchor="middle" dominant-baseline="central">${escHtml((n.label||'').slice(0,24))}</text>
+  </g>
+`;
+      return;
+    }
     const iconData = n.iconUrl ? iconDataUrls.get(n.iconUrl) : null;
     const iconMarkup = iconData
       ? `    <image href="${iconData}" x="${nx+8}" y="${ny+8}" width="24" height="24"/>`
@@ -11071,16 +11225,16 @@ const TEMPLATES = {
         { id:'n_6',  x:940,  y:160,  w:160, type:'Amazon ECS',                label:'ECS Service', sublabel:'us-east-1a / Spot', category:'Compute',    icon:'🐳', iconUrl:'icons/aws/Containers/Amazon-Elastic-Container-Service.svg',            theme:'orange', description:'ECS Service on Spot capacity in us-east-1a.', zIndex:15 },
         { id:'n_7',  x:940,  y:320,  w:160, type:'Amazon ECS',                label:'ECS Service', sublabel:'us-east-1b / Spot', category:'Compute',    icon:'🐳', iconUrl:'icons/aws/Containers/Amazon-Elastic-Container-Service.svg',            theme:'orange', description:'ECS Service on Spot capacity in us-east-1b.', zIndex:16 },
         { id:'n_8',  x:940,  y:480,  w:160, type:'Amazon ECS',                label:'ECS Service', sublabel:'us-east-1c / Spot', category:'Compute',    icon:'🐳', iconUrl:'icons/aws/Containers/Amazon-Elastic-Container-Service.svg',            theme:'orange', description:'ECS Service on Spot capacity in us-east-1c.', zIndex:17 },
-        { id:'n_9',  x:1160, y:240,  w:160, type:'VPC Endpoint',              label:'VPC Endpoint',sublabel:'DynamoDB',          category:'Networking', icon:'🔌', iconUrl:'icons/aws/Networking-Content-Delivery/Amazon-Virtual-Private-Cloud.svg', theme:'purple', description:'Gateway VPC endpoint to DynamoDB — traffic stays on AWS backbone.', zIndex:18 },
-        { id:'n_10', x:1160, y:400,  w:160, type:'VPC Endpoint',              label:'VPC Endpoint',sublabel:'S3',                category:'Networking', icon:'🔌', iconUrl:'icons/aws/Networking-Content-Delivery/Amazon-Virtual-Private-Cloud.svg', theme:'purple', description:'Gateway VPC endpoint to S3 — no NAT, no public IPs.', zIndex:19 },
+        { id:'n_9',  x:1160, y:240,  w:160, type:'VPC Endpoint',              label:'VPC Endpoint',sublabel:'DynamoDB',          category:'Networking', icon:'🔌', iconUrl:'icons/aws/Networking-Content-Delivery/AWS-PrivateLink.svg', theme:'purple', description:'Gateway VPC endpoint to DynamoDB — traffic stays on AWS backbone.', zIndex:18 },
+        { id:'n_10', x:1160, y:400,  w:160, type:'VPC Endpoint',              label:'VPC Endpoint',sublabel:'S3',                category:'Networking', icon:'🔌', iconUrl:'icons/aws/Networking-Content-Delivery/AWS-PrivateLink.svg', theme:'purple', description:'Gateway VPC endpoint to S3 — no NAT, no public IPs.', zIndex:19 },
         { id:'n_11', x:1380, y:240,  w:160, type:'Amazon DynamoDB',           label:'DynamoDB',    sublabel:'Global Table',      category:'Database',   icon:'🔷', iconUrl:'icons/aws/Databases/Amazon-DynamoDB.svg',                              theme:'blue',   description:'DynamoDB Global Table replica in us-east-1.', zIndex:20 },
         { id:'n_12', x:1380, y:400,  w:160, type:'Amazon S3',                 label:'S3 Bucket',   sublabel:'us-east-1',         category:'Storage',    icon:'🪣', iconUrl:'icons/aws/Storage/Amazon-Simple-Storage-Service.svg',                  theme:'green',  description:'S3 bucket in us-east-1 with CRR to eu-west-1.', zIndex:21 },
         { id:'n_13', x:720,  y:950,  w:160, type:'Application Load Balancer', label:'ALB',         sublabel:'eu-west-1',         category:'Networking', icon:'⚖️', iconUrl:'icons/aws/Networking-Content-Delivery/Elastic-Load-Balancing.svg',     theme:'purple', description:'ALB in eu-west-1 — takes over on failover.', zIndex:22 },
         { id:'n_14', x:940,  y:790,  w:160, type:'Amazon ECS',                label:'ECS Service', sublabel:'eu-west-1a / Spot', category:'Compute',    icon:'🐳', iconUrl:'icons/aws/Containers/Amazon-Elastic-Container-Service.svg',            theme:'orange', description:'ECS Service on Spot capacity in eu-west-1a.', zIndex:23 },
         { id:'n_15', x:940,  y:950,  w:160, type:'Amazon ECS',                label:'ECS Service', sublabel:'eu-west-1b / Spot', category:'Compute',    icon:'🐳', iconUrl:'icons/aws/Containers/Amazon-Elastic-Container-Service.svg',            theme:'orange', description:'ECS Service on Spot capacity in eu-west-1b.', zIndex:24 },
         { id:'n_16', x:940,  y:1110, w:160, type:'Amazon ECS',                label:'ECS Service', sublabel:'eu-west-1c / Spot', category:'Compute',    icon:'🐳', iconUrl:'icons/aws/Containers/Amazon-Elastic-Container-Service.svg',            theme:'orange', description:'ECS Service on Spot capacity in eu-west-1c.', zIndex:25 },
-        { id:'n_17', x:1160, y:870,  w:160, type:'VPC Endpoint',              label:'VPC Endpoint',sublabel:'DynamoDB',          category:'Networking', icon:'🔌', iconUrl:'icons/aws/Networking-Content-Delivery/Amazon-Virtual-Private-Cloud.svg', theme:'purple', description:'Gateway VPC endpoint to DynamoDB in eu-west-1.', zIndex:26 },
-        { id:'n_18', x:1160, y:1030, w:160, type:'VPC Endpoint',              label:'VPC Endpoint',sublabel:'S3',                category:'Networking', icon:'🔌', iconUrl:'icons/aws/Networking-Content-Delivery/Amazon-Virtual-Private-Cloud.svg', theme:'purple', description:'Gateway VPC endpoint to S3 in eu-west-1.', zIndex:27 },
+        { id:'n_17', x:1160, y:870,  w:160, type:'VPC Endpoint',              label:'VPC Endpoint',sublabel:'DynamoDB',          category:'Networking', icon:'🔌', iconUrl:'icons/aws/Networking-Content-Delivery/AWS-PrivateLink.svg', theme:'purple', description:'Gateway VPC endpoint to DynamoDB in eu-west-1.', zIndex:26 },
+        { id:'n_18', x:1160, y:1030, w:160, type:'VPC Endpoint',              label:'VPC Endpoint',sublabel:'S3',                category:'Networking', icon:'🔌', iconUrl:'icons/aws/Networking-Content-Delivery/AWS-PrivateLink.svg', theme:'purple', description:'Gateway VPC endpoint to S3 in eu-west-1.', zIndex:27 },
         { id:'n_19', x:1380, y:870,  w:160, type:'Amazon DynamoDB',           label:'DynamoDB',    sublabel:'Global Table',      category:'Database',   icon:'🔷', iconUrl:'icons/aws/Databases/Amazon-DynamoDB.svg',                              theme:'blue',   description:'DynamoDB Global Table replica in eu-west-1.', zIndex:28 },
         { id:'n_20', x:1380, y:1030, w:160, type:'Amazon S3',                 label:'S3 Bucket',   sublabel:'eu-west-1',         category:'Storage',    icon:'🪣', iconUrl:'icons/aws/Storage/Amazon-Simple-Storage-Service.svg',                  theme:'green',  description:'S3 bucket in eu-west-1 — CRR target.', zIndex:29 },
         { id:'n_21', x:1600, y:320,  w:160, type:'AWS KMS',                   label:'KMS',         sublabel:'us-east-1 replica', category:'Security',   icon:'🗝️', iconUrl:'icons/aws/Security-Identity/AWS-Key-Management-Service.svg',           theme:'red',    description:'KMS multi-region key primary in us-east-1.', zIndex:30 },
