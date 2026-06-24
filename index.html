@@ -5449,6 +5449,10 @@ function renderNode(node) {
   el.style.left = node.x + 'px';
   el.style.top = node.y + 'px';
   el.style.width = (node.w || 160) + 'px';
+  // The explicit width drives the box; neutralize the CSS 140–220px clamp so
+  // the user can freely shrink or widen it (e.g. a thin/wide rectangle).
+  el.style.minWidth = '0';
+  el.style.maxWidth = 'none';
   el.style.zIndex = node.zIndex || 10;
   if (node.h) el.style.height = node.h + 'px'; else el.style.height = '';
 
