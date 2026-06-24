@@ -7340,7 +7340,7 @@ function renderGroup(grp) {
   const safeGid = escHtml(grp.id);
   el.innerHTML = `
     <div class="group-header">
-      <div class="group-label" contenteditable="false" data-gid="${safeGid}">${escHtml(grp.label || '')}</div>
+      <div class="group-label" contenteditable="false" data-gid="${safeGid}" style="${grp.fontSize ? `font-size:${grp.fontSize}px;` : ''}font-weight:${grp.bold === false ? 400 : 800};">${escHtml(grp.label || '')}</div>
     </div>
     <div class="group-delete" data-gdel="${safeGid}" title="Delete group">✕</div>
     <div class="group-resize" data-gresize="${safeGid}"></div>`;
@@ -7464,6 +7464,17 @@ function renderGroupProps(grp) {
       <div class="prop-row">
         <span class="prop-label">Label</span>
         <input class="prop-input" value="${escHtml(grp.label || '')}" oninput="updateGroupProp('${grp.id}','label',this.value)" placeholder="e.g. VPC, Subnet">
+      </div>
+      <div class="prop-row">
+        <span class="prop-label">Text size</span>
+        <input type="range" min="9" max="32" step="1" value="${grp.fontSize || 11}" oninput="updateGroupProp('${grp.id}','fontSize',+this.value)" style="flex:1" title="Label text size (px)">
+        <span style="font-size:10px;color:var(--text-muted);width:30px;text-align:right">${grp.fontSize || 11}px</span>
+      </div>
+      <div class="prop-row">
+        <label class="prop-checkbox">
+          <input type="checkbox" ${grp.bold !== false ? 'checked' : ''} onchange="updateGroupStyle('${grp.id}','bold',this.checked)">
+          Bold label
+        </label>
       </div>
     </div>
 
@@ -9671,7 +9682,7 @@ async function buildDiagramSVG(theme = 'dark') {
     // the box is set to transparent (border only).
     const gfill = g.transparent ? 'none' : (col + '12');
     svg += `  <rect class="potato-group-rect" x="${g.x+ox}" y="${g.y+oy}" width="${g.w}" height="${g.h}" rx="12" fill="${gfill}" stroke="${col}" stroke-width="1.5" stroke-dasharray="6,4" opacity="0.7"/>
-  <text x="${g.x+ox+12}" y="${g.y+oy+22}" class="grp-label">${escHtml((g.label||'').toUpperCase())}</text>
+  <text x="${g.x+ox+12}" y="${g.y+oy+22}" class="grp-label"${g.fontSize ? ` font-size="${g.fontSize}"` : ''}${g.bold === false ? ' font-weight="400"' : ''}>${escHtml((g.label||'').toUpperCase())}</text>
 `;
   });
 
@@ -11145,6 +11156,9 @@ function importFromAI() {
     h:     typeof g.h === 'number' ? g.h : 300,
     label: g.label || g.name || 'Group',
     color: g.color || 'purple',
+    ...(g.transparent ? { transparent: true } : {}),
+    ...(typeof g.fontSize === 'number' ? { fontSize: g.fontSize } : {}),
+    ...(g.bold === false ? { bold: false } : {}),
   }));
 
   // playFlow is optional narration; keep only steps whose arrow exists.
