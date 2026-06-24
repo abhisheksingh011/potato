@@ -497,11 +497,14 @@ body {
 .node-resize {
   position: absolute;
   opacity: 0;
+  pointer-events: none;   /* never steal port hits while hovering / connecting */
   transition: opacity 0.18s;
   z-index: 6;
 }
-.node:hover .node-resize, .node.selected .node-resize { opacity: 0.5; }
-.node-resize:hover { opacity: 1 !important; }
+/* Only the selected node shows interactive handles, so hovering a node to find
+   its connection ports — or dropping an arrow onto it — is never blocked. */
+.node.selected .node-resize { opacity: 0.5; pointer-events: all; }
+.node.selected .node-resize:hover { opacity: 1; }
 /* Corners — drag to change width and height together. */
 .node-resize.nw { top: 2px;    left: 2px;   width: 12px; height: 12px; cursor: nwse-resize; }
 .node-resize.ne { top: 2px;    right: 2px;  width: 12px; height: 12px; cursor: nesw-resize; }
