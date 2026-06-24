@@ -7941,7 +7941,12 @@ function sendToBack(id) {
   const n = getNode(id);
   if (!n) return;
   pushHistory();
-  n.zIndex = 1;
+  // Negative so the node drops *below* the #arrows-svg layer (z-index auto ≈ 0).
+  // Otherwise a box sent to back still sits above the arrows and covers them —
+  // which made arrows routed inside a shape container un-clickable. The arrows
+  // SVG is pointer-events:none except on the stroke, so the node stays
+  // selectable (clicks on its body fall through to it).
+  n.zIndex = -1;
   renderNode(n);
   markDirty();
 }
