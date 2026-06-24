@@ -5349,8 +5349,10 @@ function addNodeFromComp(comp, x, y) {
     type: comp.type,
     shape: comp.shape || '',
     label: comp.name,
-    sublabel: isShape ? '' : comp.type,
-    category: isShape ? '' : (comp.cat || ''),
+    // Only the label is pre-filled. Sublabel and category start empty so the
+    // user can fill them in if they want — they're not auto-populated.
+    sublabel: '',
+    category: '',
     icon: comp.icon,
     iconUrl: comp.iconUrl || '',
     theme: comp.theme,
@@ -5513,7 +5515,7 @@ function renderNode(node) {
       : `<span class="node-icon" aria-hidden="true">${escHtml(node.icon || '')}</span>`;
   el.innerHTML = `
     ${iconMarkup}
-    ${isText ? '' : `<div class="node-label" data-field="category">${escHtml(node.category || node.type || '')}</div>`}
+    ${isText ? '' : `<div class="node-label" data-field="category">${escHtml(node.category || '')}</div>`}
     <div class="node-name" data-field="label">${escHtml(node.label || '')}</div>
     ${isText ? '' : `<div class="node-sub" data-field="sublabel">${escHtml(node.sublabel || '')}</div>`}
     ${portsHtml}
@@ -7509,11 +7511,11 @@ function updatePropsPanel() {
       ${node.shape ? '' : `
       <div class="prop-row">
         <span class="prop-label">Sub-label</span>
-        <input class="prop-input" value="${escHtml(node.sublabel||'')}" oninput="updateNodeProp('${id}','sublabel',this.value)">
+        <input class="prop-input" value="${escHtml(node.sublabel||'')}" oninput="updateNodeProp('${id}','sublabel',this.value)" placeholder="optional">
       </div>
       <div class="prop-row">
         <span class="prop-label">Category</span>
-        <input class="prop-input" value="${escHtml(node.category||node.type||'')}" oninput="updateNodeProp('${id}','category',this.value)">
+        <input class="prop-input" value="${escHtml(node.category||'')}" oninput="updateNodeProp('${id}','category',this.value)" placeholder="optional">
       </div>
       <div class="prop-row">
         <span class="prop-label">Icon</span>
