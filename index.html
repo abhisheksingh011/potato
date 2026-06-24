@@ -6304,7 +6304,12 @@ function drawArrow(arrow) {
   // — used by the theme-aware default arrow colour — actually resolve.
   path.style.stroke = colorConf.stroke;
   path.removeAttribute('stroke');
-  path.setAttribute('stroke-opacity', '0.7');
+  // Custom thickness (px) and a "darker" toggle that drops the usual
+  // translucency so the line reads bolder. Both fall back to the CSS default
+  // when unset (so hover/selected emphasis still works on untouched arrows).
+  path.style.strokeWidth = arrow.width ? arrow.width + 'px' : '';
+  path.style.opacity = arrow.darker ? '1' : '';
+  path.setAttribute('stroke-opacity', arrow.darker ? '1' : '0.7');
   // Arrowheads follow the path stroke colour via context-stroke markers, so
   // both ends can be set independently (none / open / filled).
   const endMk = arrowMarker(arrow.endArrow || 'arrow');
@@ -7646,6 +7651,11 @@ function renderArrowProps(arrow) {
         </select>
       </div>
       <div class="prop-row">
+        <span class="prop-label">Thickness</span>
+        <input type="range" min="1" max="6" step="0.5" value="${arrow.width || 1.5}" oninput="updateArrowProp('${arrow.id}','width',+this.value)" style="flex:1" title="Line thickness (px)">
+        <span style="font-size:10px;color:var(--text-muted);width:30px;text-align:right">${arrow.width || 1.5}px</span>
+      </div>
+      <div class="prop-row">
         <span class="prop-label">Routing</span>
         <select class="prop-select" onchange="updateArrowProp('${arrow.id}','routing',this.value)">
           <option value="orthogonal" ${(!arrow.routing||arrow.routing==='orthogonal')?'selected':''}>Orthogonal</option>
@@ -7689,6 +7699,12 @@ function renderArrowProps(arrow) {
         <label class="prop-checkbox">
           <input type="checkbox" ${arrow.animated?'checked':''} onchange="updateArrowProp('${arrow.id}','animated',this.checked)">
           Animated flow
+        </label>
+      </div>
+      <div class="prop-row">
+        <label class="prop-checkbox">
+          <input type="checkbox" ${arrow.darker?'checked':''} onchange="updateArrowProp('${arrow.id}','darker',this.checked)">
+          Darker line
         </label>
       </div>
     </div>
@@ -9621,7 +9637,9 @@ async function buildDiagramSVG(theme = 'dark') {
     const endStyle = a.endArrow || 'arrow', startStyle = a.startArrow || 'none';
     const endMarker = endStyle==='none' ? '' : endStyle==='open' ? 'marker-end="url(#mk-open)"' : `marker-end="url(#${markerId})"`;
     const startMarker = startStyle==='none' ? '' : startStyle==='open' ? 'marker-start="url(#mk-open)"' : 'marker-start="url(#mk-tri)"';
-    svg += `  <path class="potato-arrow" data-arrow-id="${escHtml(a.id)}" data-arrow-color="${arrColor}" d="${dStr}" fill="none" stroke="${stroke}" stroke-width="1.5" ${dashArr} ${endMarker} ${startMarker} opacity="0.75"/>
+    const sw = (typeof a.width === 'number' && a.width > 0) ? a.width : 1.5;
+    const op = a.darker ? 1 : 0.75;
+    svg += `  <path class="potato-arrow" data-arrow-id="${escHtml(a.id)}" data-arrow-color="${arrColor}" d="${dStr}" fill="none" stroke="${stroke}" stroke-width="${sw}" ${dashArr} ${endMarker} ${startMarker} opacity="${op}"/>
 `;
     if (a.label) {
       const mid = midpointOfPolyline(routePts);
@@ -11020,6 +11038,8 @@ function importFromAI() {
       bold:      !!a.bold,
       animated:  !!a.animated,
       ...(ARROW_LABEL_SIZES[a.labelSize] && a.labelSize !== 'normal' ? { labelSize: a.labelSize } : {}),
+      ...(typeof a.width === 'number' && a.width > 0 ? { width: a.width } : {}),
+      ...(a.darker ? { darker: true } : {}),
       ...(typeof a.labelDx === 'number' ? { labelDx: a.labelDx } : {}),
       ...(typeof a.labelDy === 'number' ? { labelDy: a.labelDy } : {}),
     };
