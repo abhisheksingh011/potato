@@ -6289,7 +6289,7 @@ function drawArrow(arrow) {
       // In free routing, double-clicking the line drops a bend point; otherwise
       // it edits the label (orthogonal routing manages its own corners).
       if (arrow.routing === 'straight' || arrow.routing === 'curved') addArrowWaypoint(arrow.id, e);
-      else promptArrowLabel(arrow.id, e);
+      else promptArrowLabel(arrow.id, 0, e);
     });
     g.appendChild(hit);
 
@@ -6329,49 +6329,46 @@ function drawArrow(arrow) {
   else if (arrow.style === 'dotted') path.setAttribute('stroke-dasharray', '2,4');
   else                                path.removeAttribute('stroke-dasharray');
 
-  // Label — place at the geometric center of the routed polyline (so it sits
-  // on the longest middle segment rather than floating over an obstacle).
-  let lbl = g.querySelector('.arrow-label');
-  if (arrow.label) {
-    if (!lbl) {
-      lbl = document.createElementNS('http://www.w3.org/2000/svg', 'text');
-      lbl.setAttribute('class', 'arrow-label');
-      lbl.setAttribute('text-anchor', 'middle');
-      // The label is draggable: grab it to reposition, double-click to edit
-      // the text, and the context menu resets it to the auto midpoint.
-      lbl.style.pointerEvents = 'all';
-      lbl.style.cursor = 'move';
-      lbl.addEventListener('pointerdown', (e) => {
-        e.stopPropagation(); e.preventDefault();
-        startArrowLabelDrag(arrow.id, e, e.currentTarget);
-      });
-      lbl.addEventListener('dblclick', (e) => { e.stopPropagation(); promptArrowLabel(arrow.id, e); });
-      lbl.addEventListener('contextmenu', (e) => { e.preventDefault(); selectArrow(arrow.id); showArrowContextMenu(e, arrow.id); });
-      g.appendChild(lbl);
-    }
-    const mid = midpointOfPolyline(routePoints);
-    // Cache the geometric midpoint so a manual drag can store the label as an
-    // offset relative to it — that way the label follows when nodes move.
-    arrowLabelMids.set(arrow.id, { x: mid.x, y: mid.y });
-    // Stagger labels vertically when multiple arrows share the same from↔to pair
-    const parallels = arrows.filter(a => a.label && (
-      (a.from === arrow.from && a.to === arrow.to) ||
-      (a.from === arrow.to   && a.to === arrow.from)
-    ));
-    const pidx = parallels.findIndex(a => a.id === arrow.id);
-    const hasManual = (arrow.labelDx != null && arrow.labelDy != null);
-    const labelX = hasManual ? mid.x + arrow.labelDx : mid.x;
-    const labelY = hasManual ? mid.y + arrow.labelDy : (mid.y - 5 + (pidx - (parallels.length - 1) / 2) * 14);
-    lbl.setAttribute('x', labelX);
-    lbl.setAttribute('y', labelY);
+  // Labels — one draggable text tag per entry. An arrow can carry several tags,
+  // each repositionable; offsets are stored per tag relative to the route
+  // midpoint (cached below) so they follow when the arrow reroutes.
+  const labels = getArrowLabels(arrow);
+  const mid = midpointOfPolyline(routePoints);
+  arrowLabelMids.set(arrow.id, { x: mid.x, y: mid.y });
+  // Stagger the anchor when multiple arrows share the same from↔to pair.
+  const parallels = arrows.filter(a => getArrowLabels(a).length && (
+    (a.from === arrow.from && a.to === arrow.to) ||
+    (a.from === arrow.to   && a.to === arrow.from)
+  ));
+  const pidx = Math.max(0, parallels.findIndex(a => a.id === arrow.id));
+  const baseY = mid.y - 5 + (pidx - (parallels.length - 1) / 2) * 14;
+  // Rebuild the tag elements each draw (only a handful per arrow) so adds,
+  // removes and legacy single-label migration all stay in sync.
+  g.querySelectorAll('.arrow-label').forEach(el => el.remove());
+  labels.forEach((lab, i) => {
+    const lbl = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+    lbl.setAttribute('class', 'arrow-label');
+    lbl.setAttribute('text-anchor', 'middle');
+    lbl.dataset.idx = i;
+    // Each tag is draggable to reposition, double-click to edit its text.
+    lbl.style.pointerEvents = 'all';
+    lbl.style.cursor = 'move';
+    lbl.addEventListener('pointerdown', (e) => {
+      e.stopPropagation(); e.preventDefault();
+      startArrowLabelDrag(arrow.id, +e.currentTarget.dataset.idx, e, e.currentTarget);
+    });
+    lbl.addEventListener('dblclick', (e) => { e.stopPropagation(); promptArrowLabel(arrow.id, +e.currentTarget.dataset.idx, e); });
+    lbl.addEventListener('contextmenu', (e) => { e.preventDefault(); selectArrow(arrow.id); showArrowContextMenu(e, arrow.id); });
+    const hasManual = (lab.dx != null && lab.dy != null);
+    lbl.setAttribute('x', hasManual ? mid.x + lab.dx : mid.x);
+    lbl.setAttribute('y', hasManual ? mid.y + lab.dy : baseY + i * 14);
     lbl.setAttribute('font-weight', arrow.bold ? '700' : '400');
     // Inline style overrides the .arrow-label CSS (presentation attributes lose
     // to the class rule, an inline style wins). 10px is the class default.
     lbl.style.fontSize = (10 * arrowLabelMult(arrow)).toFixed(1) + 'px';
-    lbl.textContent = arrow.label;
-  } else if (lbl) {
-    lbl.remove();
-  }
+    lbl.textContent = lab.text;
+    g.appendChild(lbl);
+  });
 }
 
 // Returns the point on a polyline at half the total path length.
@@ -6769,14 +6766,61 @@ function startWaypointDrag(arrowId, idx, e) {
   window.addEventListener('pointercancel', onUp);
 }
 
-// Drag an arrow's label to reposition it. Stored as labelDx/labelDy — an offset
-// from the route's geometric midpoint (cached in arrowLabelMids during draw)
-// so the label keeps its relative placement as the arrow reroutes.
-function startArrowLabelDrag(arrowId, e, lbl) {
+// ----- Arrow labels (multiple draggable tags per arrow) -----
+// Normalize to an array of { text, dx?, dy? }. Legacy single-label arrows
+// (label / labelDx / labelDy) are read transparently.
+function getArrowLabels(arrow) {
+  if (Array.isArray(arrow.labels)) return arrow.labels;
+  if (arrow.label) return [{ text: arrow.label, ...(arrow.labelDx != null ? { dx: arrow.labelDx, dy: arrow.labelDy } : {}) }];
+  return [];
+}
+// Get a live, mutable labels array, migrating any legacy single label.
+function ensureArrowLabels(arrow) {
+  if (!Array.isArray(arrow.labels)) arrow.labels = getArrowLabels(arrow);
+  return arrow.labels;
+}
+// Mirror the first tag onto the legacy label/offset fields so the flow
+// summaries, sequence editor and exporter (which read arrow.label) stay valid.
+function syncLegacyArrowLabel(arrow) {
+  const labels = arrow.labels || [];
+  arrow.label = labels.length ? (labels[0].text || '') : '';
+  if (labels[0] && labels[0].dx != null) { arrow.labelDx = labels[0].dx; arrow.labelDy = labels[0].dy; }
+  else { delete arrow.labelDx; delete arrow.labelDy; }
+}
+function addArrowLabel(id) {
+  const arrow = arrows.find(a => a.id === id); if (!arrow) return;
+  pushHistory();
+  ensureArrowLabels(arrow).push({ text: 'label' });
+  syncLegacyArrowLabel(arrow);
+  drawArrow(arrow); markDirty(); updatePropsPanel();
+}
+function removeArrowLabelAt(id, idx) {
+  const arrow = arrows.find(a => a.id === id); if (!arrow) return;
+  pushHistory();
+  ensureArrowLabels(arrow).splice(idx, 1);
+  syncLegacyArrowLabel(arrow);
+  drawArrow(arrow); markDirty(); updatePropsPanel();
+}
+function updateArrowLabelText(id, idx, text) {
+  const arrow = arrows.find(a => a.id === id); if (!arrow) return;
+  pushHistoryDebounced();
+  const labels = ensureArrowLabels(arrow);
+  if (!labels[idx]) return;
+  labels[idx].text = text;
+  syncLegacyArrowLabel(arrow);
+  drawArrow(arrow); markDirty();
+}
+
+// Drag a single tag to reposition it. Stored as a per-tag dx/dy offset from the
+// route's geometric midpoint (cached in arrowLabelMids during draw) so it keeps
+// its relative placement as the arrow reroutes.
+function startArrowLabelDrag(arrowId, idx, e, lbl) {
   const arrow = arrows.find(a => a.id === arrowId);
   if (!arrow || !lbl) return;
   pushHistory();
   selectArrow(arrowId);
+  const lab = ensureArrowLabels(arrow)[idx];
+  if (!lab) return;
   const rect0 = canvasArea.getBoundingClientRect();
   const startWx = (e.clientX - rect0.left - panX) / zoom;
   const startWy = (e.clientY - rect0.top  - panY) / zoom;
@@ -6789,8 +6833,9 @@ function startArrowLabelDrag(arrowId, e, lbl) {
     const wx = (e2.clientX - rect.left - panX) / zoom;
     const wy = (e2.clientY - rect.top  - panY) / zoom;
     const base = arrowLabelMids.get(arrow.id) || { x: wx, y: wy };
-    arrow.labelDx = (wx + grabX) - base.x;
-    arrow.labelDy = (wy + grabY) - base.y;
+    lab.dx = (wx + grabX) - base.x;
+    lab.dy = (wy + grabY) - base.y;
+    syncLegacyArrowLabel(arrow);
     drawArrow(arrow);
   };
   const onUp = () => {
@@ -6804,13 +6849,16 @@ function startArrowLabelDrag(arrowId, e, lbl) {
   window.addEventListener('pointercancel', onUp);
 }
 
-// Restore an arrow's label to its automatic midpoint position.
-function resetArrowLabelPos(arrowId) {
+// Restore an arrow's tags to their automatic midpoint positions. With an index,
+// resets just that tag; otherwise resets them all.
+function resetArrowLabelPos(arrowId, idx) {
   const arrow = arrows.find(a => a.id === arrowId);
   if (!arrow) return;
   pushHistory();
-  delete arrow.labelDx;
-  delete arrow.labelDy;
+  const labels = ensureArrowLabels(arrow);
+  if (idx == null) labels.forEach(l => { delete l.dx; delete l.dy; });
+  else if (labels[idx]) { delete labels[idx].dx; delete labels[idx].dy; }
+  syncLegacyArrowLabel(arrow);
   drawArrow(arrow);
   markDirty();
   notify('Label position reset', 'info');
@@ -6832,25 +6880,29 @@ function selectArrow(id) {
   updatePropsPanel();
 }
 
-function promptArrowLabel(arrowId, e) {
+function promptArrowLabel(arrowId, idx, e) {
   const arrow = arrows.find(a => a.id === arrowId);
   if (!arrow) return;
 
-  // Compute midpoint of the arrow in screen coordinates.
   const fn = getNode(arrow.from), tn = getNode(arrow.to);
   if (!fn || !tn) return;
-  const fel = document.getElementById('node-'+arrow.from);
-  const tel = document.getElementById('node-'+arrow.to);
-  const fw = fel ? fel.offsetWidth : 160, fh = fel ? fel.offsetHeight : 80;
-  const tw = tel ? tel.offsetWidth : 160, th = tel ? tel.offsetHeight : 80;
+  const labels = ensureArrowLabels(arrow);
+  if (idx == null) idx = 0;
+  // Editing a tag that doesn't exist yet (e.g. double-clicking a bare line)
+  // creates it; an empty result is discarded below.
+  const isNew = !labels[idx];
+  if (isNew) labels[idx] = { text: '' };
+  const lab = labels[idx];
+
   const from = getPortCenter(arrow.from, arrow.fromPort || 'right');
   const to   = getPortCenter(arrow.to,   arrow.toPort   || 'left');
-  // Prefer the route midpoint cached during draw; apply any manual label offset
-  // so the editor opens right over the label wherever the user dragged it.
+  // Prefer the route midpoint cached during draw; apply this tag's manual offset
+  // (or its default stacked position) so the editor opens right over it.
   const _lm = arrowLabelMids.get(arrow.id);
   let mx = _lm ? _lm.x : (from.x + to.x) / 2;
   let my = _lm ? _lm.y : (from.y + to.y) / 2;
-  if (arrow.labelDx != null && arrow.labelDy != null) { mx += arrow.labelDx; my += arrow.labelDy; }
+  if (lab.dx != null && lab.dy != null) { mx += lab.dx; my += lab.dy; }
+  else { my += idx * 14; }
   const rect = canvasArea.getBoundingClientRect();
   const screenX = rect.left + mx * zoom + panX;
   const screenY = rect.top  + my * zoom + panY;
@@ -6861,8 +6913,8 @@ function promptArrowLabel(arrowId, e) {
   const input = document.createElement('input');
   input.type = 'text';
   input.className = 'arrow-label-edit';
-  input.value = arrow.label || '';
-  input.placeholder = 'label';
+  input.value = lab.text || '';
+  input.placeholder = 'tag';
   input.style.left = (screenX - 50) + 'px';
   input.style.top  = (screenY - 18) + 'px';
   input.style.position = 'fixed';
@@ -6872,9 +6924,16 @@ function promptArrowLabel(arrowId, e) {
 
   const finish = (commit) => {
     if (commit) {
-      arrow.label = input.value;
+      lab.text = input.value;
+      // Drop a freshly-added tag left empty rather than keeping a blank.
+      if (isNew && !input.value.trim()) labels.splice(idx, 1);
+      syncLegacyArrowLabel(arrow);
       drawArrow(arrow);
       markDirty();
+    } else if (isNew) {
+      labels.splice(idx, 1);
+      syncLegacyArrowLabel(arrow);
+      drawArrow(arrow);
     }
     input.remove();
   };
@@ -7647,9 +7706,16 @@ function renderArrowProps(arrow) {
     <div class="prop-group">
       <div class="prop-group-title">Connection</div>
       <div style="font-size:10px;color:var(--text-dim);margin-bottom:8px;font-family:var(--font-mono);">💡 Drag the teal dots at either end to reroute this arrow.</div>
-      <div class="prop-row">
-        <span class="prop-label">Label</span>
-        <input class="prop-input" value="${escHtml(arrow.label||'')}" oninput="updateArrowProp('${arrow.id}','label',this.value)" placeholder="connection label">
+      <div class="prop-row" style="align-items:flex-start">
+        <span class="prop-label">Tags</span>
+        <div style="flex:1;display:flex;flex-direction:column;gap:4px">
+          ${getArrowLabels(arrow).map((lab, i) => `
+            <div style="display:flex;gap:4px;align-items:center">
+              <input class="prop-input" style="flex:1" value="${escHtml(lab.text||'')}" oninput="updateArrowLabelText('${arrow.id}',${i},this.value)" placeholder="tag text">
+              <button class="prop-btn" style="flex:none;width:26px;padding:4px 0" title="Remove tag" onclick="removeArrowLabelAt('${arrow.id}',${i})">×</button>
+            </div>`).join('')}
+          <button class="prop-btn" style="font-size:11px" onclick="addArrowLabel('${arrow.id}')">+ Add tag</button>
+        </div>
       </div>
       <div class="prop-row">
         <span class="prop-label">Style</span>
@@ -9650,11 +9716,15 @@ async function buildDiagramSVG(theme = 'dark') {
     const op = a.darker ? 1 : 0.75;
     svg += `  <path class="potato-arrow" data-arrow-id="${escHtml(a.id)}" data-arrow-color="${arrColor}" d="${dStr}" fill="none" stroke="${stroke}" stroke-width="${sw}" ${dashArr} ${endMarker} ${startMarker} opacity="${op}"/>
 `;
-    if (a.label) {
+    const aLabels = getArrowLabels(a);
+    if (aLabels.length) {
       const mid = midpointOfPolyline(routePts);
-      const lx = (a.labelDx != null) ? mid.x + a.labelDx : mid.x;
-      const ly = (a.labelDy != null) ? mid.y + a.labelDy : mid.y - 4;
-      arrowLabels.push({ x: lx, y: ly, text: a.label, bold: !!a.bold, mult: arrowLabelMult(a) });
+      aLabels.forEach((lab, li) => {
+        if (!lab.text) return;
+        const lx = (lab.dx != null) ? mid.x + lab.dx : mid.x;
+        const ly = (lab.dy != null) ? mid.y + lab.dy : mid.y - 4 + li * 14;
+        arrowLabels.push({ x: lx, y: ly, text: lab.text, bold: !!a.bold, mult: arrowLabelMult(a) });
+      });
     }
   });
 
@@ -11049,6 +11119,7 @@ function importFromAI() {
       ...(ARROW_LABEL_SIZES[a.labelSize] && a.labelSize !== 'normal' ? { labelSize: a.labelSize } : {}),
       ...(typeof a.width === 'number' && a.width > 0 ? { width: a.width } : {}),
       ...(a.darker ? { darker: true } : {}),
+      ...(Array.isArray(a.labels) ? { labels: a.labels.filter(l => l && typeof l.text === 'string').map(l => ({ text: l.text, ...(typeof l.dx === 'number' && typeof l.dy === 'number' ? { dx: l.dx, dy: l.dy } : {}) })) } : {}),
       ...(typeof a.labelDx === 'number' ? { labelDx: a.labelDx } : {}),
       ...(typeof a.labelDy === 'number' ? { labelDy: a.labelDy } : {}),
     };
