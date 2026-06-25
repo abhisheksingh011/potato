@@ -1453,6 +1453,8 @@ kbd {
     <button class="zoom-display" id="arrow-text-scale-label" onclick="resetArrowLabelScale()" title="Arrow label text size for all arrows — click to reset to 100%" aria-label="Arrow text size">100%</button>
     <button class="tool-mode-btn" onclick="bumpArrowLabelScale(1)" title="Increase arrow label text size (all arrows)" aria-label="Increase arrow text size">A+</button>
 
+    <button id="btn-line-jumps" class="tb-btn active" onclick="toggleLineJumps()" title="Line jumps — where two connections cross, the one on top hops over the other" aria-label="Toggle line jumps" aria-pressed="true"><span class="tb-icon" aria-hidden="true">⌒</span><span class="tb-label">Jumps</span></button>
+
     <div style="flex:1;"></div>
     <button id="btn-props-toggle" class="tb-btn" onclick="togglePanel('props')" title="Show / hide the Properties panel — edit the selected item's label, colour, icon & notes" aria-label="Toggle properties panel" aria-pressed="false"><span class="tb-icon" aria-hidden="true">⚙</span><span class="tb-label">Properties</span></button>
   </div>
@@ -1710,6 +1712,20 @@ kbd {
 
     <div style="display:flex;gap:8px;margin-top:14px;justify-content:flex-end">
       <button class="tb-btn" onclick="closeCostEstimator()">Close</button>
+    </div>
+  </div>
+</div>
+
+<!-- SERVICE DETAILS MODAL (right-click → Service details) -->
+<div id="svc-details-overlay" role="dialog" aria-modal="true" aria-labelledby="svc-details-title" onclick="if(event.target===this)closeServiceDetails()" style="position:fixed;inset:0;background:var(--shadow-strong);z-index:8500;display:none;align-items:center;justify-content:center;backdrop-filter:blur(4px)">
+  <div style="background:var(--bg2);border:1px solid var(--border);border-radius:14px;padding:24px;width:560px;max-width:94vw;max-height:88vh;display:flex;flex-direction:column;box-shadow:0 24px 80px var(--shadow-strong)">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+      <h2 id="svc-details-title" style="font-size:17px;font-weight:800">📊 Service details</h2>
+      <button onclick="closeServiceDetails()" aria-label="Close" style="background:none;border:none;color:var(--text-muted);font-size:22px;cursor:pointer;line-height:1">×</button>
+    </div>
+    <div id="svc-details-body" style="flex:1;overflow-y:auto;padding-right:4px"></div>
+    <div style="display:flex;gap:8px;margin-top:14px;justify-content:flex-end">
+      <button class="tb-btn" onclick="closeServiceDetails()">Close</button>
     </div>
   </div>
 </div>
@@ -5317,18 +5333,37 @@ function getServiceKB(typeOrId) {
   return null;
 }
 
-function buildAutoDescription(comp) {
-  const kb = getServiceKB(comp.type) || getServiceKB(comp.id);
+// Render the service KB (SLA, limits, cost, pitfalls) as HTML for the
+// right-click "Service details" modal. Returns '' when there's no KB entry.
+function buildKbDetailsHtml(kb) {
   if (!kb) return '';
-  let out = '';
-  if (kb.sla)       out += '📊 SLA\n' + kb.sla + '\n\n';
-  if (kb.limits)    out += '📋 LIMITS\n' + kb.limits + '\n\n';
-  if (kb.whenToUse) out += '💡 WHY USE THIS\n' + kb.whenToUse + '\n\n';
-  if (kb.cost)      out += '💰 COST (' + (SERVICE_KB_AS_OF || 'approx') + ')\n' + kb.cost + '\n\n';
-  if (kb.pitfalls && kb.pitfalls.length) {
-    out += '⚠️ COMMON PITFALLS\n' + kb.pitfalls.map(p => '• ' + p).join('\n');
-  }
-  return out.trim();
+  const sec = (title, body) => body ? `
+      <div class="prop-group-title" style="margin-top:14px">${title}</div>
+      <div style="font-size:12px;line-height:1.65;color:var(--text-muted);font-family:var(--font-mono);white-space:pre-wrap">${escHtml(body)}</div>` : '';
+  const list = (title, items) => (items && items.length) ? `
+      <div class="prop-group-title" style="margin-top:14px">${title}</div>
+      <ul style="font-size:12px;line-height:1.65;color:var(--text-muted);font-family:var(--font-mono);margin:4px 0 0;padding-left:18px">${items.map(p => `<li>${escHtml(p)}</li>`).join('')}</ul>` : '';
+  return sec('📊 SLA', kb.sla)
+    + sec('📋 Limits', kb.limits)
+    + sec('💡 When to use', kb.whenToUse)
+    + sec('💰 Cost' + (SERVICE_KB_AS_OF ? ' (as of ' + SERVICE_KB_AS_OF + ')' : ''), kb.cost)
+    + list('⚠️ Common pitfalls', kb.pitfalls);
+}
+
+function showServiceDetails(id) {
+  const node = getNode(id);
+  const kb = inferKbForNode(node);
+  if (!kb) return;
+  const body = document.getElementById('svc-details-body');
+  const title = document.getElementById('svc-details-title');
+  if (title) title.textContent = '📊 ' + (node.type || node.label || 'Service details');
+  const html = buildKbDetailsHtml(kb);
+  body.innerHTML = html || '<div style="font-size:12px;color:var(--text-dim);font-family:var(--font-mono)">No reference data for this service.</div>';
+  document.getElementById('svc-details-overlay').style.display = 'flex';
+}
+
+function closeServiceDetails() {
+  document.getElementById('svc-details-overlay').style.display = 'none';
 }
 
 function addNodeFromComp(comp, x, y) {
@@ -5356,7 +5391,11 @@ function addNodeFromComp(comp, x, y) {
     icon: comp.icon,
     iconUrl: comp.iconUrl || '',
     theme: comp.theme,
-    description: isShape ? '' : buildAutoDescription(comp),
+    // Description starts empty so hovering a node doesn't pop a wall of SLA /
+    // limits text while you're laying out a diagram. The service KB (SLA,
+    // limits, cost, pitfalls) still lives in the Properties panel and behind
+    // the right-click "Service details" item — see showServiceDetails().
+    description: '',
     zIndex: 10 + nodes.length,
   };
   nodes.push(node);
@@ -6096,7 +6135,7 @@ function startArrowEndpointDrag(arrowId, end, e) {
       pushHistory();
       arrow[end]          = newNode;
       arrow[end + 'Port'] = newPort;
-      drawArrow(arrow);
+      redrawArrows();
       markDirty();
       updateStatusBar();
     }
@@ -6202,7 +6241,7 @@ function resetArrowLabelScale() { setArrowLabelScale(1); }
 function setArrowLabelScale(s) {
   arrowLabelScale = Math.max(0.3, Math.min(4, +s || 1));
   updateArrowScaleLabel();
-  arrows.forEach(a => drawArrow(a));
+  redrawArrows();
   markDirty();
 }
 function updateArrowScaleLabel() {
@@ -6241,11 +6280,13 @@ function smoothPathD(pts) {
 }
 
 // Build the SVG path 'd' for an arrow's route, honouring its routing mode.
-function buildArrowPathD(arrow, pts) {
+// hopsBySeg (optional) maps a raw-segment index → list of crossing points where
+// this arrow should "hop" (a little bridge arc) over an arrow beneath it.
+function buildArrowPathD(arrow, pts, hopsBySeg) {
   const routing = arrow.routing || 'orthogonal';
-  if (routing === 'curved')   return smoothPathD(pts);
-  if (routing === 'straight') return pts.map((p, i) => (i ? 'L' : 'M') + p.x.toFixed(1) + ' ' + p.y.toFixed(1)).join(' ');
-  return pointsToRoundedPath(pts);
+  if (routing === 'curved')   return smoothPathD(pts);           // hops skipped on curves
+  if (routing === 'straight') return pointsToRoundedPath(pts, 0, hopsBySeg);
+  return pointsToRoundedPath(pts, undefined, hopsBySeg);
 }
 
 // Reuses existing SVG elements when possible — only attributes are updated
@@ -6259,19 +6300,30 @@ function drawArrow(arrow) {
   if (!from || !to) return;
 
   const colorConf = ARROW_COLORS[arrow.color] || ARROW_COLORS.default;
-  // Orthogonal (Manhattan) routing — collect obstacles from the live DOM.
-  const obstacles = collectObstacleRects(arrow.from, arrow.to, (n) => {
-    const el = document.getElementById('node-' + n.id);
-    if (!el) return null;
-    return { x: n.x, y: n.y, w: el.offsetWidth, h: el.offsetHeight };
-  });
-  // Manual spacing: a dragged midline is stored as midX (when both ports are
-  // horizontal — the S-bend midline is vertical) or midY (both vertical).
-  const _fromH = portSide(fp) === 'left' || portSide(fp) === 'right';
-  const _toH   = portSide(tp) === 'left' || portSide(tp) === 'right';
-  const manualMid = (_fromH && _toH) ? arrow.midX : (!_fromH && !_toH ? arrow.midY : undefined);
-  const routePoints = getArrowRoutePoints(arrow, from, fp, to, tp, obstacles, manualMid);
-  const dStr = buildArrowPathD(arrow, routePoints);
+  // During a full redrawArrows() pass every route was just computed into the
+  // cache, so reuse it here instead of re-routing (the expensive obstacle scan).
+  let routePoints;
+  const cached = _arrowRoutePassFresh ? arrowRouteCache.get(arrow.id) : null;
+  if (cached) {
+    routePoints = cached.pts;
+  } else {
+    // Orthogonal (Manhattan) routing — collect obstacles from the live DOM.
+    const obstacles = collectObstacleRects(arrow.from, arrow.to, (n) => {
+      const el = document.getElementById('node-' + n.id);
+      if (!el) return null;
+      return { x: n.x, y: n.y, w: el.offsetWidth, h: el.offsetHeight };
+    });
+    // Manual spacing: a dragged midline is stored as midX (when both ports are
+    // horizontal — the S-bend midline is vertical) or midY (both vertical).
+    const _fromH = portSide(fp) === 'left' || portSide(fp) === 'right';
+    const _toH   = portSide(tp) === 'left' || portSide(tp) === 'right';
+    const manualMid = (_fromH && _toH) ? arrow.midX : (!_fromH && !_toH ? arrow.midY : undefined);
+    routePoints = getArrowRoutePoints(arrow, from, fp, to, tp, obstacles, manualMid);
+  }
+  // Cache this route so other arrows can detect crossings against it, then build
+  // the path with line-jump bridges over any arrow beneath this one.
+  arrowRouteCache.set(arrow.id, { pts: routePoints, routing: arrow.routing || 'orthogonal' });
+  const dStr = buildArrowPathD(arrow, routePoints, computeHopsBySeg(arrow, routePoints));
 
   let g = document.getElementById('arrow-' + arrow.id);
   let hit, path;
@@ -6536,32 +6588,174 @@ function orthogonalRoute(from, fromPort, to, toPort, obstacles, manualMid) {
 }
 
 // Render a polyline as an SVG path string with rounded corners.
-function pointsToRoundedPath(points, radius) {
+function pointsToRoundedPath(points, radius, hopsBySeg) {
   if (!points || points.length < 2) return '';
   const r = radius != null ? radius : ORTH_CORNER_RADIUS;
-  let d = 'M' + points[0].x + ',' + points[0].y;
+  const f = (v) => Math.round(v * 10) / 10;
+  let d = 'M' + f(points[0].x) + ',' + f(points[0].y);
+  // Each straight "run" lies along exactly one raw segment points[k]→points[k+1];
+  // _hopRun bridges any crossing points recorded for that segment.
+  let runStart = points[0];
   for (let i = 1; i < points.length - 1; i++) {
     const prev = points[i - 1], curr = points[i], next = points[i + 1];
     // Limit the corner radius so it doesn't exceed half the segment lengths.
     const inLen  = Math.hypot(curr.x - prev.x, curr.y - prev.y);
     const outLen = Math.hypot(next.x - curr.x, next.y - curr.y);
     const rr = Math.max(0, Math.min(r, inLen / 2, outLen / 2));
-    if (rr < 0.5) { d += ' L' + curr.x + ',' + curr.y; continue; }
+    if (rr < 0.5) {
+      d += _hopRun(runStart, curr, hopsBySeg && hopsBySeg[i - 1], f);
+      runStart = curr;
+      continue;
+    }
     const ux1 = (curr.x - prev.x) / (inLen || 1);
     const uy1 = (curr.y - prev.y) / (inLen || 1);
     const ux2 = (next.x - curr.x) / (outLen || 1);
     const uy2 = (next.y - curr.y) / (outLen || 1);
     const ax = curr.x - ux1 * rr, ay = curr.y - uy1 * rr;
     const bx = curr.x + ux2 * rr, by = curr.y + uy2 * rr;
-    d += ' L' + ax + ',' + ay + ' Q' + curr.x + ',' + curr.y + ' ' + bx + ',' + by;
+    d += _hopRun(runStart, { x: ax, y: ay }, hopsBySeg && hopsBySeg[i - 1], f);
+    d += ' Q' + f(curr.x) + ',' + f(curr.y) + ' ' + f(bx) + ',' + f(by);
+    runStart = { x: bx, y: by };
   }
   const last = points[points.length - 1];
-  d += ' L' + last.x + ',' + last.y;
+  d += _hopRun(runStart, last, hopsBySeg && hopsBySeg[points.length - 2], f);
   return d;
 }
 
+// ===== ARROW LINE-JUMPS (hops) =====
+// Where one arrow crosses another, the arrow on top draws a small semicircular
+// "bridge" so the crossing reads clearly. Diagram-wide toggle (persisted on
+// meta.lineJumps), like arrowLabelScale — a view setting, not part of undo.
+let lineJumpsEnabled = true;
+const HOP_R = 5;          // bridge radius (px)
+// Live cache of each arrow's routed polyline, so a single arrow's redraw can
+// detect crossings against the others without re-routing them all.
+const arrowRouteCache = new Map();
+// True only while redrawArrows() is mid-pass: tells drawArrow the cache is
+// authoritative, so it reuses the just-computed route instead of re-routing.
+let _arrowRoutePassFresh = false;
+
+// Emit ' L…'(+ bridge arcs) from the current pen (assumed at S) to E. hopPts are
+// crossing points on this run's underlying segment; we bridge those comfortably
+// inside the run (never on top of a rounded corner) and skip ones too close
+// together to avoid overlapping arcs.
+function _hopRun(S, E, hopPts, f) {
+  if (!hopPts || !hopPts.length) return ' L' + f(E.x) + ',' + f(E.y);
+  const dx = E.x - S.x, dy = E.y - S.y;
+  const len = Math.hypot(dx, dy) || 1;
+  const ux = dx / len, uy = dy / len;
+  const items = hopPts
+    .map(p => ({ t: (p.x - S.x) * ux + (p.y - S.y) * uy }))
+    .filter(o => o.t > HOP_R + 1 && o.t < len - HOP_R - 1)
+    .sort((a, b) => a.t - b.t);
+  let out = '', lastT = -Infinity;
+  for (const o of items) {
+    if (o.t - lastT < 2 * HOP_R + 1) continue;
+    const e1x = S.x + ux * (o.t - HOP_R), e1y = S.y + uy * (o.t - HOP_R);
+    const e2x = S.x + ux * (o.t + HOP_R), e2y = S.y + uy * (o.t + HOP_R);
+    // sweep flag 0 → bump consistently to one side of the travel direction.
+    out += ' L' + f(e1x) + ',' + f(e1y) + ' A' + HOP_R + ',' + HOP_R + ' 0 0 0 ' + f(e2x) + ',' + f(e2y);
+    lastT = o.t;
+  }
+  out += ' L' + f(E.x) + ',' + f(E.y);
+  return out;
+}
+
+// Strict interior intersection of segments p1p2 and p3p4, or null. The epsilon
+// keeps shared endpoints (arrows meeting at a node) from registering as a cross.
+function segSegIntersection(p1, p2, p3, p4) {
+  const d1x = p2.x - p1.x, d1y = p2.y - p1.y;
+  const d2x = p4.x - p3.x, d2y = p4.y - p3.y;
+  const den = d1x * d2y - d1y * d2x;
+  if (Math.abs(den) < 1e-6) return null;     // parallel / collinear
+  const t = ((p3.x - p1.x) * d2y - (p3.y - p1.y) * d2x) / den;
+  const u = ((p3.x - p1.x) * d1y - (p3.y - p1.y) * d1x) / den;
+  const E = 0.01;
+  if (t <= E || t >= 1 - E || u <= E || u >= 1 - E) return null;
+  return { x: p1.x + t * d1x, y: p1.y + t * d1y };
+}
+
+// Crossing points (grouped by my segment index) where I should bridge. Only the
+// arrow that is *on top* (higher index in the arrows array) draws the hop, so a
+// crossing is bridged exactly once. Arrows that share an endpoint node meet
+// rather than cross, so they're skipped.
+function _hopsBetween(myIdx, myPts, myRouting, myFrom, myTo, routes) {
+  if (!lineJumpsEnabled || myRouting === 'curved' || !myPts || myPts.length < 2) return null;
+  const hops = {};
+  for (const o of routes) {
+    if (o.idx >= myIdx) continue;            // only hop over arrows beneath me
+    if (o.routing === 'curved' || !o.pts || o.pts.length < 2) continue;
+    if (o.from === myFrom || o.from === myTo || o.to === myFrom || o.to === myTo) continue;
+    for (let i = 0; i < myPts.length - 1; i++) {
+      for (let j = 0; j < o.pts.length - 1; j++) {
+        const X = segSegIntersection(myPts[i], myPts[i + 1], o.pts[j], o.pts[j + 1]);
+        if (X) (hops[i] || (hops[i] = [])).push(X);
+      }
+    }
+  }
+  return Object.keys(hops).length ? hops : null;
+}
+
+// Editor-side wrapper: build the "other routes" list from the live cache.
+function computeHopsBySeg(arrow, pts) {
+  if (!lineJumpsEnabled) return null;
+  const myIdx = arrows.indexOf(arrow);
+  const routes = [];
+  arrows.forEach((a, idx) => {
+    if (a === arrow) return;
+    const c = arrowRouteCache.get(a.id);
+    if (c) routes.push({ idx, from: a.from, to: a.to, routing: c.routing, pts: c.pts });
+  });
+  return _hopsBetween(myIdx, pts, arrow.routing || 'orthogonal', arrow.from, arrow.to, routes);
+}
+
+// Route an arrow to its polyline (same inputs drawArrow uses), for the cache.
+function routeArrowPoints(arrow) {
+  const fp = arrow.fromPort || getBestPorts(arrow.from, arrow.to).fp;
+  const tp = arrow.toPort   || getBestPorts(arrow.from, arrow.to).tp;
+  const from = getPortCenter(arrow.from, fp);
+  const to   = getPortCenter(arrow.to, tp);
+  if (!from || !to) return null;
+  const obstacles = collectObstacleRects(arrow.from, arrow.to, (n) => {
+    const el = document.getElementById('node-' + n.id);
+    if (!el) return null;
+    return { x: n.x, y: n.y, w: el.offsetWidth, h: el.offsetHeight };
+  });
+  const _fromH = portSide(fp) === 'left' || portSide(fp) === 'right';
+  const _toH   = portSide(tp) === 'left' || portSide(tp) === 'right';
+  const manualMid = (_fromH && _toH) ? arrow.midX : (!_fromH && !_toH ? arrow.midY : undefined);
+  return getArrowRoutePoints(arrow, from, fp, to, tp, obstacles, manualMid);
+}
+
+function recomputeArrowRouteCache() {
+  arrowRouteCache.clear();
+  arrows.forEach(a => {
+    const pts = routeArrowPoints(a);
+    if (pts) arrowRouteCache.set(a.id, { pts, routing: a.routing || 'orthogonal' });
+  });
+}
+
 function redrawArrows() {
-  arrows.forEach(a => drawArrow(a));
+  // Populate every arrow's route first so each one can hop over the others in
+  // the same pass (otherwise an earlier arrow can't see a later one's route).
+  recomputeArrowRouteCache();
+  _arrowRoutePassFresh = true;
+  try { arrows.forEach(a => drawArrow(a)); }
+  finally { _arrowRoutePassFresh = false; }
+}
+
+function toggleLineJumps() {
+  lineJumpsEnabled = !lineJumpsEnabled;
+  updateLineJumpsBtn();
+  redrawArrows();
+  markDirty();
+  notify(lineJumpsEnabled ? 'Line jumps on — crossings hop' : 'Line jumps off', 'info');
+}
+function updateLineJumpsBtn() {
+  const b = document.getElementById('btn-line-jumps');
+  if (!b) return;
+  b.setAttribute('aria-pressed', lineJumpsEnabled ? 'true' : 'false');
+  b.classList.toggle('active', lineJumpsEnabled);
 }
 
 // ----------------------------------------------------------------------
@@ -6667,7 +6861,7 @@ function startArrowMidDrag(arrowId, e) {
     const wx = (e2.clientX - rect.left - panX) / zoom;
     const wy = (e2.clientY - rect.top  - panY) / zoom;
     if (horiz) arrow.midX = wx; else arrow.midY = wy;
-    drawArrow(arrow);
+    redrawArrows();
   };
   const onUp = () => {
     markDirty();
@@ -6687,7 +6881,7 @@ function resetArrowMid(arrowId) {
   pushHistory();
   delete arrow.midX;
   delete arrow.midY;
-  drawArrow(arrow);
+  redrawArrows();
   markDirty();
   notify('Arrow routing reset to automatic', 'info');
 }
@@ -6736,7 +6930,7 @@ function removeArrowWaypoint(arrowId, idx) {
   pushHistory();
   arrow.points.splice(idx, 1);
   if (!arrow.points.length) delete arrow.points;
-  drawArrow(arrow);
+  redrawArrows();
   renderEndpointHandles(arrow);
   markDirty();
 }
@@ -6751,7 +6945,7 @@ function startWaypointDrag(arrowId, idx, e) {
       x: Math.round((e2.clientX - rect.left - panX) / zoom),
       y: Math.round((e2.clientY - rect.top  - panY) / zoom),
     };
-    drawArrow(arrow);
+    redrawArrows();
     const h = arrowHandlesSvg.querySelector(`.arrow-waypoint-handle[data-wp="${idx}"]`);
     if (h) { h.setAttribute('cx', arrow.points[idx].x); h.setAttribute('cy', arrow.points[idx].y); }
   };
@@ -7104,6 +7298,8 @@ function setupEventListeners() {
     if (e.key === 'Escape') {
       const ip = document.getElementById('icon-picker-overlay');
       if (ip && ip.style.display === 'flex') { e.preventDefault(); closeIconPicker(); return; }
+      const sd = document.getElementById('svc-details-overlay');
+      if (sd && sd.style.display === 'flex') { e.preventDefault(); closeServiceDetails(); return; }
     }
     const isTypingField = tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || e.target.isContentEditable;
     // Allow Escape always; allow Ctrl+S / Ctrl+Shift+S in any field for save.
@@ -7920,7 +8116,8 @@ function updateArrowProp(id, key, val) {
   a[key] = val;
   // Switching routing changes which reroute handles apply (mid-jog vs bends).
   if (key === 'routing' && selectedArrow === id) renderEndpointHandles(a);
-  drawArrow(a);
+  // Routing changes a line's geometry, so other arrows' hops over it may change.
+  if (key === 'routing') redrawArrows(); else drawArrow(a);
   markDirty();
   updatePropsPanel();
 }
@@ -7973,8 +8170,12 @@ function deleteArrow(id) {
   arrows = arrows.filter(a => a.id !== id);
   playFlow = playFlow.filter(s => s.arrow !== id);
   removeArrowDom(id);
+  arrowRouteCache.delete(id);
   selectedArrow = null;
   clearEndpointHandles();
+  // Other arrows may have hopped over the deleted one — rebuild so those
+  // now-orphaned bridges disappear.
+  redrawArrows();
   markDirty();
   updateStatusBar();
   showPropsEmpty();
@@ -8146,7 +8347,7 @@ function restoreState(state) {
   // Re-render
   groups.forEach(g => renderGroup(g));
   nodes.forEach(n => renderNode(n));
-  arrows.forEach(a => drawArrow(a));
+  redrawArrows();
   // Reflect the restored state's relationship to the last saved snapshot
   // rather than forcing the dirty bit on — undoing back to the saved state
   // should clear "unsaved changes".
@@ -8158,9 +8359,11 @@ function restoreState(state) {
 
 // ===== CONTEXT MENU =====
 function nodeCtxMenuHtml() {
+  const hasKb = !!inferKbForNode(getNode(ctxTargetId));
   return `
     <div class="ctx-item" onclick="ctxAction('edit')">✏️ Edit Label</div>
     <div class="ctx-item" onclick="openStyleInPanel()">🎨 Style…</div>
+    ${hasKb ? `<div class="ctx-item" onclick="ctxAction('details')">📊 Service details…</div>` : ''}
     <div class="ctx-item" onclick="ctxAction('duplicate')">📋 Duplicate</div>
     <div class="ctx-item" onclick="ctxAction('toFront')">⬆️ Bring to Front</div>
     <div class="ctx-item" onclick="ctxAction('toBack')">⬇️ Send to Back</div>
@@ -8285,6 +8488,7 @@ function ctxAction(action) {
     const el = document.getElementById('node-' + ctxTargetId);
     if (el) { const lbl = el.querySelector('[data-field="label"]'); if (lbl) startInlineEdit(lbl, getNode(ctxTargetId)); }
   }
+  if (action === 'details') showServiceDetails(ctxTargetId);
   if (action === 'duplicate') duplicateNode(ctxTargetId);
   if (action === 'toFront') bringToFront(ctxTargetId);
   if (action === 'toBack') sendToBack(ctxTargetId);
@@ -8892,7 +9096,8 @@ function getDiagramData() {
       created: _diagramCreatedAt,
       updated: now,
       name: document.getElementById('filename-input').value,
-      arrowLabelScale
+      arrowLabelScale,
+      lineJumps: lineJumpsEnabled
     }
   };
 }
@@ -9687,7 +9892,10 @@ async function buildDiagramSVG(theme = 'dark') {
   });
 
   const arrowLabels = [];  // deferred so we can de-overlap before drawing
-  arrows.forEach(a => {
+  // Pass 1: route every arrow (in export coords) so Pass 2 can add line-jumps
+  // — an arrow can only hop over another once it knows the other's route.
+  const expRoutes = [];
+  arrows.forEach((a, idx) => {
     const fn=getNode(a.from), tn=getNode(a.to);
     if (!fn||!tn) return;
     const fel=document.getElementById('node-'+a.from), tel=document.getElementById('node-'+a.to);
@@ -9718,7 +9926,14 @@ async function buildDiagramSVG(theme = 'dark') {
     } else {
       routePts = orthogonalRoute(from, fp, to, tp, obstacles, eManualMid);
     }
-    const dStr = buildArrowPathD(a, routePts);
+    expRoutes.push({ a, idx, routing, routePts });
+  });
+
+  // Pass 2: emit each arrow's path (bridging crossings over arrows beneath it).
+  const _expRouteList = expRoutes.map(r => ({ idx: r.idx, from: r.a.from, to: r.a.to, routing: r.routing, pts: r.routePts }));
+  expRoutes.forEach(({ a, idx, routing, routePts }) => {
+    const hopsBySeg = _hopsBetween(idx, routePts, routing, a.from, a.to, _expRouteList);
+    const dStr = buildArrowPathD(a, routePts, hopsBySeg);
     const stroke=colorMap[a.color]||colorMap.default;
     const dashArr=a.style==='dashed'?'stroke-dasharray="6 4"':a.style==='dotted'?'stroke-dasharray="2 4"':'';
     const markerId=a.color&&a.color!=='default'?`ah-${a.color}`:'ah';
@@ -9861,6 +10076,9 @@ function loadDiagramData(data) {
   arrowLabelScale = (data && data.meta && +data.meta.arrowLabelScale) || 1;
   if (!(arrowLabelScale > 0)) arrowLabelScale = 1;
   updateArrowScaleLabel();
+  // Line-jumps: on unless the file explicitly saved it off (older files → on).
+  lineJumpsEnabled = !(data && data.meta && data.meta.lineJumps === false);
+  updateLineJumpsBtn();
   nodes = data.nodes || [];
   arrows = data.arrows || [];
   groups = data.groups || [];
@@ -9884,7 +10102,7 @@ function loadDiagramData(data) {
   // Render
   groups.forEach(g => renderGroup(g));
   nodes.forEach(n => renderNode(n));
-  setTimeout(() => { arrows.forEach(a => drawArrow(a)); fitToContent(); }, 50);
+  setTimeout(() => { redrawArrows(); fitToContent(); }, 50);
   updateStatusBar();
   markClean();
 }
@@ -9898,6 +10116,7 @@ function newDiagram() {
   historyStack = []; redoStack = [];
   _diagramCreatedAt = null;
   arrowLabelScale = 1; updateArrowScaleLabel();
+  lineJumpsEnabled = true; updateLineJumpsBtn(); arrowRouteCache.clear();
   canvasViewport.querySelectorAll('.node').forEach(el => el.remove());
   canvasViewport.querySelectorAll('.group-node').forEach(el => el.remove());
   arrowsSvg.querySelectorAll('g').forEach(el => el.remove());
