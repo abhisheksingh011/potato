@@ -6677,15 +6677,15 @@ function segSegIntersection(p1, p2, p3, p4) {
 
 // Crossing points (grouped by my segment index) where I should bridge. Only the
 // arrow that is *on top* (higher index in the arrows array) draws the hop, so a
-// crossing is bridged exactly once. Arrows that share an endpoint node meet
-// rather than cross, so they're skipped.
+// crossing is bridged exactly once. Two arrows that share an endpoint node only
+// touch *at* that node (t≈0/1), which the intersection epsilon already rejects —
+// so arrows fanning out from the same box still hop where they genuinely cross.
 function _hopsBetween(myIdx, myPts, myRouting, myFrom, myTo, routes) {
   if (!lineJumpsEnabled || myRouting === 'curved' || !myPts || myPts.length < 2) return null;
   const hops = {};
   for (const o of routes) {
     if (o.idx >= myIdx) continue;            // only hop over arrows beneath me
     if (o.routing === 'curved' || !o.pts || o.pts.length < 2) continue;
-    if (o.from === myFrom || o.from === myTo || o.to === myFrom || o.to === myTo) continue;
     for (let i = 0; i < myPts.length - 1; i++) {
       for (let j = 0; j < o.pts.length - 1; j++) {
         const X = segSegIntersection(myPts[i], myPts[i + 1], o.pts[j], o.pts[j + 1]);
