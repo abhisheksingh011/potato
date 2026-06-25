@@ -235,7 +235,10 @@ body {
   overflow: hidden;
   flex-shrink: 0;
   z-index: 100;
+  transition: width 0.18s ease;
 }
+/* Collapsed (hidden) left column — reopen from the toolbar's ◧ button. */
+#sidebar.collapsed { width: 0; min-width: 0; border-right-color: transparent; }
 
 #sidebar-header {
   padding: 10px 12px 6px;
@@ -1374,6 +1377,7 @@ kbd {
   <!-- ROW 1 — PRIMARY -->
   <div class="toolbar-row primary">
     <div class="toolbar-brand">🥔 Potato</div>
+    <button id="btn-sidebar-toggle" class="tb-btn active" onclick="toggleSidebar()" title="Show / hide the components panel (left column)" aria-label="Toggle components panel" aria-pressed="true"><span class="tb-icon" aria-hidden="true">◧</span></button>
     <div class="toolbar-sep"></div>
 
     <button class="tb-btn" onclick="showTemplatesModal()" title="Start from a template" aria-label="Templates"><span class="tb-icon" aria-hidden="true">✨</span><span class="tb-label">Templates</span></button>
@@ -1397,9 +1401,18 @@ kbd {
     </select>
     <button class="tb-btn" onclick="showCostEstimator()" title="Estimate monthly cost based on the services in this diagram" aria-label="Estimate monthly cost"><span class="tb-icon" aria-hidden="true">💰</span><span class="tb-label">Cost</span></button>
 
+    <div class="toolbar-sep"></div>
+
+    <span class="row-label">Arrows</span>
+    <button class="tool-mode-btn" onclick="bumpArrowLabelScale(-1)" title="Decrease arrow label text size (all arrows)" aria-label="Decrease arrow text size">A−</button>
+    <button class="zoom-display" id="arrow-text-scale-label" onclick="resetArrowLabelScale()" title="Arrow label text size for all arrows — click to reset to 100%" aria-label="Arrow text size">100%</button>
+    <button class="tool-mode-btn" onclick="bumpArrowLabelScale(1)" title="Increase arrow label text size (all arrows)" aria-label="Increase arrow text size">A+</button>
+    <button id="btn-line-jumps" class="tb-btn active" onclick="toggleLineJumps()" title="Line jumps — where two connections cross, the one on top hops over the other" aria-label="Toggle line jumps" aria-pressed="true"><span class="tb-icon" aria-hidden="true">⌒</span><span class="tb-label">Jumps</span></button>
+
     <div style="flex:1;"></div>
 
     <input type="text" id="filename-input" value="my-diagram" placeholder="diagram name" aria-label="Diagram name">
+    <button id="btn-fullscreen" class="tb-btn" onclick="toggleFullscreen()" title="Toggle full screen (F11)" aria-label="Toggle full screen" aria-pressed="false"><span class="tb-icon" aria-hidden="true">⛶</span></button>
     <button class="tb-btn" id="theme-toggle-btn" onclick="toggleTheme()" title="Switch theme (dark / light)" aria-label="Toggle theme">🌙</button>
     <button class="tb-btn" onclick="showHelp()" title="Help & Shortcuts" aria-label="Help and shortcuts">?</button>
   </div>
@@ -1445,15 +1458,6 @@ kbd {
     <button class="tb-btn" onclick="autoLayout('tb')" title="Auto Layout Top→Bottom" aria-label="Auto-layout top to bottom"><span class="tb-icon" aria-hidden="true">↓</span><span class="tb-label">TB</span></button>
     <button id="btn-grid-snap" class="tb-btn" onclick="toggleGridSnap()" title="Toggle snap to 20px grid" aria-label="Toggle grid snap" aria-pressed="false"><span class="tb-icon" aria-hidden="true">⌗</span><span class="tb-label">Snap</span></button>
     <button id="btn-edit-flow" class="tb-btn" onclick="showFlowEditor()" title="Edit the play sequence and narration" aria-label="Edit play sequence"><span class="tb-icon" aria-hidden="true">📝</span><span class="tb-label">Sequence</span></button>
-
-    <div class="toolbar-sep"></div>
-
-    <span class="row-label">Arrow text</span>
-    <button class="tool-mode-btn" onclick="bumpArrowLabelScale(-1)" title="Decrease arrow label text size (all arrows)" aria-label="Decrease arrow text size">A−</button>
-    <button class="zoom-display" id="arrow-text-scale-label" onclick="resetArrowLabelScale()" title="Arrow label text size for all arrows — click to reset to 100%" aria-label="Arrow text size">100%</button>
-    <button class="tool-mode-btn" onclick="bumpArrowLabelScale(1)" title="Increase arrow label text size (all arrows)" aria-label="Increase arrow text size">A+</button>
-
-    <button id="btn-line-jumps" class="tb-btn active" onclick="toggleLineJumps()" title="Line jumps — where two connections cross, the one on top hops over the other" aria-label="Toggle line jumps" aria-pressed="true"><span class="tb-icon" aria-hidden="true">⌒</span><span class="tb-label">Jumps</span></button>
 
     <div style="flex:1;"></div>
     <button id="btn-props-toggle" class="tb-btn" onclick="togglePanel('props')" title="Show / hide the Properties panel — edit the selected item's label, colour, icon & notes" aria-label="Toggle properties panel" aria-pressed="false"><span class="tb-icon" aria-hidden="true">⚙</span><span class="tb-label">Properties</span></button>
@@ -4389,6 +4393,10 @@ function init() {
 
 // ===== SIDEBAR =====
 function switchSidebarTab(tab) {
+  // If the components panel is collapsed (e.g. user hit "Build from scratch"
+  // from the empty state), reveal it so the chosen tab is actually visible.
+  const sb = document.getElementById('sidebar');
+  if (sb && sb.classList.contains('collapsed')) toggleSidebar();
   document.querySelectorAll('.sidebar-tab').forEach((t, i) => {
     const tabs = ['shapes','aws','azure','gcp'];
     t.classList.toggle('active', tabs[i] === tab);
@@ -10341,6 +10349,45 @@ function updatePropsToggleBtn() {
   btn.classList.toggle('attention', hasSelection && !open);
   btn.setAttribute('aria-pressed', open ? 'true' : 'false');
 }
+
+// ===== LEFT SIDEBAR (components) show / hide =====
+function toggleSidebar() {
+  const sb = document.getElementById('sidebar');
+  if (!sb) return;
+  sb.classList.toggle('collapsed');
+  const collapsed = sb.classList.contains('collapsed');
+  const btn = document.getElementById('btn-sidebar-toggle');
+  if (btn) {
+    btn.classList.toggle('active', !collapsed);
+    btn.setAttribute('aria-pressed', collapsed ? 'false' : 'true');
+  }
+  // The canvas reflows via flexbox; refresh the minimap once the slide settles.
+  setTimeout(() => { try { updateMinimap(); } catch (_) {} }, 220);
+}
+
+// ===== FULL SCREEN =====
+function toggleFullscreen() {
+  const doc = document;
+  const el = doc.documentElement;
+  const isFs = doc.fullscreenElement || doc.webkitFullscreenElement;
+  if (!isFs) {
+    const req = el.requestFullscreen || el.webkitRequestFullscreen;
+    if (req) req.call(el).catch(() => notify('Full screen was blocked by the browser', 'warning'));
+  } else {
+    const exit = doc.exitFullscreen || doc.webkitExitFullscreen;
+    if (exit) exit.call(doc);
+  }
+}
+function updateFullscreenBtn() {
+  const btn = document.getElementById('btn-fullscreen');
+  if (!btn) return;
+  const on = !!(document.fullscreenElement || document.webkitFullscreenElement);
+  btn.classList.toggle('active', on);
+  btn.setAttribute('aria-pressed', on ? 'true' : 'false');
+  btn.title = on ? 'Exit full screen (F11)' : 'Toggle full screen (F11)';
+}
+document.addEventListener('fullscreenchange', updateFullscreenBtn);
+document.addEventListener('webkitfullscreenchange', updateFullscreenBtn);
 
 // ===== THEME (dark / light) =====
 // Theme is stored in localStorage so it persists across sessions.
