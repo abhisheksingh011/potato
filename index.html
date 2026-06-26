@@ -10098,7 +10098,12 @@ async function buildDiagramSVG(theme = 'dark') {
 `;
   });
 
-  nodes.forEach(n => {
+  // Paint in stacking order (zIndex) so a box "sent to back" stays behind the
+  // icon dropped on top of it — the canvas stacks by zIndex, but a plain
+  // array walk would paint a later-added box over an earlier icon. Array.sort
+  // is stable, so equal-zIndex nodes keep their original order.
+  const _zOf = (n) => (n.zIndex || 10);   // same as renderNode's el.style.zIndex
+  [...nodes].sort((a, b) => _zOf(a) - _zOf(b)).forEach(n => {
     const el=document.getElementById('node-'+n.id);
     const nw=el?el.offsetWidth:160, nh=el?el.offsetHeight:80;
     const nx=n.x+ox, ny=n.y+oy;
