@@ -94,7 +94,14 @@ body {
   align-items: center;
   gap: 6px;
   min-height: 36px;
+  flex-wrap: wrap;        /* never let buttons clip off-screen — wrap instead */
+  row-gap: 6px;
 }
+/* Icon-only toolbar: hide button text + section labels so every control fits
+   on small screens. Each button keeps its title tooltip (and aria-label) so
+   the name is still one hover away. */
+#toolbar .tb-label,
+#toolbar .row-label { display: none; }
 .toolbar-row.secondary {
   border-top: 1px solid var(--border);
   padding-top: 6px;
@@ -1448,8 +1455,8 @@ kbd {
     <button class="tool-mode-btn" onclick="zoomOut()" title="Zoom Out (-)" aria-label="Zoom out">−</button>
     <button class="zoom-display" id="zoom-label" onclick="promptZoomLevel(event)" title="Click to set zoom %" aria-label="Set zoom level">100%</button>
     <button class="tool-mode-btn" onclick="zoomIn()" title="Zoom In (+)" aria-label="Zoom in">+</button>
-    <button class="tb-btn" onclick="zoomReset()" title="Reset zoom to 100% (0)" aria-label="Reset zoom"><span class="tb-label">Reset</span></button>
-    <button class="tb-btn" onclick="fitToContent()" title="Fit all content (F)" aria-label="Fit to content"><span class="tb-label">Fit</span></button>
+    <button class="tb-btn" onclick="zoomReset()" title="Reset zoom to 100% (0)" aria-label="Reset zoom"><span class="tb-icon" aria-hidden="true">⊙</span><span class="tb-label">Reset</span></button>
+    <button class="tb-btn" onclick="fitToContent()" title="Fit all content (F)" aria-label="Fit to content"><span class="tb-icon" aria-hidden="true">⤢</span><span class="tb-label">Fit</span></button>
 
     <div class="toolbar-sep"></div>
 
