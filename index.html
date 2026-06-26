@@ -95,8 +95,11 @@ body {
    cursor (which sits on the button) never covers the text the way the native
    title tooltip does. Names come from data-tip (set from each button's title at
    startup); aria-label keeps screen-reader access. */
-#toolbar button[data-tip] { position: relative; }
-#toolbar button[data-tip]::after {
+#toolbar [data-tip] { position: relative; }
+/* The select dropdown can't paint ::after (replaced element), so its tooltip
+   lives on a wrapper span instead. */
+#toolbar .tb-tip { display: inline-flex; align-items: center; }
+#toolbar [data-tip]::after {
   content: attr(data-tip);
   position: absolute;
   top: calc(100% + 7px);
@@ -121,11 +124,12 @@ body {
   z-index: 1000;
   transition: opacity 0.12s ease 0.18s;
 }
-#toolbar button[data-tip]:hover::after,
-#toolbar button[data-tip]:focus-visible::after { opacity: 1; }
+#toolbar [data-tip]:hover::after,
+#toolbar [data-tip]:focus-within::after,
+#toolbar [data-tip]:focus-visible::after { opacity: 1; }
 /* Edge buttons anchor their tooltip to one side so it never runs off-screen. */
-#toolbar button[data-tip-align="start"]::after { left: 0; right: auto; transform: none; }
-#toolbar button[data-tip-align="end"]::after   { left: auto; right: 0; transform: none; }
+#toolbar [data-tip-align="start"]::after { left: 0; right: auto; transform: none; }
+#toolbar [data-tip-align="end"]::after   { left: auto; right: 0; transform: none; }
 .toolbar-row {
   display: flex;
   align-items: center;
@@ -1438,11 +1442,13 @@ kbd {
     <div class="toolbar-sep"></div>
 
     <button id="btn-play-flow" class="tb-btn" onclick="togglePlayFlow()" title="Animate the data flow through the diagram (Space)" aria-label="Play flow animation"><span class="tb-icon" aria-hidden="true">▶</span><span class="tb-label">Play</span></button>
-    <select id="play-speed" class="tb-btn" onchange="setPlaySpeed(this.value)" title="Animation speed" aria-label="Animation speed" style="padding:6px 8px;font-size:11px">
-      <option value="2500">🐢 Slow</option>
-      <option value="1400" selected>Normal</option>
-      <option value="700">🐇 Fast</option>
-    </select>
+    <span class="tb-tip" data-tip="Animation speed">
+      <select id="play-speed" class="tb-btn" onchange="setPlaySpeed(this.value)" aria-label="Animation speed" style="padding:6px 8px;font-size:11px">
+        <option value="2500">🐢 Slow</option>
+        <option value="1400" selected>Normal</option>
+        <option value="700">🐇 Fast</option>
+      </select>
+    </span>
     <button class="tb-btn" onclick="showCostEstimator()" title="Estimate monthly cost based on the services in this diagram" aria-label="Estimate monthly cost"><span class="tb-icon" aria-hidden="true">💰</span><span class="tb-label">Cost</span></button>
 
     <div class="toolbar-sep"></div>
@@ -4429,13 +4435,15 @@ function setTip(el, text) {
   el.setAttribute('aria-label', text);
   el.removeAttribute('title');
 }
-// Convert every toolbar button's native title into the custom data-tip bubble.
+// Convert every toolbar control's native title into the custom data-tip bubble,
+// so the OS tooltip (drawn at the cursor) never covers the text. Selects can't
+// paint ::after, so their tooltip lives on a wrapping .tb-tip span — skip those.
 function initToolbarTooltips() {
-  document.querySelectorAll('#toolbar button[title]').forEach(el => {
+  document.querySelectorAll('#toolbar [title]').forEach(el => {
     const t = el.getAttribute('title');
     if (!t) return;
     if (!el.getAttribute('aria-label')) el.setAttribute('aria-label', t);
-    el.setAttribute('data-tip', t);
+    if (el.tagName !== 'SELECT' && el.tagName !== 'INPUT') el.setAttribute('data-tip', t);
     el.removeAttribute('title');
   });
 }
