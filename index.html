@@ -10186,7 +10186,7 @@ ${geom}
     svg += `  <g class="potato-node" data-node-id="${escHtml(n.id)}" style="cursor:pointer"${gOpacity}>
     <rect class="potato-node-rect" x="${nx}" y="${ny}" width="${nw}" height="${nh}" rx="${rx}" fill="${rectFill}" stroke="${strokeCol}" stroke-width="${strokeW}" opacity="0.95"/>
 ${iconMarkup}
-${n.category ? `    <text x="${nx+12}" y="${ny+39}" class="node-label">${escHtml((n.category||'').toUpperCase().slice(0,22))}</text>\n` : ''}    <text x="${nx+12}" y="${ny+55}" class="node-name"${labelFont}${labelFill}>${escHtml((n.label||'').slice(0,20))}</text>
+${n.category ? `    <text x="${nx+12}" y="${ny+39}" class="node-label">${escHtml((n.category||'').toUpperCase().slice(0,22))}</text>\n` : ''}    <text x="${nx+12}" y="${ny+55}" class="node-name"${labelFont}${labelFill}>${escHtml(n.label||'')}</text>
 ${n.sublabel ? `    <text x="${nx+12}" y="${ny+68}" class="node-sub">${escHtml((n.sublabel||'').slice(0,24))}</text>\n` : ''}  </g>
 `;
   });
