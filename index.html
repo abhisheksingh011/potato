@@ -5555,6 +5555,29 @@ function shapeSvg(kind) {
   return `<svg viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">${inner}</svg>`;
 }
 
+// Wrap a label into lines that fit `maxWidth` (px) for the export SVG, mirroring
+// the canvas's wrapping flex box. SVG <text> doesn't wrap on its own, so without
+// this a long label in a narrow shape spills out the sides. Monospace export
+// font → ~0.6em per char. Breaks on spaces, and hard-breaks words longer than
+// a line (matches the editor's `overflow-wrap: anywhere`).
+function wrapSvgText(text, maxWidth, fontSize) {
+  const charW = fontSize * 0.6;
+  const maxChars = Math.max(1, Math.floor(maxWidth / charW));
+  const out = [];
+  (text || '').split(/\s+/).forEach(word => {
+    if (!word) return;
+    while (word.length > maxChars) {       // hard-break an over-long word
+      out.push(word.slice(0, maxChars));
+      word = word.slice(maxChars);
+    }
+    if (!out.length) { out.push(word); return; }
+    const last = out[out.length - 1];
+    if (last.length + 1 + word.length <= maxChars) out[out.length - 1] = last + ' ' + word;
+    else out.push(word);
+  });
+  return out.length ? out : [''];
+}
+
 // Absolute-coordinate SVG outline for a shape node, used by the export/saved
 // viewer so it matches the live canvas. `fill` is a faint tint of the theme col.
 function exportShapeGeom(kind, x, y, w, h, col, fillOverride, strokeW) {
@@ -10121,10 +10144,19 @@ async function buildDiagramSVG(theme = 'dark') {
     // Simple geometric shape: outlined form with centred text, no icon card.
     if (n.shape) {
       const geom = exportShapeGeom(n.shape, nx, ny, nw, nh, strokeCol, n.fill, strokeW);
-      const anchor = n.align==='left' ? `x="${nx+8}" text-anchor="start"` : n.align==='right' ? `x="${nx+nw-8}" text-anchor="end"` : `x="${nx+nw/2}" text-anchor="middle"`;
+      const lx = n.align==='left' ? nx+10 : n.align==='right' ? nx+nw-10 : nx+nw/2;
+      const anchor = n.align==='left' ? `x="${lx}" text-anchor="start"` : n.align==='right' ? `x="${lx}" text-anchor="end"` : `x="${lx}" text-anchor="middle"`;
+      // Wrap the label to fit inside the box (10px padding each side), matching
+      // the canvas's wrapping flex label, then centre the block vertically.
+      const fs = +n.fontSize || 12;
+      const lh = fs * 1.25;
+      const lines = wrapSvgText(n.label || '', nw - 20, fs);
+      const top = (ny + nh/2) - (lines.length - 1) * lh / 2;
+      const tspans = lines.map((ln, i) =>
+        `<tspan ${anchor} y="${(top + i*lh).toFixed(1)}">${escHtml(ln)}</tspan>`).join('');
       svg += `  <g class="potato-node" data-node-id="${escHtml(n.id)}" style="cursor:pointer"${gOpacity}>
 ${geom}
-    <text ${anchor} y="${ny+nh/2}" class="node-name"${labelFont}${labelFill} dominant-baseline="central">${escHtml((n.label||'').slice(0,24))}</text>
+    <text class="node-name"${labelFont}${labelFill} dominant-baseline="central">${tspans}</text>
   </g>
 `;
       return;
