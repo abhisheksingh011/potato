@@ -619,17 +619,20 @@ body {
 }
 .theme-gradient:hover { box-shadow: 0 0 28px rgba(123,47,190,0.4), 0 0 28px rgba(26,188,156,0.25); }
 
-/* Text/Sticky note node */
+/* Text / Note node — the typed text is centred in the card (both axes) so the
+   canvas matches the PNG/SVG export. text-align falls back to centre here but is
+   overridden by the inline el.style.textAlign that applyNodeCustomStyle sets
+   whenever the node has an explicit align (left / right). */
 .node-text-style {
-  background: rgba(241,196,15,0.07);
-  border-color: rgba(241,196,15,0.3);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  text-align: center;
   min-width: 120px;
 }
 .node-text-style .node-name {
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--yellow);
   white-space: pre-wrap;
+  width: 100%;
 }
 
 /* Inline editing */
@@ -5605,7 +5608,7 @@ function renderNode(node) {
 
   el.className = node.shape
     ? `node is-shape shape-${escHtml(node.shape)} theme-${node.theme}`
-    : `node theme-${node.theme}`;
+    : `node theme-${node.theme}${node.type === 'text' ? ' node-text-style' : ''}`;
   if (selectedIds.has(node.id)) el.classList.add('selected');
   el.setAttribute('aria-label', `${node.type || 'node'}: ${node.label || ''}`);
 
