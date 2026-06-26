@@ -10121,6 +10121,22 @@ ${geom}
 `;
       return;
     }
+    // Text / Note nodes: render just the typed text, centred in the card — no
+    // emoji icon and no category/sublabel (mirrors the live canvas). Without
+    // this they exported as an icon card with the label spilling out the bottom.
+    if (n.type === 'text') {
+      const tFill = n.fill || P.nodeFill;
+      const tRx = n.rounded === false ? 0 : 10;
+      const tAnchor = n.align==='left' ? `x="${nx+12}" text-anchor="start"`
+                    : n.align==='right' ? `x="${nx+nw-12}" text-anchor="end"`
+                    : `x="${nx+nw/2}" text-anchor="middle"`;
+      svg += `  <g class="potato-node" data-node-id="${escHtml(n.id)}" style="cursor:pointer"${gOpacity}>
+    <rect class="potato-node-rect" x="${nx}" y="${ny}" width="${nw}" height="${nh}" rx="${tRx}" fill="${tFill}" stroke="${strokeCol}" stroke-width="${strokeW}" opacity="0.95"/>
+    <text ${tAnchor} y="${ny+nh/2}" class="node-name"${labelFont}${labelFill} dominant-baseline="central">${escHtml((n.label||'').slice(0,40))}</text>
+  </g>
+`;
+      return;
+    }
     const iconData = n.iconUrl ? iconDataUrls.get(n.iconUrl) : null;
     const iconMarkup = iconData
       ? `    <image href="${iconData}" x="${nx+8}" y="${ny+8}" width="24" height="24"/>`
