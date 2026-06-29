@@ -10022,7 +10022,7 @@ async function buildDiagramSVG(theme = 'dark') {
     // the box is set to transparent (border only).
     const gfill = g.transparent ? 'none' : (col + '12');
     svg += `  <rect class="potato-group-rect" x="${g.x+ox}" y="${g.y+oy}" width="${g.w}" height="${g.h}" rx="12" fill="${gfill}" stroke="${col}" stroke-width="1.5" stroke-dasharray="6,4" opacity="0.7"/>
-  <text x="${g.x+ox+12}" y="${g.y+oy+22}" class="grp-label"${g.fontSize ? ` font-size="${g.fontSize}"` : ''}${g.bold === false ? ' font-weight="400"' : ''}>${escHtml((g.label||'').toUpperCase())}</text>
+  <text x="${g.x+ox+12}" y="${g.y+oy+22}" class="grp-label" style="${g.fontSize ? `font-size:${g.fontSize}px;` : ''}${g.bold === false ? 'font-weight:400;' : ''}">${escHtml((g.label||'').toUpperCase())}</text>
 `;
   });
 
@@ -10140,8 +10140,14 @@ async function buildDiagramSVG(theme = 'dark') {
     const strokeCol = n.stroke || col;
     const strokeW   = n.strokeWidth || 1;
     const gOpacity  = (n.opacity != null && n.opacity !== '') ? ` opacity="${n.opacity}"` : '';
-    const labelFont = n.fontSize ? ` font-size="${n.fontSize}"` : '';
-    const labelFill = n.fontColor ? ` fill="${n.fontColor}"` : '';
+    // Emit per-node font size / colour as an inline style, NOT as presentation
+    // attributes: a CSS rule in the embedded <style> (e.g. .node-name{font-size:12px})
+    // overrides presentation attributes, so font-size="20" would be ignored and
+    // every label would render at 12px. Inline styles beat stylesheet selectors.
+    const labelStyleParts = [];
+    if (n.fontSize)  labelStyleParts.push(`font-size:${n.fontSize}px`);
+    if (n.fontColor) labelStyleParts.push(`fill:${n.fontColor}`);
+    const labelStyle = labelStyleParts.length ? ` style="${labelStyleParts.join(';')}"` : '';
     // Simple geometric shape: outlined form with centred text, no icon card.
     if (n.shape) {
       const geom = exportShapeGeom(n.shape, nx, ny, nw, nh, strokeCol, n.fill, strokeW);
@@ -10157,7 +10163,7 @@ async function buildDiagramSVG(theme = 'dark') {
         `<tspan ${anchor} y="${(top + i*lh).toFixed(1)}">${escHtml(ln)}</tspan>`).join('');
       svg += `  <g class="potato-node" data-node-id="${escHtml(n.id)}" style="cursor:pointer"${gOpacity}>
 ${geom}
-    <text class="node-name"${labelFont}${labelFill} dominant-baseline="central">${tspans}</text>
+    <text class="node-name"${labelStyle} dominant-baseline="central">${tspans}</text>
   </g>
 `;
       return;
@@ -10173,7 +10179,7 @@ ${geom}
                     : `x="${nx+nw/2}" text-anchor="middle"`;
       svg += `  <g class="potato-node" data-node-id="${escHtml(n.id)}" style="cursor:pointer"${gOpacity}>
     <rect class="potato-node-rect" x="${nx}" y="${ny}" width="${nw}" height="${nh}" rx="${tRx}" fill="${tFill}" stroke="${strokeCol}" stroke-width="${strokeW}" opacity="0.95"/>
-    <text ${tAnchor} y="${ny+nh/2}" class="node-name"${labelFont}${labelFill} dominant-baseline="central">${escHtml((n.label||'').slice(0,40))}</text>
+    <text ${tAnchor} y="${ny+nh/2}" class="node-name"${labelStyle} dominant-baseline="central">${escHtml((n.label||'').slice(0,40))}</text>
   </g>
 `;
       return;
@@ -10197,7 +10203,7 @@ ${geom}
     svg += `  <g class="potato-node" data-node-id="${escHtml(n.id)}" style="cursor:pointer"${gOpacity}>
     <rect class="potato-node-rect" x="${nx}" y="${ny}" width="${nw}" height="${nh}" rx="${rx}" fill="${rectFill}" stroke="${strokeCol}" stroke-width="${strokeW}" opacity="0.95"/>
 ${iconMarkup}
-${n.category ? `    <text x="${nx+12}" y="${ny+39}" class="node-label">${escHtml((n.category||'').toUpperCase().slice(0,22))}</text>\n` : ''}    <text class="node-name"${labelFont}${labelFill}>${nameSpans}</text>
+${n.category ? `    <text x="${nx+12}" y="${ny+39}" class="node-label">${escHtml((n.category||'').toUpperCase().slice(0,22))}</text>\n` : ''}    <text class="node-name"${labelStyle}>${nameSpans}</text>
 ${n.sublabel ? `    <text x="${nx+12}" y="${subY.toFixed(1)}" class="node-sub">${escHtml((n.sublabel||'').slice(0,24))}</text>\n` : ''}  </g>
 `;
   });
