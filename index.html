@@ -1348,9 +1348,9 @@ body.seq-picking .arrow-hit-area { cursor: pointer; }
 #seq-record-bar .seq-count { font-weight: 700; color: var(--teal); white-space: nowrap; }
 #seq-record-bar .tb-btn { font-size: 11px; padding: 4px 10px; }
 /* Numbered play-order chip drawn on each sequenced arrow */
-.arrow-seq-badge circle { fill: var(--teal); stroke: var(--bg); stroke-width: 2; }
+.arrow-seq-badge circle, .arrow-seq-badge rect { fill: var(--teal); stroke: var(--bg); stroke-width: 2; }
 .arrow-seq-badge text { fill: #06251f; font-size: 11px; font-weight: 800; font-family: var(--font-mono); }
-body:not(.seq-picking) .arrow-seq-badge circle { fill: rgba(26,188,156,0.85); }
+body:not(.seq-picking) .arrow-seq-badge circle, body:not(.seq-picking) .arrow-seq-badge rect { fill: rgba(26,188,156,0.85); }
 
 kbd {
   display: inline-block;
@@ -1529,6 +1529,7 @@ kbd {
     <button id="btn-grid-snap" class="tb-btn" onclick="toggleGridSnap()" title="Toggle snap to 20px grid" aria-label="Toggle grid snap" aria-pressed="false"><span class="tb-icon" aria-hidden="true">⌗</span><span class="tb-label">Snap</span></button>
     <button id="btn-seq-pick" class="tb-btn" onclick="toggleSequenceMode()" title="Build the play order by clicking arrows on the canvas in sequence" aria-label="Pick play order on canvas"><span class="tb-icon" aria-hidden="true">🔢</span><span class="tb-label">Order</span></button>
     <button id="btn-edit-flow" class="tb-btn" onclick="showFlowEditor()" title="Edit the play sequence and narration" aria-label="Edit play sequence"><span class="tb-icon" aria-hidden="true">📝</span><span class="tb-label">Sequence</span></button>
+    <button id="btn-seq-badges" class="tb-btn active" onclick="toggleSeqBadges()" title="Show or hide the play-order numbers on arrows" aria-label="Toggle play-order numbers" aria-pressed="true"><span class="tb-icon" aria-hidden="true">👁</span><span class="tb-label">Numbers</span></button>
 
     <div style="flex:1;"></div>
     <button id="btn-props-toggle" class="tb-btn" data-tip-align="end" onclick="togglePanel('props')" title="Show / hide the Properties panel — edit the selected item's label, colour, icon & notes" aria-label="Toggle properties panel" aria-pressed="false"><span class="tb-icon" aria-hidden="true">⚙</span><span class="tb-label">Properties</span></button>
@@ -1983,6 +1984,9 @@ let groups = [];      // { id, x, y, w, h, label, color }
 let playFlow = [];    // OPTIONAL ordered narration: [{ arrow: arrowId, title: "Auth", text: "User opens app..." }, ...]
 let _seqMode = false; // canvas "pick play order" mode: click arrows to sequence them
 let _seqDraft = [];   // ordered arrow ids being picked while _seqMode is on
+// Whether saved play-order badges show during normal editing (persisted). While
+// picking they always show — you need them to sequence.
+let _showSeqBadges = (() => { try { return localStorage.getItem('potato.seqBadges') !== 'off'; } catch (e) { return true; } })();
 let selectedIds = new Set();
 let selectedArrow = null;
 let selectedGroup = null;
@@ -6535,7 +6539,7 @@ function drawArrow(arrow) {
     hit.setAttribute('class', 'arrow-hit-area');
     hit.style.cursor = 'pointer';
     hit.addEventListener('click', (e) => { e.stopPropagation(); if (_seqMode) { seqHandleArrowClick(arrow.id); return; } selectArrow(arrow.id); });
-    hit.addEventListener('contextmenu', (e) => { e.preventDefault(); selectArrow(arrow.id); showArrowContextMenu(e, arrow.id); });
+    hit.addEventListener('contextmenu', (e) => { e.preventDefault(); if (_seqMode) { seqRemoveArrowOccurrence(arrow.id); return; } selectArrow(arrow.id); showArrowContextMenu(e, arrow.id); });
     hit.addEventListener('dblclick', (e) => {
       e.stopPropagation();
       // In free routing, double-clicking the line drops a bend point; otherwise
@@ -6622,23 +6626,34 @@ function drawArrow(arrow) {
     g.appendChild(lbl);
   });
 
-  // Sequence badge: a numbered chip showing this arrow's position in the play
-  // order (live draft while picking, otherwise its saved playFlow step number).
+  // Sequence badge: a numbered chip showing this arrow's position(s) in the play
+  // order. An arrow can fire more than once (e.g. a loop), so all of its step
+  // numbers are shown together, e.g. "2,5". Circle for one, pill for several.
   g.querySelectorAll('.arrow-seq-badge').forEach(el => el.remove());
-  const seqN = arrowSeqNumber(arrow.id);
-  if (seqN > 0) {
+  const seqNums = arrowSeqNumbers(arrow.id);
+  if (seqNums.length && (_seqMode || _showSeqBadges)) {
     const SVGNS = 'http://www.w3.org/2000/svg';
+    const txt = seqNums.join(',');
     const by = labels.length ? mid.y - 14 : mid.y;
     const badge = document.createElementNS(SVGNS, 'g');
     badge.setAttribute('class', 'arrow-seq-badge');
     badge.style.pointerEvents = 'none';
-    const circ = document.createElementNS(SVGNS, 'circle');
-    circ.setAttribute('cx', mid.x); circ.setAttribute('cy', by); circ.setAttribute('r', '9');
+    if (seqNums.length === 1) {
+      const circ = document.createElementNS(SVGNS, 'circle');
+      circ.setAttribute('cx', mid.x); circ.setAttribute('cy', by); circ.setAttribute('r', '9');
+      badge.appendChild(circ);
+    } else {
+      const w = Math.max(20, txt.length * 7 + 8);
+      const rect = document.createElementNS(SVGNS, 'rect');
+      rect.setAttribute('x', mid.x - w / 2); rect.setAttribute('y', by - 9);
+      rect.setAttribute('width', w); rect.setAttribute('height', '18'); rect.setAttribute('rx', '9');
+      badge.appendChild(rect);
+    }
     const num = document.createElementNS(SVGNS, 'text');
     num.setAttribute('x', mid.x); num.setAttribute('y', by);
     num.setAttribute('text-anchor', 'middle'); num.setAttribute('dominant-baseline', 'central');
-    num.textContent = String(seqN);
-    badge.appendChild(circ); badge.appendChild(num);
+    num.textContent = txt;
+    badge.appendChild(num);
     g.appendChild(badge);
   }
 }
@@ -9027,7 +9042,7 @@ function startSequenceMode() {
   const b = document.getElementById('btn-seq-pick'); if (b) b.classList.add('active');
   updateSeqBar();
   redrawArrows();   // paint the numbered badges
-  notify('Click arrows in play order. Click a numbered arrow to remove it.', 'info');
+  notify('Click arrows in play order. Click one again to repeat it; right-click to remove.', 'info');
 }
 
 function endSequenceMode(save) {
@@ -9055,12 +9070,20 @@ function commitSequenceDraft() {
   notify(`Saved ${_seqDraft.length} step${_seqDraft.length !== 1 ? 's' : ''} — open Sequence to add narration`);
 }
 
-// Click handler while picking: append the arrow, or remove it (toggle) if it's
-// already in the order, then renumber everything.
+// Click while picking: append the arrow as the next step. Clicking the same
+// arrow again repeats it (loops fire one arrow at several steps). Right-click
+// (seqRemoveArrowOccurrence) takes one occurrence back off.
 function seqHandleArrowClick(arrowId) {
-  const i = _seqDraft.indexOf(arrowId);
-  if (i >= 0) _seqDraft.splice(i, 1);
-  else _seqDraft.push(arrowId);
+  _seqDraft.push(arrowId);
+  updateSeqBar();
+  redrawArrows();
+}
+
+// Remove this arrow's most recent occurrence from the draft, then renumber.
+function seqRemoveArrowOccurrence(arrowId) {
+  const i = _seqDraft.lastIndexOf(arrowId);
+  if (i < 0) return;
+  _seqDraft.splice(i, 1);
   updateSeqBar();
   redrawArrows();
 }
@@ -9071,25 +9094,43 @@ function seqClearDraft() {
   redrawArrows();
 }
 
+// Show/hide the saved play-order numbers during normal editing (persisted).
+function toggleSeqBadges() {
+  _showSeqBadges = !_showSeqBadges;
+  try { localStorage.setItem('potato.seqBadges', _showSeqBadges ? 'on' : 'off'); } catch (e) {}
+  updateSeqBadgesBtn();
+  redrawArrows();
+  notify(_showSeqBadges ? 'Showing play-order numbers' : 'Play-order numbers hidden', 'info');
+}
+function updateSeqBadgesBtn() {
+  const b = document.getElementById('btn-seq-badges');
+  if (!b) return;
+  b.classList.toggle('active', _showSeqBadges);
+  b.setAttribute('aria-pressed', _showSeqBadges ? 'true' : 'false');
+}
+
 function updateSeqBar() {
   const bar = document.getElementById('seq-record-bar');
   if (!bar) return;
   const n = _seqDraft.length;
   bar.querySelector('.seq-count').textContent = n
-    ? `${n} step${n !== 1 ? 's' : ''} picked — keep clicking, or Done`
-    : 'Click arrows in play order…';
+    ? `${n} step${n !== 1 ? 's' : ''} — click to add (repeat ok), right-click to remove`
+    : 'Click arrows in play order… (click one twice to repeat it)';
   bar.classList.add('show');
 }
 
-// 1-based play position for an arrow: its index in the live draft while picking,
-// otherwise its step number in the saved sequence (0 = not sequenced).
-function arrowSeqNumber(arrowId) {
-  if (_seqMode) { const i = _seqDraft.indexOf(arrowId); return i >= 0 ? i + 1 : 0; }
-  if (playFlow && playFlow.length) {
-    const idx = playFlow.findIndex(s => s.arrow === arrowId);
-    return idx >= 0 ? idx + 1 : 0;
+// All 1-based play positions for an arrow (an arrow may fire more than once):
+// its indices in the live draft while picking, else its step numbers in the
+// saved sequence. Empty when the arrow isn't sequenced.
+function arrowSeqNumbers(arrowId) {
+  const out = [];
+  const src = _seqMode ? _seqDraft : null;
+  if (src) {
+    src.forEach((id, i) => { if (id === arrowId) out.push(i + 1); });
+  } else if (playFlow && playFlow.length) {
+    playFlow.forEach((s, i) => { if (s.arrow === arrowId) out.push(i + 1); });
   }
-  return 0;
+  return out;
 }
 
 // ===== PLAY SEQUENCE EDITOR =====
@@ -9273,6 +9314,7 @@ function renderFlowEditor() {
 
 // Wire overlay-click-to-close once at startup (the element is in the DOM by now).
 (function () {
+  updateSeqBadgesBtn();   // reflect the persisted show/hide-numbers preference
   const ov = document.getElementById('flow-editor-overlay');
   if (ov) ov.addEventListener('click', (e) => { if (e.target === e.currentTarget) closeFlowEditor(false); });
   const ov2 = document.getElementById('cost-modal-overlay');
