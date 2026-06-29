@@ -10185,25 +10185,44 @@ ${geom}
       return;
     }
     const iconData = n.iconUrl ? iconDataUrls.get(n.iconUrl) : null;
-    const iconMarkup = iconData
-      ? `    <image href="${iconData}" x="${nx+8}" y="${ny+8}" width="24" height="24"/>`
-      : `    <text x="${nx+12}" y="${ny+24}" font-size="18">${escHtml(n.icon||'⬜')}</text>`;
+    // Only draw an icon when the node actually has one. The canvas shows nothing
+    // for an icon-less box (empty .node-icon span), so don't invent a ⬜ fallback
+    // here — that phantom icon was shrinking/cramping the label in exports.
+    const hasIcon = !!(iconData || n.icon);
+    const iconMarkup = !hasIcon ? ''
+      : iconData
+        ? `    <image href="${iconData}" x="${nx+8}" y="${ny+8}" width="24" height="24"/>`
+        : `    <text x="${nx+12}" y="${ny+24}" font-size="18">${escHtml(n.icon)}</text>`;
     const rectFill = n.fill || P.nodeFill;
     const rx = n.rounded === false ? 0 : 10;
     // Wrap the label to the card's text width (12px padding each side) so a long
     // name flows onto extra lines instead of running past the card edge — the
-    // canvas card has max-width:220 and wraps the same way. The sublabel then
-    // follows below the last name line.
+    // canvas card has max-width:220 and wraps the same way.
     const nFs = +n.fontSize || 12;
     const nLh = nFs * 1.3;
     const nLines = wrapSvgText(n.label || '', nw - 24, nFs);
+    // With an icon the text is top-anchored beneath it (category +39, name +55).
+    // Without one, centre the whole text block (category + name + sublabel) in
+    // the box so a plain labelled rectangle reads the same as it does on canvas.
+    let catY, nameTop;
+    if (hasIcon) {
+      catY = ny + 39;
+      nameTop = ny + 55;
+    } else {
+      const catH = n.category ? 13 : 0;
+      const subH = n.sublabel ? 13 : 0;
+      const blockH = catH + nLines.length * nLh + subH;
+      const start = ny + nh/2 - blockH/2;
+      catY = start + 9;
+      nameTop = start + catH + nFs;
+    }
     const nameSpans = nLines.map((ln, i) =>
-      `<tspan x="${nx+12}" y="${(ny + 55 + i*nLh).toFixed(1)}">${escHtml(ln)}</tspan>`).join('');
-    const subY = ny + 55 + (nLines.length - 1) * nLh + 13;
+      `<tspan x="${nx+12}" y="${(nameTop + i*nLh).toFixed(1)}">${escHtml(ln)}</tspan>`).join('');
+    const subY = nameTop + (nLines.length - 1) * nLh + 13;
     svg += `  <g class="potato-node" data-node-id="${escHtml(n.id)}" style="cursor:pointer"${gOpacity}>
     <rect class="potato-node-rect" x="${nx}" y="${ny}" width="${nw}" height="${nh}" rx="${rx}" fill="${rectFill}" stroke="${strokeCol}" stroke-width="${strokeW}" opacity="0.95"/>
 ${iconMarkup}
-${n.category ? `    <text x="${nx+12}" y="${ny+39}" class="node-label">${escHtml((n.category||'').toUpperCase().slice(0,22))}</text>\n` : ''}    <text class="node-name"${labelStyle}>${nameSpans}</text>
+${n.category ? `    <text x="${nx+12}" y="${catY.toFixed(1)}" class="node-label">${escHtml((n.category||'').toUpperCase().slice(0,22))}</text>\n` : ''}    <text class="node-name"${labelStyle}>${nameSpans}</text>
 ${n.sublabel ? `    <text x="${nx+12}" y="${subY.toFixed(1)}" class="node-sub">${escHtml((n.sublabel||'').slice(0,24))}</text>\n` : ''}  </g>
 `;
   });
