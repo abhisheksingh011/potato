@@ -1327,6 +1327,11 @@ g.arrow-selected .arrow-waypoint-handle { opacity: 1; pointer-events: all; }
 
 #btn-play-flow.playing { background: linear-gradient(135deg, #1abc9c, #2e86c1); border-color: transparent; }
 
+/* Paused: badge the indicator and freeze the arrow's marching-ants dash. */
+#play-indicator.paused { border-color: var(--orange); color: var(--orange); box-shadow: 0 8px 32px var(--shadow-strong), 0 0 24px rgba(255,153,0,0.3); }
+#play-indicator.paused::before { content: "⏸ PAUSED"; display: block; font-size: 9px; font-weight: 800; letter-spacing: 1px; opacity: 0.85; margin-bottom: 4px; }
+body.flow-paused .arrow-path.playing-flow { animation: none !important; }
+
 kbd {
   display: inline-block;
   padding: 1px 5px;
@@ -1433,7 +1438,10 @@ kbd {
 
     <div class="toolbar-sep"></div>
 
-    <button id="btn-play-flow" class="tb-btn" onclick="togglePlayFlow()" title="Animate the data flow through the diagram (Space)" aria-label="Play flow animation"><span class="tb-icon" aria-hidden="true">▶</span><span class="tb-label">Play</span></button>
+    <button id="btn-play-flow" class="tb-btn" onclick="togglePlayFlow()" title="Play / pause the data-flow animation (Space)" aria-label="Play or pause flow animation"><span class="tb-icon" aria-hidden="true">▶</span><span class="tb-label">Play</span></button>
+    <button id="btn-step-prev" class="tb-btn" onclick="stepPlay(-1)" title="Previous step" aria-label="Previous step" style="display:none"><span class="tb-icon" aria-hidden="true">⏮</span></button>
+    <button id="btn-step-next" class="tb-btn" onclick="stepPlay(1)" title="Next step" aria-label="Next step" style="display:none"><span class="tb-icon" aria-hidden="true">⏭</span></button>
+    <button id="btn-stop-flow" class="tb-btn" onclick="stopPlayFlow()" title="Stop and reset to the start (Esc)" aria-label="Stop flow animation" style="display:none"><span class="tb-icon" aria-hidden="true">⏹</span><span class="tb-label">Stop</span></button>
     <span class="tb-tip" data-tip="Animation speed">
       <select id="play-speed" class="tb-btn" onchange="setPlaySpeed(this.value)" aria-label="Animation speed" style="padding:6px 8px;font-size:11px">
         <option value="2500">🐢 Slow</option>
@@ -7491,7 +7499,7 @@ function setupEventListeners() {
     if (e.key === '-') zoomOut();
     if (e.key === '0') zoomReset();
     if (e.key === 'f') fitToContent();
-    if (e.key === 'Escape') { clearSelection(); setTool('select'); cancelConnecting(); if (_playFlowTimer) stopPlayFlow(); }
+    if (e.key === 'Escape') { clearSelection(); setTool('select'); cancelConnecting(); if (_playFlowTimer || _playPaused) stopPlayFlow(); }
     if (e.key === ' ' || e.key === 'Spacebar') { e.preventDefault(); togglePlayFlow(); }
 
     // Arrow key nudge
@@ -8753,6 +8761,7 @@ let _playStepMs = 1400;
 let _playFlowTimer = null;
 let _playFlowSteps = [];
 let _playFlowIdx = 0;
+let _playPaused = false;
 
 function setPlaySpeed(ms) {
   _playStepMs = Math.max(250, Math.min(5000, parseInt(ms, 10) || 1400));
@@ -8815,9 +8824,12 @@ function buildPlaySteps() {
   return steps;
 }
 
+// Play states: idle (no timer, not paused) / playing (timer running) /
+// paused (timer cleared but position + highlights kept so you can resume).
 function togglePlayFlow() {
-  if (_playFlowTimer) { stopPlayFlow(); return; }
-  startPlayFlow();
+  if (_playFlowTimer) { pausePlayFlow(); return; }   // playing → pause
+  if (_playPaused)    { resumePlayFlow(); return; }   // paused  → resume
+  startPlayFlow();                                     // idle    → start
 }
 
 function startPlayFlow() {
@@ -8826,35 +8838,84 @@ function startPlayFlow() {
     notify(arrows.length ? 'Nothing to play' : 'Add connections, then press Play', 'warning');
     return;
   }
+  _playPaused = false;
   _playFlowIdx = 0;
-  const btn = document.getElementById('btn-play-flow');
-  if (btn) {
-    btn.classList.add('playing');
-    btn.querySelector('.tb-icon').textContent = '⏹';
-    btn.querySelector('.tb-label').textContent = 'Stop';
-  }
   document.getElementById('play-indicator').classList.add('show');
+  updatePlayControls();
   runPlayStep();
+  _playFlowTimer = setInterval(runPlayStep, _playStepMs);
+}
+
+// Freeze in place: keep _playFlowIdx and the current highlight/narration so the
+// step stays spotlighted (e.g. to talk over it), and resume picks up from here.
+function pausePlayFlow() {
+  if (_playFlowTimer) clearInterval(_playFlowTimer);
+  _playFlowTimer = null;
+  _playPaused = true;
+  updatePlayControls();
+}
+
+function resumePlayFlow() {
+  if (!_playFlowSteps.length) { startPlayFlow(); return; }
+  _playPaused = false;
+  updatePlayControls();
+  // Don't fire immediately — let the current step keep its remaining dwell time
+  // before auto-advancing, so a resume doesn't instantly skip ahead.
   _playFlowTimer = setInterval(runPlayStep, _playStepMs);
 }
 
 function stopPlayFlow() {
   if (_playFlowTimer) clearInterval(_playFlowTimer);
   _playFlowTimer = null;
+  _playPaused = false;
+  _playFlowIdx = 0;
   clearPlayHighlights();
   document.getElementById('play-indicator').classList.remove('show');
+  updatePlayControls();
+}
+
+// Single source of truth for the play/pause/stop/step button + indicator state.
+function updatePlayControls() {
+  const playing = !!_playFlowTimer;
+  const active  = playing || _playPaused;
   const btn = document.getElementById('btn-play-flow');
   if (btn) {
-    btn.classList.remove('playing');
-    btn.querySelector('.tb-icon').textContent = '▶';
-    btn.querySelector('.tb-label').textContent = 'Play';
+    btn.classList.toggle('playing', playing);
+    btn.querySelector('.tb-icon').textContent = playing ? '⏸' : '▶';
+    btn.querySelector('.tb-label').textContent = playing ? 'Pause' : (_playPaused ? 'Resume' : 'Play');
   }
+  ['btn-stop-flow', 'btn-step-prev', 'btn-step-next'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.style.display = active ? '' : 'none';
+  });
+  document.body.classList.toggle('flow-paused', _playPaused);
+  document.getElementById('play-indicator').classList.toggle('paused', _playPaused);
+}
+
+// Manual jump used by the ⏮/⏭ buttons. Pauses auto-advance, then shows step i.
+function stepPlay(dir) {
+  if (!_playFlowSteps.length) return;
+  if (_playFlowTimer) { clearInterval(_playFlowTimer); _playFlowTimer = null; _playPaused = true; }
+  // The step currently on screen is _playFlowIdx - 1; move relative to it.
+  let i = (_playFlowIdx - 1) + dir;
+  i = Math.max(0, Math.min(_playFlowSteps.length - 1, i));
+  renderPlayStep(i);
+  _playFlowIdx = i + 1;
+  updatePlayControls();
 }
 
 function runPlayStep() {
-  clearPlayHighlights();
   if (_playFlowIdx >= _playFlowSteps.length) { stopPlayFlow(); return; }
-  const step = _playFlowSteps[_playFlowIdx];
+  renderPlayStep(_playFlowIdx);
+  _playFlowIdx++;
+}
+
+// Highlight step i and write its narration into the indicator. No index math —
+// callers own _playFlowIdx — so it's reusable by both auto-play and stepping.
+function renderPlayStep(i) {
+  clearPlayHighlights();
+  const step = _playFlowSteps[i];
+  if (!step) return;
   const arrow = step.arrow;   // null for a free-form (narration-only) step
   const total = _playFlowSteps.length;
 
@@ -8876,7 +8937,7 @@ function runPlayStep() {
     const toName   = (getNode(arrow.to)   || {}).label || arrow.to;
     arrowSummary = `${fromName} → ${toName}${arrow.label ? ' — ' + arrow.label : ''}`;
   }
-  const counter = `Step ${_playFlowIdx + 1} / ${total}`;
+  const counter = `Step ${i + 1} / ${total}`;
   const topLine = arrowSummary ? `${counter} · ${escHtml(arrowSummary)}` : counter;
   // Heading (if set) is the spotlight; narration sits below; both fall back to
   // the from→to summary (or just the counter for a free-form step).
@@ -8886,8 +8947,6 @@ function runPlayStep() {
        ${step.title ? `<div style="font-size:14px;font-weight:800;margin-top:4px;color:var(--text)">${escHtml(step.title)}</div>` : ''}
        ${step.text ? `<div style="font-size:13px;margin-top:${step.title ? '2' : '4'}px;color:var(--text)">${escHtml(step.text)}</div>` : ''}`
     : topLine;
-
-  _playFlowIdx++;
 }
 
 function clearPlayHighlights() {
@@ -9724,6 +9783,9 @@ function buildSavedHTML(name, dataStr, svgMarkup) {
   #potato-step-text.show { display: block; }
   #potato-step-text .counter { font-family: var(--font-mono); font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px; }
   #potato-step-text .narration { font-size: 13px; color: var(--text); margin-top: 4px; line-height: 1.5; }
+  #potato-step-text.paused { border-color: #FF9900; box-shadow: 0 8px 32px var(--shadow-strong), 0 0 24px rgba(255,153,0,0.3); }
+  #potato-step-text.paused::before { content: "\\23F8 PAUSED"; display: block; font-size: 9px; font-weight: 800; letter-spacing: 1px; color: #FF9900; margin-bottom: 4px; }
+  body.flow-paused .potato-arrow.playing-flow { animation: none !important; }
 
   /* Service tooltip (hover) */
   #potato-tooltip { position: fixed; background: var(--tip-bg); border: 1px solid var(--border); border-radius: 10px; padding: 14px 16px; max-width: 360px; z-index: 300; display: none; pointer-events: none; backdrop-filter: blur(10px); box-shadow: 0 12px 40px var(--shadow-strong); color: var(--text); }
@@ -9762,6 +9824,9 @@ ${viewerPayload}
   <button class="ctrl" id="potato-theme-btn" onclick="potatoToggleTheme()" title="Switch theme (dark / light)" aria-label="Toggle theme">🌙</button>
   <button class="ctrl" onclick="potatoShowEditHint()" title="How to edit this diagram">✏️ Edit</button>
   <button class="ctrl primary" id="potato-play-btn" onclick="potatoTogglePlay()">▶ Play Flow</button>
+  <button class="ctrl" id="potato-prev-btn" onclick="potatoStep(-1)" title="Previous step" style="display:none">⏮</button>
+  <button class="ctrl" id="potato-next-btn" onclick="potatoStep(1)" title="Next step" style="display:none">⏭</button>
+  <button class="ctrl" id="potato-stop-btn" onclick="potatoStopPlay()" title="Stop and reset" style="display:none">⏹ Stop</button>
   <select class="ctrl" id="potato-speed" onchange="potatoSetSpeed(this.value)" title="Animation speed">
     <option value="2500">🐢 Slow</option>
     <option value="1400" selected>Normal</option>
@@ -9867,7 +9932,7 @@ ${svgMarkup}
   document.addEventListener('click', () => { _pinned = null; tipEl.style.display = 'none'; });
 
   // -------------------- PLAY FLOW --------------------
-  let _timer = null, _idx = 0, _stepMs = 1400;
+  let _timer = null, _idx = 0, _stepMs = 1400, _paused = false;
   let _steps = []; // [{ arrow, text }]
 
   function buildSteps() {
@@ -9897,10 +9962,11 @@ ${svgMarkup}
     document.querySelectorAll('.potato-arrow.playing-flow').forEach(p => p.classList.remove('playing-flow'));
   }
 
-  function tick() {
+  // Highlight + narrate step i. No index math here — callers own _idx.
+  function renderStep(i) {
     clearHi();
-    if (_idx >= _steps.length) { stopPlay(); return; }
-    const step = _steps[_idx], a = step.arrow;   // a is null for a free-form step
+    const step = _steps[i]; if (!step) return;
+    const a = step.arrow;   // a is null for a free-form step
     let summary = '';
     if (a) {
       document.querySelector('[data-node-id="' + a.from + '"]')?.classList.add('playing-flow');
@@ -9910,32 +9976,72 @@ ${svgMarkup}
       summary = (fromN ? fromN.label : a.from) + ' → ' + (toN ? toN.label : a.to) + (a.label ? ' — ' + a.label : '');
     }
     const ind = document.getElementById('potato-step-text');
-    ind.innerHTML = '<div class="counter">Step ' + (_idx + 1) + ' / ' + _steps.length + (summary ? ' · ' + esc(summary) : '') + '</div>'
+    ind.innerHTML = '<div class="counter">Step ' + (i + 1) + ' / ' + _steps.length + (summary ? ' · ' + esc(summary) : '') + '</div>'
       + (step.title ? '<div class="narration" style="font-weight:800">' + esc(step.title) + '</div>' : '')
       + (step.text ? '<div class="narration">' + esc(step.text) + '</div>' : '');
     ind.classList.add('show');
+  }
+
+  function tick() {
+    if (_idx >= _steps.length) { stopPlay(); return; }
+    renderStep(_idx);
     _idx++;
   }
 
+  // Drives the play/pause/resume/stop/step button + indicator state.
+  function updateCtrls() {
+    const playing = !!_timer, active = playing || _paused;
+    const btn = document.getElementById('potato-play-btn');
+    if (btn) {
+      btn.textContent = playing ? '⏸ Pause' : (_paused ? '▶ Resume' : '▶ Play Flow');
+      btn.classList.toggle('playing', playing);
+    }
+    ['potato-stop-btn', 'potato-prev-btn', 'potato-next-btn'].forEach(function (id) {
+      const el = document.getElementById(id); if (el) el.style.display = active ? '' : 'none';
+    });
+    document.body.classList.toggle('flow-paused', _paused);
+    document.getElementById('potato-step-text').classList.toggle('paused', _paused);
+  }
+
   window.potatoTogglePlay = function () {
-    if (_timer) { stopPlay(); return; }
+    if (_timer) { potatoPause(); return; }
+    if (_paused) { potatoResume(); return; }
     _steps = buildSteps();
     if (!_steps.length) { alert('Nothing to play — this diagram has no connections.'); return; }
-    _idx = 0;
-    const btn = document.getElementById('potato-play-btn');
-    btn.textContent = '⏹ Stop';
-    btn.classList.add('playing');
+    _paused = false; _idx = 0;
+    updateCtrls();
     tick();
     _timer = setInterval(tick, _stepMs);
   };
-  function stopPlay() {
+  function potatoPause() {
     if (_timer) clearInterval(_timer); _timer = null;
+    _paused = true;   // keep _idx + highlight so resume continues in place
+    updateCtrls();
+  }
+  function potatoResume() {
+    if (!_steps.length) { potatoStopPlay(); return; }
+    _paused = false;
+    updateCtrls();
+    _timer = setInterval(tick, _stepMs);   // wait one interval before advancing
+  }
+  window.potatoStopPlay = function () {
+    if (_timer) clearInterval(_timer); _timer = null;
+    _paused = false; _idx = 0;
     clearHi();
     document.getElementById('potato-step-text').classList.remove('show');
-    const btn = document.getElementById('potato-play-btn');
-    btn.textContent = '▶ Play Flow';
-    btn.classList.remove('playing');
-  }
+    updateCtrls();
+  };
+  // Back-compat alias used by the keyboard handler below.
+  const stopPlay = window.potatoStopPlay;
+  window.potatoStep = function (dir) {
+    if (!_steps.length) return;
+    if (_timer) { clearInterval(_timer); _timer = null; _paused = true; }
+    let i = (_idx - 1) + dir;   // step on screen is _idx - 1
+    i = Math.max(0, Math.min(_steps.length - 1, i));
+    renderStep(i);
+    _idx = i + 1;
+    updateCtrls();
+  };
   window.potatoSetSpeed = function (ms) {
     _stepMs = Math.max(250, Math.min(5000, parseInt(ms, 10) || 1400));
     if (_timer) { clearInterval(_timer); _timer = setInterval(tick, _stepMs); }
@@ -9977,7 +10083,7 @@ ${svgMarkup}
 
   // Esc/Space shortcuts
   document.addEventListener('keydown', e => {
-    if (e.key === 'Escape' && _timer) stopPlay();
+    if (e.key === 'Escape' && (_timer || _paused)) stopPlay();
     if (e.key === ' ' && document.activeElement === document.body) { e.preventDefault(); potatoTogglePlay(); }
   });
 })();
