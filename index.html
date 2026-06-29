@@ -10051,6 +10051,116 @@ async function buildDiagramSVG(theme = 'dark') {
 `;
   });
 
+  // Render one node to an SVG string. Extracted so we can paint nodes in two
+  // passes around the arrows: a box "sent to back" gets a negative zIndex and on
+  // the canvas sits BELOW the #arrows-svg layer, so connectors routed inside it
+  // (e.g. lambdas wired sequentially inside a step-function box) draw on top.
+  // Painting every node after the arrows would let that box's fill cover them.
+  const _zOf = (n) => (n.zIndex || 10);   // same as renderNode's el.style.zIndex
+  const _renderNodeSvg = (n) => {
+    const el=document.getElementById('node-'+n.id);
+    const nw=el?el.offsetWidth:160, nh=el?el.offsetHeight:80;
+    const nx=n.x+ox, ny=n.y+oy;
+    const col=themeColors[n.theme]||'#7986cb';
+    // Custom-style overrides (match the live canvas): stroke colour, width, the
+    // group opacity, and the per-node label font size / colour.
+    const strokeCol = n.stroke || col;
+    const strokeW   = n.strokeWidth || 1;
+    const gOpacity  = (n.opacity != null && n.opacity !== '') ? ` opacity="${n.opacity}"` : '';
+    // Emit per-node font size / colour as an inline style, NOT as presentation
+    // attributes: a CSS rule in the embedded <style> (e.g. .node-name{font-size:12px})
+    // overrides presentation attributes, so font-size="20" would be ignored and
+    // every label would render at 12px. Inline styles beat stylesheet selectors.
+    const labelStyleParts = [];
+    if (n.fontSize)  labelStyleParts.push(`font-size:${n.fontSize}px`);
+    if (n.fontColor) labelStyleParts.push(`fill:${n.fontColor}`);
+    const labelStyle = labelStyleParts.length ? ` style="${labelStyleParts.join(';')}"` : '';
+    // Simple geometric shape: outlined form with centred text, no icon card.
+    if (n.shape) {
+      const geom = exportShapeGeom(n.shape, nx, ny, nw, nh, strokeCol, n.fill, strokeW);
+      const lx = n.align==='left' ? nx+10 : n.align==='right' ? nx+nw-10 : nx+nw/2;
+      const anchor = n.align==='left' ? `x="${lx}" text-anchor="start"` : n.align==='right' ? `x="${lx}" text-anchor="end"` : `x="${lx}" text-anchor="middle"`;
+      // Wrap the label to fit inside the box (10px padding each side), matching
+      // the canvas's wrapping flex label, then centre the block vertically.
+      const fs = +n.fontSize || 12;
+      const lh = fs * 1.25;
+      const lines = wrapSvgText(n.label || '', nw - 20, fs);
+      const top = (ny + nh/2) - (lines.length - 1) * lh / 2;
+      const tspans = lines.map((ln, i) =>
+        `<tspan ${anchor} y="${(top + i*lh).toFixed(1)}">${escHtml(ln)}</tspan>`).join('');
+      return `  <g class="potato-node" data-node-id="${escHtml(n.id)}" style="cursor:pointer"${gOpacity}>
+${geom}
+    <text class="node-name"${labelStyle} dominant-baseline="central">${tspans}</text>
+  </g>
+`;
+    }
+    // Text / Note nodes: render just the typed text, centred in the card — no
+    // emoji icon and no category/sublabel (mirrors the live canvas). Without
+    // this they exported as an icon card with the label spilling out the bottom.
+    if (n.type === 'text') {
+      const tFill = n.fill || P.nodeFill;
+      const tRx = n.rounded === false ? 0 : 10;
+      const tAnchor = n.align==='left' ? `x="${nx+12}" text-anchor="start"`
+                    : n.align==='right' ? `x="${nx+nw-12}" text-anchor="end"`
+                    : `x="${nx+nw/2}" text-anchor="middle"`;
+      return `  <g class="potato-node" data-node-id="${escHtml(n.id)}" style="cursor:pointer"${gOpacity}>
+    <rect class="potato-node-rect" x="${nx}" y="${ny}" width="${nw}" height="${nh}" rx="${tRx}" fill="${tFill}" stroke="${strokeCol}" stroke-width="${strokeW}" opacity="0.95"/>
+    <text ${tAnchor} y="${ny+nh/2}" class="node-name"${labelStyle} dominant-baseline="central">${escHtml((n.label||'').slice(0,40))}</text>
+  </g>
+`;
+    }
+    const iconData = n.iconUrl ? iconDataUrls.get(n.iconUrl) : null;
+    // Only draw an icon when the node actually has a real one. Besides truly
+    // empty icons, nodes often carry a generic placeholder glyph (e.g. '⬡', the
+    // default given to icon-less nodes on import, or '⬜') — that's not a real
+    // icon, so drawing it produces a "ghost" icon in the export that cramps the
+    // label even though the box reads as plain on canvas. Treat those as none.
+    const iconGlyph = (n.icon || '').trim();
+    const realGlyph = iconGlyph && !PLACEHOLDER_ICON_GLYPHS.has(iconGlyph);
+    const hasIcon = !!(iconData || realGlyph);
+    const iconMarkup = !hasIcon ? ''
+      : iconData
+        ? `    <image href="${iconData}" x="${nx+8}" y="${ny+8}" width="24" height="24"/>`
+        : `    <text x="${nx+12}" y="${ny+24}" font-size="18">${escHtml(iconGlyph)}</text>`;
+    const rectFill = n.fill || P.nodeFill;
+    const rx = n.rounded === false ? 0 : 10;
+    // Wrap the label to the card's text width (12px padding each side) so a long
+    // name flows onto extra lines instead of running past the card edge — the
+    // canvas card has max-width:220 and wraps the same way.
+    const nFs = +n.fontSize || 12;
+    const nLh = nFs * 1.3;
+    const nLines = wrapSvgText(n.label || '', nw - 24, nFs);
+    // With an icon the text is top-anchored beneath it (category +39, name +55).
+    // Without one, centre the whole text block (category + name + sublabel) in
+    // the box so a plain labelled rectangle reads the same as it does on canvas.
+    let catY, nameTop;
+    if (hasIcon) {
+      catY = ny + 39;
+      nameTop = ny + 55;
+    } else {
+      const catH = n.category ? 13 : 0;
+      const subH = n.sublabel ? 13 : 0;
+      const blockH = catH + nLines.length * nLh + subH;
+      const start = ny + nh/2 - blockH/2;
+      catY = start + 9;
+      nameTop = start + catH + nFs;
+    }
+    const nameSpans = nLines.map((ln, i) =>
+      `<tspan x="${nx+12}" y="${(nameTop + i*nLh).toFixed(1)}">${escHtml(ln)}</tspan>`).join('');
+    const subY = nameTop + (nLines.length - 1) * nLh + 13;
+    return `  <g class="potato-node" data-node-id="${escHtml(n.id)}" style="cursor:pointer"${gOpacity}>
+    <rect class="potato-node-rect" x="${nx}" y="${ny}" width="${nw}" height="${nh}" rx="${rx}" fill="${rectFill}" stroke="${strokeCol}" stroke-width="${strokeW}" opacity="0.95"/>
+${iconMarkup}
+${n.category ? `    <text x="${nx+12}" y="${catY.toFixed(1)}" class="node-label">${escHtml((n.category||'').toUpperCase().slice(0,22))}</text>\n` : ''}    <text class="node-name"${labelStyle}>${nameSpans}</text>
+${n.sublabel ? `    <text x="${nx+12}" y="${subY.toFixed(1)}" class="node-sub">${escHtml((n.sublabel||'').slice(0,24))}</text>\n` : ''}  </g>
+`;
+  };
+  // Stable sort by zIndex (matches renderNode's el.style.zIndex). Equal-zIndex
+  // nodes keep insertion order so a later icon stays above an earlier box.
+  const _sortedNodes = [...nodes].sort((a, b) => _zOf(a) - _zOf(b));
+  // Below the arrows: nodes sent to back (negative zIndex) paint first.
+  _sortedNodes.filter(n => _zOf(n) < 0).forEach(n => { svg += _renderNodeSvg(n); });
+
   const arrowLabels = [];  // deferred so we can de-overlap before drawing
   // Pass 1: route every arrow (in export coords) so Pass 2 can add line-jumps
   // — an arrow can only hop over another once it knows the other's route.
@@ -10150,111 +10260,9 @@ async function buildDiagramSVG(theme = 'dark') {
 `;
   });
 
-  // Paint in stacking order (zIndex) so a box "sent to back" stays behind the
-  // icon dropped on top of it — the canvas stacks by zIndex, but a plain
-  // array walk would paint a later-added box over an earlier icon. Array.sort
-  // is stable, so equal-zIndex nodes keep their original order.
-  const _zOf = (n) => (n.zIndex || 10);   // same as renderNode's el.style.zIndex
-  [...nodes].sort((a, b) => _zOf(a) - _zOf(b)).forEach(n => {
-    const el=document.getElementById('node-'+n.id);
-    const nw=el?el.offsetWidth:160, nh=el?el.offsetHeight:80;
-    const nx=n.x+ox, ny=n.y+oy;
-    const col=themeColors[n.theme]||'#7986cb';
-    // Custom-style overrides (match the live canvas): stroke colour, width, the
-    // group opacity, and the per-node label font size / colour.
-    const strokeCol = n.stroke || col;
-    const strokeW   = n.strokeWidth || 1;
-    const gOpacity  = (n.opacity != null && n.opacity !== '') ? ` opacity="${n.opacity}"` : '';
-    // Emit per-node font size / colour as an inline style, NOT as presentation
-    // attributes: a CSS rule in the embedded <style> (e.g. .node-name{font-size:12px})
-    // overrides presentation attributes, so font-size="20" would be ignored and
-    // every label would render at 12px. Inline styles beat stylesheet selectors.
-    const labelStyleParts = [];
-    if (n.fontSize)  labelStyleParts.push(`font-size:${n.fontSize}px`);
-    if (n.fontColor) labelStyleParts.push(`fill:${n.fontColor}`);
-    const labelStyle = labelStyleParts.length ? ` style="${labelStyleParts.join(';')}"` : '';
-    // Simple geometric shape: outlined form with centred text, no icon card.
-    if (n.shape) {
-      const geom = exportShapeGeom(n.shape, nx, ny, nw, nh, strokeCol, n.fill, strokeW);
-      const lx = n.align==='left' ? nx+10 : n.align==='right' ? nx+nw-10 : nx+nw/2;
-      const anchor = n.align==='left' ? `x="${lx}" text-anchor="start"` : n.align==='right' ? `x="${lx}" text-anchor="end"` : `x="${lx}" text-anchor="middle"`;
-      // Wrap the label to fit inside the box (10px padding each side), matching
-      // the canvas's wrapping flex label, then centre the block vertically.
-      const fs = +n.fontSize || 12;
-      const lh = fs * 1.25;
-      const lines = wrapSvgText(n.label || '', nw - 20, fs);
-      const top = (ny + nh/2) - (lines.length - 1) * lh / 2;
-      const tspans = lines.map((ln, i) =>
-        `<tspan ${anchor} y="${(top + i*lh).toFixed(1)}">${escHtml(ln)}</tspan>`).join('');
-      svg += `  <g class="potato-node" data-node-id="${escHtml(n.id)}" style="cursor:pointer"${gOpacity}>
-${geom}
-    <text class="node-name"${labelStyle} dominant-baseline="central">${tspans}</text>
-  </g>
-`;
-      return;
-    }
-    // Text / Note nodes: render just the typed text, centred in the card — no
-    // emoji icon and no category/sublabel (mirrors the live canvas). Without
-    // this they exported as an icon card with the label spilling out the bottom.
-    if (n.type === 'text') {
-      const tFill = n.fill || P.nodeFill;
-      const tRx = n.rounded === false ? 0 : 10;
-      const tAnchor = n.align==='left' ? `x="${nx+12}" text-anchor="start"`
-                    : n.align==='right' ? `x="${nx+nw-12}" text-anchor="end"`
-                    : `x="${nx+nw/2}" text-anchor="middle"`;
-      svg += `  <g class="potato-node" data-node-id="${escHtml(n.id)}" style="cursor:pointer"${gOpacity}>
-    <rect class="potato-node-rect" x="${nx}" y="${ny}" width="${nw}" height="${nh}" rx="${tRx}" fill="${tFill}" stroke="${strokeCol}" stroke-width="${strokeW}" opacity="0.95"/>
-    <text ${tAnchor} y="${ny+nh/2}" class="node-name"${labelStyle} dominant-baseline="central">${escHtml((n.label||'').slice(0,40))}</text>
-  </g>
-`;
-      return;
-    }
-    const iconData = n.iconUrl ? iconDataUrls.get(n.iconUrl) : null;
-    // Only draw an icon when the node actually has a real one. Besides truly
-    // empty icons, nodes often carry a generic placeholder glyph (e.g. '⬡', the
-    // default given to icon-less nodes on import, or '⬜') — that's not a real
-    // icon, so drawing it produces a "ghost" icon in the export that cramps the
-    // label even though the box reads as plain on canvas. Treat those as none.
-    const iconGlyph = (n.icon || '').trim();
-    const realGlyph = iconGlyph && !PLACEHOLDER_ICON_GLYPHS.has(iconGlyph);
-    const hasIcon = !!(iconData || realGlyph);
-    const iconMarkup = !hasIcon ? ''
-      : iconData
-        ? `    <image href="${iconData}" x="${nx+8}" y="${ny+8}" width="24" height="24"/>`
-        : `    <text x="${nx+12}" y="${ny+24}" font-size="18">${escHtml(iconGlyph)}</text>`;
-    const rectFill = n.fill || P.nodeFill;
-    const rx = n.rounded === false ? 0 : 10;
-    // Wrap the label to the card's text width (12px padding each side) so a long
-    // name flows onto extra lines instead of running past the card edge — the
-    // canvas card has max-width:220 and wraps the same way.
-    const nFs = +n.fontSize || 12;
-    const nLh = nFs * 1.3;
-    const nLines = wrapSvgText(n.label || '', nw - 24, nFs);
-    // With an icon the text is top-anchored beneath it (category +39, name +55).
-    // Without one, centre the whole text block (category + name + sublabel) in
-    // the box so a plain labelled rectangle reads the same as it does on canvas.
-    let catY, nameTop;
-    if (hasIcon) {
-      catY = ny + 39;
-      nameTop = ny + 55;
-    } else {
-      const catH = n.category ? 13 : 0;
-      const subH = n.sublabel ? 13 : 0;
-      const blockH = catH + nLines.length * nLh + subH;
-      const start = ny + nh/2 - blockH/2;
-      catY = start + 9;
-      nameTop = start + catH + nFs;
-    }
-    const nameSpans = nLines.map((ln, i) =>
-      `<tspan x="${nx+12}" y="${(nameTop + i*nLh).toFixed(1)}">${escHtml(ln)}</tspan>`).join('');
-    const subY = nameTop + (nLines.length - 1) * nLh + 13;
-    svg += `  <g class="potato-node" data-node-id="${escHtml(n.id)}" style="cursor:pointer"${gOpacity}>
-    <rect class="potato-node-rect" x="${nx}" y="${ny}" width="${nw}" height="${nh}" rx="${rx}" fill="${rectFill}" stroke="${strokeCol}" stroke-width="${strokeW}" opacity="0.95"/>
-${iconMarkup}
-${n.category ? `    <text x="${nx+12}" y="${catY.toFixed(1)}" class="node-label">${escHtml((n.category||'').toUpperCase().slice(0,22))}</text>\n` : ''}    <text class="node-name"${labelStyle}>${nameSpans}</text>
-${n.sublabel ? `    <text x="${nx+12}" y="${subY.toFixed(1)}" class="node-sub">${escHtml((n.sublabel||'').slice(0,24))}</text>\n` : ''}  </g>
-`;
-  });
+  // Above the arrows: every node not sent to back, in stacking order. The
+  // sent-to-back (negative zIndex) nodes were already painted before the arrows.
+  _sortedNodes.filter(n => _zOf(n) >= 0).forEach(n => { svg += _renderNodeSvg(n); });
 
   svg += '</svg>';
   return svg;
