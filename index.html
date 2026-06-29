@@ -1332,6 +1332,26 @@ g.arrow-selected .arrow-waypoint-handle { opacity: 1; pointer-events: all; }
 #play-indicator.paused::before { content: "⏸ PAUSED"; display: block; font-size: 9px; font-weight: 800; letter-spacing: 1px; opacity: 0.85; margin-bottom: 4px; }
 body.flow-paused .arrow-path.playing-flow { animation: none !important; }
 
+/* Sequence "pick on canvas" mode */
+body.seq-picking #canvas-area { cursor: crosshair; }
+body.seq-picking .arrow-hit-area { cursor: pointer; }
+#seq-record-bar {
+  position: fixed; bottom: 36px; left: 50%; transform: translateX(-50%);
+  display: none; align-items: center; gap: 10px; min-width: 360px; max-width: 90vw;
+  background: var(--bg-overlay); border: 1px solid var(--teal); border-radius: 10px;
+  padding: 8px 12px 8px 16px; font-family: var(--font-mono); font-size: 12px; color: var(--text);
+  z-index: 9000; backdrop-filter: blur(10px);
+  box-shadow: 0 8px 32px var(--shadow-strong), 0 0 24px rgba(26,188,156,0.3);
+}
+#seq-record-bar.show { display: flex; }
+#seq-record-bar .seq-dot { width: 9px; height: 9px; border-radius: 50%; background: var(--teal); animation: port-pulse 1.1s ease-in-out infinite; }
+#seq-record-bar .seq-count { font-weight: 700; color: var(--teal); white-space: nowrap; }
+#seq-record-bar .tb-btn { font-size: 11px; padding: 4px 10px; }
+/* Numbered play-order chip drawn on each sequenced arrow */
+.arrow-seq-badge circle { fill: var(--teal); stroke: var(--bg); stroke-width: 2; }
+.arrow-seq-badge text { fill: #06251f; font-size: 11px; font-weight: 800; font-family: var(--font-mono); }
+body:not(.seq-picking) .arrow-seq-badge circle { fill: rgba(26,188,156,0.85); }
+
 kbd {
   display: inline-block;
   padding: 1px 5px;
@@ -1507,6 +1527,7 @@ kbd {
     <button class="tb-btn" onclick="autoLayout('lr')" title="Auto Layout Left→Right" aria-label="Auto-layout left to right"><span class="tb-icon" aria-hidden="true">→</span><span class="tb-label">LR</span></button>
     <button class="tb-btn" onclick="autoLayout('tb')" title="Auto Layout Top→Bottom" aria-label="Auto-layout top to bottom"><span class="tb-icon" aria-hidden="true">↓</span><span class="tb-label">TB</span></button>
     <button id="btn-grid-snap" class="tb-btn" onclick="toggleGridSnap()" title="Toggle snap to 20px grid" aria-label="Toggle grid snap" aria-pressed="false"><span class="tb-icon" aria-hidden="true">⌗</span><span class="tb-label">Snap</span></button>
+    <button id="btn-seq-pick" class="tb-btn" onclick="toggleSequenceMode()" title="Build the play order by clicking arrows on the canvas in sequence" aria-label="Pick play order on canvas"><span class="tb-icon" aria-hidden="true">🔢</span><span class="tb-label">Order</span></button>
     <button id="btn-edit-flow" class="tb-btn" onclick="showFlowEditor()" title="Edit the play sequence and narration" aria-label="Edit play sequence"><span class="tb-icon" aria-hidden="true">📝</span><span class="tb-label">Sequence</span></button>
 
     <div style="flex:1;"></div>
@@ -1677,6 +1698,14 @@ kbd {
 
 <!-- PLAY FLOW INDICATOR -->
 <div id="play-indicator" aria-live="polite"></div>
+<div id="seq-record-bar" role="status">
+  <span class="seq-dot" aria-hidden="true"></span>
+  <span class="seq-count">Click arrows in play order…</span>
+  <span style="flex:1"></span>
+  <button class="tb-btn" onclick="seqClearDraft()" title="Remove all picked steps">Clear</button>
+  <button class="tb-btn" onclick="endSequenceMode(false)" title="Discard and exit (Esc)">✕ Cancel</button>
+  <button class="tb-btn primary" onclick="endSequenceMode(true)" title="Save this order">✓ Done</button>
+</div>
 
 <!-- NOTIFICATIONS -->
 <div id="notifications" role="status" aria-live="polite" aria-atomic="false"></div>
@@ -1796,6 +1825,7 @@ kbd {
     </div>
     <div style="display:flex;gap:8px;margin-top:6px;margin-bottom:10px;flex-wrap:wrap">
       <button type="button" class="tb-btn" onclick="flowEditorAddStep()" style="font-size:11px">+ Add step</button>
+      <button type="button" class="tb-btn" onclick="flowEditorPickOnCanvas()" style="font-size:11px" title="Close this and set the order by clicking arrows on the canvas">🔢 Pick on canvas</button>
       <button type="button" class="tb-btn" onclick="flowEditorResetToAuto()" style="font-size:11px" title="Replace sequence with the auto-derived BFS order">↺ Reset to auto-order</button>
       <button type="button" class="tb-btn" onclick="flowEditorDownload()" style="font-size:11px" title="Download the ordered workflow as a text file">⬇ Download workflow</button>
       <button type="button" class="tb-btn danger" onclick="flowEditorClear()" style="font-size:11px">Clear all</button>
@@ -1951,6 +1981,8 @@ let nodes = [];       // { id, x, y, w, h, type, label, sublabel, category, icon
 let arrows = [];      // { id, from, to, fromPort, toPort, color, style, label, animated }
 let groups = [];      // { id, x, y, w, h, label, color }
 let playFlow = [];    // OPTIONAL ordered narration: [{ arrow: arrowId, title: "Auth", text: "User opens app..." }, ...]
+let _seqMode = false; // canvas "pick play order" mode: click arrows to sequence them
+let _seqDraft = [];   // ordered arrow ids being picked while _seqMode is on
 let selectedIds = new Set();
 let selectedArrow = null;
 let selectedGroup = null;
@@ -6502,7 +6534,7 @@ function drawArrow(arrow) {
     hit = document.createElementNS('http://www.w3.org/2000/svg', 'path');
     hit.setAttribute('class', 'arrow-hit-area');
     hit.style.cursor = 'pointer';
-    hit.addEventListener('click', (e) => { e.stopPropagation(); selectArrow(arrow.id); });
+    hit.addEventListener('click', (e) => { e.stopPropagation(); if (_seqMode) { seqHandleArrowClick(arrow.id); return; } selectArrow(arrow.id); });
     hit.addEventListener('contextmenu', (e) => { e.preventDefault(); selectArrow(arrow.id); showArrowContextMenu(e, arrow.id); });
     hit.addEventListener('dblclick', (e) => {
       e.stopPropagation();
@@ -6589,6 +6621,26 @@ function drawArrow(arrow) {
     lbl.textContent = lab.text;
     g.appendChild(lbl);
   });
+
+  // Sequence badge: a numbered chip showing this arrow's position in the play
+  // order (live draft while picking, otherwise its saved playFlow step number).
+  g.querySelectorAll('.arrow-seq-badge').forEach(el => el.remove());
+  const seqN = arrowSeqNumber(arrow.id);
+  if (seqN > 0) {
+    const SVGNS = 'http://www.w3.org/2000/svg';
+    const by = labels.length ? mid.y - 14 : mid.y;
+    const badge = document.createElementNS(SVGNS, 'g');
+    badge.setAttribute('class', 'arrow-seq-badge');
+    badge.style.pointerEvents = 'none';
+    const circ = document.createElementNS(SVGNS, 'circle');
+    circ.setAttribute('cx', mid.x); circ.setAttribute('cy', by); circ.setAttribute('r', '9');
+    const num = document.createElementNS(SVGNS, 'text');
+    num.setAttribute('x', mid.x); num.setAttribute('y', by);
+    num.setAttribute('text-anchor', 'middle'); num.setAttribute('dominant-baseline', 'central');
+    num.textContent = String(seqN);
+    badge.appendChild(circ); badge.appendChild(num);
+    g.appendChild(badge);
+  }
 }
 
 // Returns the point on a polyline at half the total path length.
@@ -7499,7 +7551,7 @@ function setupEventListeners() {
     if (e.key === '-') zoomOut();
     if (e.key === '0') zoomReset();
     if (e.key === 'f') fitToContent();
-    if (e.key === 'Escape') { clearSelection(); setTool('select'); cancelConnecting(); if (_playFlowTimer || _playPaused) stopPlayFlow(); }
+    if (e.key === 'Escape') { if (_seqMode) { endSequenceMode(false); return; } clearSelection(); setTool('select'); cancelConnecting(); if (_playFlowTimer || _playPaused) stopPlayFlow(); }
     if (e.key === ' ' || e.key === 'Spacebar') { e.preventDefault(); togglePlayFlow(); }
 
     // Arrow key nudge
@@ -8954,6 +9006,92 @@ function clearPlayHighlights() {
   document.querySelectorAll('.arrow-path.playing-flow').forEach(p => p.classList.remove('playing-flow'));
 }
 
+// ===== SEQUENCE PICK MODE (click arrows on the canvas in play order) =====
+// A faster, visual way to set the play order than the dropdown-driven editor:
+// toggle the mode, click arrows in the order they should fire, Done to save.
+function toggleSequenceMode() {
+  if (_seqMode) { endSequenceMode(false); return; }
+  startSequenceMode();
+}
+
+function startSequenceMode() {
+  if (!arrows.length) { notify('Add some connections first, then pick their play order', 'warning'); return; }
+  if (_playFlowTimer || _playPaused) stopPlayFlow();
+  clearSelection();
+  _seqMode = true;
+  // Seed from the connected steps already in playFlow so you extend, not restart.
+  const ids = new Set(arrows.map(a => a.id));
+  _seqDraft = (playFlow || []).map(s => s.arrow).filter(a => a && ids.has(a));
+  document.body.classList.add('seq-picking');
+  canvasArea.style.cursor = 'crosshair';
+  const b = document.getElementById('btn-seq-pick'); if (b) b.classList.add('active');
+  updateSeqBar();
+  redrawArrows();   // paint the numbered badges
+  notify('Click arrows in play order. Click a numbered arrow to remove it.', 'info');
+}
+
+function endSequenceMode(save) {
+  if (save) commitSequenceDraft();
+  _seqMode = false;
+  _seqDraft = [];
+  document.body.classList.remove('seq-picking');
+  canvasArea.style.cursor = currentTool === 'pan' ? 'grab' : currentTool === 'text' ? 'text' : 'default';
+  const b = document.getElementById('btn-seq-pick'); if (b) b.classList.remove('active');
+  document.getElementById('seq-record-bar').classList.remove('show');
+  redrawArrows();   // refresh badges (persisted if saved, cleared if cancelled)
+}
+
+function commitSequenceDraft() {
+  pushHistory();
+  // Preserve any existing per-arrow narration; keep free-form (no-arrow) steps
+  // at the end so picking an order never silently drops authored narration.
+  const prev = new Map((playFlow || []).filter(s => s.arrow).map(s => [s.arrow, s]));
+  const freeform = (playFlow || []).filter(s => !s.arrow && (s.title || s.text));
+  playFlow = _seqDraft.map(id => {
+    const p = prev.get(id);
+    return { arrow: id, title: p ? (p.title || '') : '', text: p ? (p.text || '') : '' };
+  }).concat(freeform);
+  markDirty();
+  notify(`Saved ${_seqDraft.length} step${_seqDraft.length !== 1 ? 's' : ''} — open Sequence to add narration`);
+}
+
+// Click handler while picking: append the arrow, or remove it (toggle) if it's
+// already in the order, then renumber everything.
+function seqHandleArrowClick(arrowId) {
+  const i = _seqDraft.indexOf(arrowId);
+  if (i >= 0) _seqDraft.splice(i, 1);
+  else _seqDraft.push(arrowId);
+  updateSeqBar();
+  redrawArrows();
+}
+
+function seqClearDraft() {
+  _seqDraft = [];
+  updateSeqBar();
+  redrawArrows();
+}
+
+function updateSeqBar() {
+  const bar = document.getElementById('seq-record-bar');
+  if (!bar) return;
+  const n = _seqDraft.length;
+  bar.querySelector('.seq-count').textContent = n
+    ? `${n} step${n !== 1 ? 's' : ''} picked — keep clicking, or Done`
+    : 'Click arrows in play order…';
+  bar.classList.add('show');
+}
+
+// 1-based play position for an arrow: its index in the live draft while picking,
+// otherwise its step number in the saved sequence (0 = not sequenced).
+function arrowSeqNumber(arrowId) {
+  if (_seqMode) { const i = _seqDraft.indexOf(arrowId); return i >= 0 ? i + 1 : 0; }
+  if (playFlow && playFlow.length) {
+    const idx = playFlow.findIndex(s => s.arrow === arrowId);
+    return idx >= 0 ? idx + 1 : 0;
+  }
+  return 0;
+}
+
 // ===== PLAY SEQUENCE EDITOR =====
 // Editor maintains its own draft copy of the sequence so users can Cancel.
 let _flowDraft = null;
@@ -8988,6 +9126,13 @@ function closeFlowEditor(save) {
   }
   document.getElementById('flow-editor-overlay').style.display = 'none';
   _flowDraft = null;
+}
+
+// Hand off from the editor to canvas picking: save nothing, just close and
+// start pick mode seeded from the current saved sequence.
+function flowEditorPickOnCanvas() {
+  closeFlowEditor(false);
+  startSequenceMode();
 }
 
 function flowEditorAddStep() {
@@ -9071,6 +9216,24 @@ function flowEditorChangeTitle(i, title) {
   _flowDraft[i].title = String(title || '');
 }
 
+// Live coupling: hovering a step row spotlights its connection on the canvas
+// (the parts not hidden behind the modal), turning the abstract dropdown into
+// something concrete. Reuses the play highlight so it matches the animation.
+function flowEditorHi(arrowId) {
+  if (!arrowId) return;
+  clearPlayHighlights();
+  const a = arrows.find(x => x.id === arrowId);
+  if (!a) return;
+  ['from', 'to'].forEach(end => {
+    const el = document.getElementById('node-' + a[end]);
+    if (el) el.classList.add('playing-flow');
+  });
+  const g = document.getElementById('arrow-' + arrowId);
+  const p = g && g.querySelector('.arrow-path');
+  if (p) p.classList.add('playing-flow');
+}
+function flowEditorUnhi() { clearPlayHighlights(); }
+
 function renderFlowEditor() {
   const list = document.getElementById('flow-editor-list');
   if (!_flowDraft.length) {
@@ -9091,7 +9254,7 @@ function renderFlowEditor() {
   };
 
   list.innerHTML = _flowDraft.map((step, i) => `
-    <div style="display:flex;gap:8px;align-items:flex-start;padding:8px;border:1px solid var(--border);border-radius:8px;background:var(--bg3);margin-bottom:6px">
+    <div onmouseenter="flowEditorHi('${escHtml(step.arrow || '')}')" onmouseleave="flowEditorUnhi()" style="display:flex;gap:8px;align-items:flex-start;padding:8px;border:1px solid var(--border);border-radius:8px;background:var(--bg3);margin-bottom:6px">
       <div style="display:flex;flex-direction:column;align-items:center;gap:2px;padding-top:2px">
         <span style="font-size:10px;font-family:var(--font-mono);color:var(--text-muted);font-weight:700;min-width:18px;text-align:center">${i + 1}</span>
         <button class="tb-btn" onclick="flowEditorMove(${i}, -1)" ${i === 0 ? 'disabled' : ''} title="Move up" aria-label="Move up" style="padding:2px 6px;font-size:11px;line-height:1">↑</button>
