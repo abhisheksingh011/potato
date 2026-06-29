@@ -5556,24 +5556,49 @@ function shapeSvg(kind) {
   return `<svg viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">${inner}</svg>`;
 }
 
+// The export renders node labels in this proportional UI font — the SAME stack
+// the canvas uses for .node-name (inherited from body via --font-ui). Earlier
+// the export drew labels in monospace, which is wider, so a label that fit on
+// one line in the editor would wrap (e.g. the trailing letter dropping to a new
+// line). Keeping the font identical is what makes wrapping match the canvas.
+const NODE_LABEL_FONT = '-apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, Roboto, "Helvetica Neue", Arial, sans-serif';
+
+// Generic geometric glyphs the app uses as "no real icon" placeholders (shape
+// palette defaults, the '⬡' fallback assigned to icon-less imported nodes, etc).
+// The export treats these as no icon so a plain box doesn't get a ghost icon.
+const PLACEHOLDER_ICON_GLYPHS = new Set(['⬜','⬡','⬢','▭','▢','□','◻','◼','▬','⬛']);
+
+// Measure rendered text width with a cached canvas 2D context. Same engine the
+// SVG text will be drawn with, so wrapping decisions match what actually paints.
+let _measureCtx = null;
+function measureTextWidth(text, font) {
+  if (!_measureCtx) _measureCtx = document.createElement('canvas').getContext('2d');
+  _measureCtx.font = font;
+  return _measureCtx.measureText(text).width;
+}
+
 // Wrap a label into lines that fit `maxWidth` (px) for the export SVG, mirroring
 // the canvas's wrapping flex box. SVG <text> doesn't wrap on its own, so without
-// this a long label in a narrow shape spills out the sides. Monospace export
-// font → ~0.6em per char. Breaks on spaces, and hard-breaks words longer than
-// a line (matches the editor's `overflow-wrap: anywhere`).
-function wrapSvgText(text, maxWidth, fontSize) {
-  const charW = fontSize * 0.6;
-  const maxChars = Math.max(1, Math.floor(maxWidth / charW));
+// this a long label in a narrow shape spills out the sides. `font` is a CSS font
+// shorthand (e.g. 'bold 12px <stack>') so widths are measured against the actual
+// glyphs. Breaks on spaces, and hard-breaks words longer than a line (matches
+// the editor's `overflow-wrap: anywhere`).
+function wrapSvgText(text, maxWidth, font) {
+  // Back-compat: a bare number means "px in the node-label font".
+  if (typeof font === 'number') font = `bold ${font}px ${NODE_LABEL_FONT}`;
+  const fits = (s) => measureTextWidth(s, font) <= maxWidth;
   const out = [];
   (text || '').split(/\s+/).forEach(word => {
     if (!word) return;
-    while (word.length > maxChars) {       // hard-break an over-long word
-      out.push(word.slice(0, maxChars));
-      word = word.slice(maxChars);
+    while (!fits(word) && word.length > 1) {   // hard-break an over-long word
+      let lo = 1, hi = word.length;            // largest prefix that still fits
+      while (lo < hi) { const mid = (lo + hi + 1) >> 1; if (fits(word.slice(0, mid))) lo = mid; else hi = mid - 1; }
+      out.push(word.slice(0, lo));
+      word = word.slice(lo);
     }
     if (!out.length) { out.push(word); return; }
     const last = out[out.length - 1];
-    if (last.length + 1 + word.length <= maxChars) out[out.length - 1] = last + ' ' + word;
+    if (fits(last + ' ' + word)) out[out.length - 1] = last + ' ' + word;
     else out.push(word);
   });
   return out.length ? out : [''];
@@ -10003,7 +10028,7 @@ async function buildDiagramSVG(theme = 'dark') {
     <style>
       text { font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace; fill: ${P.text}; }
       .node-label { font-size: 8px; fill: ${P.label}; font-weight: bold; }
-      .node-name  { font-size: 12px; fill: ${P.text}; font-weight: bold; }
+      .node-name  { font-size: 12px; fill: ${P.text}; font-weight: bold; font-family: ${NODE_LABEL_FONT}; }
       .node-sub   { font-size: 9px; fill: ${P.sub}; }
       .grp-label  { font-size: 11px; fill: ${P.label}; font-weight: bold; }
     </style>
@@ -10185,14 +10210,18 @@ ${geom}
       return;
     }
     const iconData = n.iconUrl ? iconDataUrls.get(n.iconUrl) : null;
-    // Only draw an icon when the node actually has one. The canvas shows nothing
-    // for an icon-less box (empty .node-icon span), so don't invent a ⬜ fallback
-    // here — that phantom icon was shrinking/cramping the label in exports.
-    const hasIcon = !!(iconData || n.icon);
+    // Only draw an icon when the node actually has a real one. Besides truly
+    // empty icons, nodes often carry a generic placeholder glyph (e.g. '⬡', the
+    // default given to icon-less nodes on import, or '⬜') — that's not a real
+    // icon, so drawing it produces a "ghost" icon in the export that cramps the
+    // label even though the box reads as plain on canvas. Treat those as none.
+    const iconGlyph = (n.icon || '').trim();
+    const realGlyph = iconGlyph && !PLACEHOLDER_ICON_GLYPHS.has(iconGlyph);
+    const hasIcon = !!(iconData || realGlyph);
     const iconMarkup = !hasIcon ? ''
       : iconData
         ? `    <image href="${iconData}" x="${nx+8}" y="${ny+8}" width="24" height="24"/>`
-        : `    <text x="${nx+12}" y="${ny+24}" font-size="18">${escHtml(n.icon)}</text>`;
+        : `    <text x="${nx+12}" y="${ny+24}" font-size="18">${escHtml(iconGlyph)}</text>`;
     const rectFill = n.fill || P.nodeFill;
     const rx = n.rounded === false ? 0 : 10;
     // Wrap the label to the card's text width (12px padding each side) so a long
