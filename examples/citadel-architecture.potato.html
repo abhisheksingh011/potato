@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"><title>Citadel — Grounded, Auditable AI for Regulated Teams — Potato</title></head><body>
+<!-- Potato Saved Diagram -->
+<script type="application/json" id="potato-data">
+{
+  "meta": { "version": "1.0", "name": "Citadel — Grounded, Auditable AI for Regulated Teams", "created": "2026-06-30" },
+  "nodes": [
+    {
+      "id": "n_docs", "x": 60, "y": 60, "w": 160, "h": null,
+      "type": "Document store", "label": "Bank Documents", "sublabel": "txt / md / pdf",
+      "category": "Storage", "icon": "📄", "theme": "gray",
+      "description": "The bank's own policy and procedure documents — the single source of truth Citadel is allowed to answer from. In production: a private bucket with no public egress.",
+      "zIndex": 10
+    },
+    {
+      "id": "n_ingest", "x": 280, "y": 60, "w": 160, "h": null,
+      "type": "Ingestion pipeline", "label": "Ingest + Chunk", "sublabel": "char-span aware",
+      "category": "Compute", "icon": "⚙️", "theme": "orange",
+      "description": "Loads documents and splits them into character-span-aware chunks so every citation can be traced back to the exact source text.",
+      "zIndex": 10
+    },
+    {
+      "id": "n_vector", "x": 500, "y": 60, "w": 160, "h": null,
+      "type": "Vector database", "label": "Vector Store", "sublabel": "Chroma / pgvector",
+      "category": "Database", "icon": "🗄️", "theme": "blue",
+      "description": "Cosine-similarity index over document chunks. ChromaDB on disk in the reference build; a managed pgvector or Qdrant index in a private subnet in production.",
+      "zIndex": 10
+    },
+    {
+      "id": "n_question", "x": 60, "y": 380, "w": 160, "h": null,
+      "type": "End user", "label": "Analyst Question", "sublabel": "plain English",
+      "category": "Users", "icon": "👤", "theme": "gray",
+      "description": "A compliance analyst asks a plain-English regulatory question through the UI or API.",
+      "zIndex": 10
+    },
+    {
+      "id": "n_retrieve", "x": 500, "y": 380, "w": 160, "h": null,
+      "type": "Retriever", "label": "Retrieve Top-k", "sublabel": "semantic search",
+      "category": "Compute", "icon": "🔍", "theme": "orange",
+      "description": "Embeds the question with the same model used at ingestion and pulls the top-k most relevant chunks from the vector store as candidate evidence.",
+      "zIndex": 10
+    },
+    {
+      "id": "n_rerank", "x": 720, "y": 380, "w": 160, "h": null,
+      "type": "Reranker", "label": "Rerank", "sublabel": "optional (Cohere)",
+      "category": "Compute", "icon": "📊", "theme": "orange",
+      "description": "Optional Cohere cross-encoder that reorders candidates by true relevance; falls back to a transparent no-op when no key is configured, so the system runs free and local by default.",
+      "zIndex": 10
+    },
+    {
+      "id": "n_prompt", "x": 940, "y": 380, "w": 160, "h": null,
+      "type": "Prompt builder", "label": "Grounded Prompt", "sublabel": "numbered sources",
+      "category": "Compute", "icon": "📝", "theme": "teal",
+      "description": "Assembles a strict grounding prompt that numbers the retrieved chunks as [Source N] and instructs Claude to answer only from them — or to refuse.",
+      "zIndex": 10
+    },
+    {
+      "id": "n_claude", "x": 1160, "y": 380, "w": 160, "h": null,
+      "type": "Anthropic Claude", "label": "Claude", "sublabel": "claude-sonnet-4-6",
+      "category": "AI", "icon": "🧠", "theme": "gradient",
+      "description": "Answers using only the numbered sources, citing [Source N] per claim — or emits a structured NOT_COVERED: refusal when the sources don't contain the answer.",
+      "zIndex": 10
+    },
+    {
+      "id": "n_cite", "x": 1380, "y": 380, "w": 160, "h": null,
+      "type": "Citation enforcer", "label": "Citation Enforcement", "sublabel": "+ refusal check",
+      "category": "Security", "icon": "✅", "theme": "red",
+      "description": "Doesn't trust the model's citations: verifies every [Source N] maps to a real retrieved source, flags uncited factual sentences, computes coverage, and detects the refusal marker.",
+      "zIndex": 10
+    },
+    {
+      "id": "n_answer", "x": 1600, "y": 380, "w": 160, "h": null,
+      "type": "Response", "label": "Cited Answer / Refusal", "sublabel": "never a guess",
+      "category": "Frontend", "icon": "💬", "theme": "teal",
+      "description": "Returns either a fully-cited answer or a structured refusal — never a confident, unsupported guess.",
+      "zIndex": 10
+    },
+    {
+      "id": "n_human", "x": 1600, "y": 60, "w": 160, "h": null,
+      "type": "Reviewer", "label": "Human Reviewer", "sublabel": "approve / reject / edit",
+      "category": "Users", "icon": "🧑‍⚖️", "theme": "gray",
+      "description": "A person approves, rejects, or edits the answer; their disposition is recorded additively, without mutating the machine's original decision.",
+      "zIndex": 10
+    },
+    {
+      "id": "n_ledger", "x": 940, "y": 700, "w": 160, "h": null,
+      "type": "Audit store", "label": "The Ledger", "sublabel": "append-only",
+      "category": "Database", "icon": "📒", "theme": "blue",
+      "description": "Model-agnostic audit layer that wraps the model call from the outside. Writes one immutable AuditRecord per interaction: question, sources, answer, citations, model + version, tokens, cost, latency, refusal, and human disposition.",
+      "zIndex": 10
+    },
+    {
+      "id": "n_compliance", "x": 1240, "y": 700, "w": 160, "h": null,
+      "type": "Compliance profile", "label": "Compliance Profiles", "sublabel": "SR 11-7 / EU AI Act / OSFI E-23",
+      "category": "Security", "icon": "🛡️", "theme": "red",
+      "description": "Pluggable profiles validate mandatory fields and export the SAME record shaped per regime — proving one well-designed log can satisfy many. Architectural mapping, not legal advice.",
+      "zIndex": 10
+    }
+  ],
+  "arrows": [
+    { "id": "a_1",  "from": "n_docs",     "to": "n_ingest",     "fromPort": "right",  "toPort": "left",  "color": "blue",   "style": "solid",  "label": "1. Load + chunk",      "animated": false },
+    { "id": "a_2",  "from": "n_ingest",   "to": "n_vector",     "fromPort": "right",  "toPort": "left",  "color": "green",  "style": "solid",  "label": "2. Embed + index",     "animated": false },
+    { "id": "a_3",  "from": "n_question", "to": "n_retrieve",   "fromPort": "right",  "toPort": "left",  "color": "blue",   "style": "solid",  "label": "3. Embed query",       "animated": false },
+    { "id": "a_4",  "from": "n_vector",   "to": "n_retrieve",   "fromPort": "bottom", "toPort": "top",   "color": "blue",   "style": "solid",  "label": "4. Top-k search",      "animated": false },
+    { "id": "a_5",  "from": "n_retrieve", "to": "n_rerank",     "fromPort": "right",  "toPort": "left",  "color": "purple", "style": "solid",  "label": "5. Rerank",            "animated": false },
+    { "id": "a_6",  "from": "n_rerank",   "to": "n_prompt",     "fromPort": "right",  "toPort": "left",  "color": "blue",   "style": "solid",  "label": "6. Numbered sources",  "animated": false },
+    { "id": "a_7",  "from": "n_prompt",   "to": "n_claude",     "fromPort": "right",  "toPort": "left",  "color": "blue",   "style": "solid",  "label": "7. Grounded prompt",   "animated": false },
+    { "id": "a_8",  "from": "n_claude",   "to": "n_cite",       "fromPort": "right",  "toPort": "left",  "color": "blue",   "style": "solid",  "label": "8. Draft answer",      "animated": false },
+    { "id": "a_9",  "from": "n_cite",     "to": "n_answer",     "fromPort": "right",  "toPort": "left",  "color": "green",  "style": "solid",  "label": "9. Verify / refuse",   "animated": false },
+    { "id": "a_10", "from": "n_answer",   "to": "n_human",      "fromPort": "top",    "toPort": "bottom","color": "purple", "style": "solid",  "label": "10. Human review",     "animated": false },
+    { "id": "a_11", "from": "n_claude",   "to": "n_ledger",     "fromPort": "bottom", "toPort": "top",   "color": "teal",   "style": "dotted", "label": "11. Audit capture",    "animated": false },
+    { "id": "a_12", "from": "n_cite",     "to": "n_ledger",     "fromPort": "bottom", "toPort": "top",   "color": "teal",   "style": "dotted", "label": "12. Log outcome",      "animated": false },
+    { "id": "a_13", "from": "n_human",    "to": "n_ledger",     "fromPort": "bottom", "toPort": "right", "color": "teal",   "style": "dashed", "label": "13. Disposition",      "animated": false },
+    { "id": "a_14", "from": "n_ledger",   "to": "n_compliance", "fromPort": "right",  "toPort": "left",  "color": "red",    "style": "solid",  "label": "14. Validate + export","animated": false }
+  ],
+  "groups": [
+    { "id": "g_audit", "x": 900, "y": 620, "w": 580, "h": 240, "label": "Isolated audit store — separate account, append-only (WORM)", "color": "blue" }
+  ],
+  "playFlow": [
+    { "arrow": "a_1",  "text": "The bank's own policy and procedure documents (.txt / .md / .pdf) enter the ingestion pipeline, which loads each file and splits it into character-span-aware chunks — so that every answer Citadel later gives can be traced back to the exact passage it came from." },
+    { "arrow": "a_2",  "text": "The ingestion pipeline embeds each chunk with a local sentence-transformer model and writes the vectors into the Vector Store (ChromaDB in the reference build; a managed pgvector or Qdrant index in production). The index is built once, offline, so query time stays fast and cheap." },
+    { "arrow": "a_3",  "text": "At query time a compliance analyst submits a plain-English regulatory question. The Retriever embeds that question with the same model used at ingestion, so the query and the documents live in the same vector space and are directly comparable." },
+    { "arrow": "a_4",  "text": "The Retriever runs a cosine-similarity search against the Vector Store and pulls back the top-k most relevant chunks as candidate evidence — narrowing thousands of passages down to the handful most likely to contain the answer." },
+    { "arrow": "a_5",  "text": "The candidate chunks are passed to an optional Cohere reranker (a cross-encoder) that reorders them by true relevance to the question. When no Cohere key is configured this step is a transparent no-op, so the system runs fully free and local by default." },
+    { "arrow": "a_6",  "text": "The reranked passages are handed to the Grounded Prompt builder as numbered sources, preserving their character spans so each one can be cited as [Source N] and later audited against the original document." },
+    { "arrow": "a_7",  "text": "The prompt builder assembles a strict grounding prompt — the numbered sources plus hard instructions to answer using ONLY those sources, cite every claim, and otherwise refuse — and sends it to Anthropic's Claude. Critically, the Ledger wraps this call from the outside." },
+    { "arrow": "a_8",  "text": "Claude (claude-sonnet-4-6) returns a draft answer that either cites [Source N] for each factual claim, or opens with the NOT_COVERED: marker when the sources don't contain the answer. The Citation Enforcement stage receives this raw output and does not trust it yet." },
+    { "arrow": "a_9",  "text": "Citation Enforcement verifies that every [Source N] maps to a real retrieved source (catching hallucinated citations), flags any factual sentence lacking a citation, and computes citation coverage — producing either a fully-cited answer or a structured refusal, never an unsupported guess." },
+    { "arrow": "a_10", "text": "The cited answer or refusal is surfaced to a Human Reviewer, who approves, rejects, or edits it — keeping a person accountable for any decision the institution acts on, exactly as model-risk governance requires." },
+    { "arrow": "a_11", "text": "Throughout, the Ledger captures the Claude call from the outside: it records the question, retrieved sources, the model name and the API-returned model version, token counts, estimated cost, and latency into one immutable AuditRecord — written even if the call raises, because failures must be auditable too. (Dotted = monitoring.)" },
+    { "arrow": "a_12", "text": "Citation Enforcement logs the final outcome — the answer, parsed citations, coverage score, and whether the system refused and why — into the same AuditRecord, so the safety behavior itself is on the record and replayable months later. (Dotted = monitoring.)" },
+    { "arrow": "a_13", "text": "When the Human Reviewer files a disposition, the Ledger appends a NEW version of the record with only the reviewer fields populated, never mutating the machine's original decision — so an auditor can see both what the model decided and what the human did about it as two distinct facts. (Dashed = asynchronous human step.)" },
+    { "arrow": "a_14", "text": "Finally the active Compliance Profile (SR 11-7, EU AI Act, or OSFI E-23) validates that every mandatory field is present and exports the same record shaped for that regime — proving one well-designed audit log can satisfy multiple regulators. These are architectural mappings, not legal advice." }
+  ]
+}
+</script></body></html>
