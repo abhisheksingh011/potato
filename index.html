@@ -10581,35 +10581,102 @@ ${n.sublabel ? `    <text x="${nx+12}" y="${subY.toFixed(1)}" class="node-sub">$
 }
 
 function openDiagram() {
+  // Chromium: use the File System Access API so we capture a writable
+  // handle for the chosen file. That makes subsequent Save overwrite THIS
+  // file (not whatever was remembered before), and lets the toolbar name
+  // follow the file we just opened. Everywhere else, fall back to the
+  // hidden <input> (which can read but not write the same path).
+  if (SUPPORTS_FS_ACCESS && typeof window.showOpenFilePicker === 'function') {
+    openDiagramViaPicker();
+    return;
+  }
   document.getElementById('file-input').click();
+}
+
+async function openDiagramViaPicker() {
+  let handle;
+  try {
+    [handle] = await window.showOpenFilePicker({
+      multiple: false,
+      types: [{
+        description: 'Potato Diagram',
+        accept: { 'text/html': ['.potato.html', '.html'], 'application/xml': ['.xml'] }
+      }]
+    });
+  } catch (e) {
+    if (e && e.name === 'AbortError') return; // user cancelled the picker
+    // Some environments reject showOpenFilePicker — fall back to <input>.
+    document.getElementById('file-input').click();
+    return;
+  }
+  try {
+    const file = await handle.getFile();
+    const ok = applyOpenedFile(await file.text(), file.name);
+    if (ok) {
+      // Remember THIS file as the save target so Ctrl+S overwrites it.
+      _currentFileHandle = handle;
+      await _persistHandle(handle);
+    }
+    // If parsing failed we leave the previous handle untouched.
+  } catch (e) {
+    notify('Error opening file: ' + e.message, 'error');
+  }
+}
+
+// Parse + load a Potato (or mxGraph XML) document and sync the toolbar
+// name to the opened file. Returns true on success. Does NOT touch
+// _currentFileHandle — each caller decides whether the opened file should
+// become the save target.
+function applyOpenedFile(html, fileName) {
+  try {
+    // mxGraph XML file (.xml extension, or any content that is mxGraph XML)
+    // — convert offline into a Potato diagram.
+    const isXmlDiagramFile = /\.xml$/i.test(fileName) || looksLikeMxXml(html);
+    if (isXmlDiagramFile && !/id="potato-data"/.test(html)) {
+      const data = parseXmlDiagram(html);
+      loadDiagramData(data);
+      _setNameFromOpenedFile(data, fileName);
+      setTimeout(fitToContent, 100);
+      notify(`Imported ${data.nodes.length} nodes, ${data.arrows.length} connections from XML ✅`);
+      return true;
+    }
+    const match = html.match(/<script[^>]+id="potato-data"[^>]*>([\s\S]*?)<\/script>/);
+    if (!match) { notify('No Potato data found in this file', 'error'); return false; }
+    const data = JSON.parse(match[1]);
+    loadDiagramData(data);
+    _setNameFromOpenedFile(data, fileName);
+    notify(`Loaded "${data.meta?.name || fileName}" ✅`);
+    return true;
+  } catch (err) {
+    notify('Error loading file: ' + err.message, 'error');
+    return false;
+  }
+}
+
+// Toolbar name follows the opened file: prefer the name saved inside the
+// file, otherwise derive it from the filename on disk.
+function _setNameFromOpenedFile(data, fileName) {
+  const input = document.getElementById('filename-input');
+  if (!input) return;
+  const fromMeta = data && data.meta && data.meta.name;
+  const fromFile = String(fileName || '').replace(/\.(potato\.)?(html|xml|svg|png)$/i, '');
+  const name = fromMeta || fromFile;
+  if (name) input.value = name;
 }
 
 function loadDiagramFile(e) {
   const file = e.target.files[0];
   if (!file) return;
   const reader = new FileReader();
-  reader.onload = (ev) => {
-    try {
-      const html = ev.target.result;
-      // mxGraph XML file (.xml extension, or any content that is mxGraph XML)
-      // — convert offline into a Potato diagram.
-      const isXmlDiagramFile = /\.xml$/i.test(file.name) || looksLikeMxXml(html);
-      if (isXmlDiagramFile && !/id="potato-data"/.test(html)) {
-        const data = parseXmlDiagram(html);
-        loadDiagramData(data);
-        if (data.meta?.name) document.getElementById('filename-input').value = data.meta.name;
-        setTimeout(fitToContent, 100);
-        notify(`Imported ${data.nodes.length} nodes, ${data.arrows.length} connections from XML ✅`);
-        return;
-      }
-      const match = html.match(/<script[^>]+id="potato-data"[^>]*>([\s\S]*?)<\/script>/);
-      if (!match) { notify('No Potato data found in this file', 'error'); return; }
-      const data = JSON.parse(match[1]);
-      loadDiagramData(data);
-      if (data.meta?.name) document.getElementById('filename-input').value = data.meta.name;
-      notify(`Loaded "${data.meta?.name || file.name}" ✅`);
-    } catch(err) {
-      notify('Error loading file: ' + err.message, 'error');
+  reader.onload = async (ev) => {
+    const ok = applyOpenedFile(ev.target.result, file.name);
+    if (ok) {
+      // The <input> path hands us file contents but no writable handle, so
+      // whatever file was remembered before is no longer the right save
+      // target. Drop it so the next Save prompts for a fresh location
+      // instead of silently overwriting the previously-opened file.
+      _currentFileHandle = null;
+      await _clearPersistedHandle();
     }
   };
   reader.readAsText(file);
