@@ -11,7 +11,7 @@
 [![MIT License](https://img.shields.io/badge/license-MIT-1abc9c)](LICENSE)
 [![Live demo](https://img.shields.io/badge/live%20demo-open%20in%20browser-7B2FBE)](https://abhisheksingh011.github.io/potato/)
 [![Knowledge built-in](https://img.shields.io/badge/SLA%20%C2%B7%20limits%20%C2%B7%20cost%20%C2%B7%20pitfalls-52%20services-1abc9c)](#-service-knowledge-base)
-[![Real icons](https://img.shields.io/badge/icons-1067%20AWS%20%2F%20Azure%20%2F%20GCP-FF9900)](icons/)
+[![Real icons](https://img.shields.io/badge/icons-1108%20AWS%20%2F%20Azure%20%2F%20GCP-FF9900)](icons/)
 [![Zero deps](https://img.shields.io/badge/dependencies-zero-2E86C1)](#tech-stack)
 
 <br>
@@ -218,7 +218,7 @@ If you're choosing Potato, you're not choosing it *over* a drawing tool. You're 
 | ⬇ **Downloadable workflow runbook** | Export the play-flow as a numbered **plain-text runbook** (`.txt`) — drop it straight into your docs, a PR description, or an onboarding wiki. The diagram becomes documentation. |
 | 🤖 **Plain-English → architecture** | Paste the [Potato prompt](POTATO_LLM_PROMPT.md) into any LLM (ChatGPT / Claude / Gemini / Copilot), describe your system, paste the reply back. Get a real, editable, *knowledge-enriched* design — not just shapes. |
 | 📤 **A file that explains itself** | Save → email → recipient double-clicks → interactive viewer in any browser. They hover tooltips, ▶ Play the flow, see the costs. No Potato, no account, no install. |
-| 🪣 **1067 official cloud icons** | AWS / Azure / GCP, searchable, drag-and-drop — the real artwork the vendors ship, not stylised reproductions. |
+| 🪣 **1108 official cloud icons** | AWS / Azure / GCP, searchable, drag-and-drop — the real artwork the vendors ship, not stylised reproductions. |
 
 > No account. No telemetry. No subscription. No internet after the initial download.
 
@@ -234,7 +234,7 @@ If you're choosing Potato, you're not choosing it *over* a drawing tool. You're 
 | **Downloadable text runbook** from the flow | ✅ | ❌ | ❌ | ❌ | ❌ |
 | **LLM-native** — describe it in English, any model | ✅ | ❌ | ❌ | ⚠️ syntax | ❌ |
 | **Self-explaining shareable file** (recipient interacts) | ✅ | ❌ | ❌ | ❌ | ❌ |
-| 1067 official AWS/Azure/GCP icons built-in | ✅ | ⚠️ download | ❌ | ❌ | ✅ paid |
+| 1108 official AWS/Azure/GCP icons built-in | ✅ | ⚠️ download | ❌ | ❌ | ✅ paid |
 | Single offline HTML file | ✅ | ❌ | ❌ | ❌ | ❌ |
 | Lives in `git diff` next to your code | ✅ HTML | ⚠️ XML | ⚠️ JSON | ✅ MD | ❌ |
 | Account / login required | ❌ | ❌ | ❌ | ❌ | ✅ |
@@ -247,7 +247,7 @@ The first six rows are the product. The drawing is table stakes.
 ## 🚀 Features at a glance
 
 **Diagramming**
-- 1067 real AWS / Azure / GCP icons + emoji shapes
+- 1108 real AWS / Azure / GCP icons + emoji shapes
 - Orthogonal arrows that route around obstacles
 - Animated / dashed / dotted arrow styles, 9 colors
 - Groups / swimlanes for VPCs, subnets, service boundaries
@@ -369,7 +369,7 @@ potato/
 ├── _generate_kb.js            ← Splices service_kb.json into index.html
 ├── _generate_components.js    ← Splices the icons/ tree into the COMPONENTS manifest
 ├── _test_saved_viewer.js      ← Smoke test for the saved-viewer inline script
-├── icons/                     ← 1067 SVGs across aws/azure/gcp by category
+├── icons/                     ← 1108 SVGs across aws/azure/gcp by category
 ├── assets/                    ← Screenshots and brand assets
 ├── POTATO_LLM_PROMPT.md       ← Long-form prompt you can copy into any LLM
 ├── .github/

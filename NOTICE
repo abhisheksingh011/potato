@@ -69,6 +69,31 @@ icons/azure/
 
 
 ----------------------------------------------------------------------
+icons/azure/Fabric/
+----------------------------------------------------------------------
+  Artwork source:   Microsoft Fabric product, experience, and item icons
+                    https://learn.microsoft.com/en-us/fabric/fundamentals/icons
+  Acquired via:     github.com/microsoft/fabric-samples (docs-samples/Icons.zip)
+                    Also published as the npm package @fabric-msft/svg-icons.
+  Rights holder:    Microsoft Corporation
+  Usage:            Subject to the same Microsoft icon terms below. Per
+                    Microsoft's Do's and Don'ts for these icons: do NOT
+                    crop, flip, rotate, distort, or otherwise change the
+                    shape of an icon (scaling is fine); do not use them to
+                    represent a non-Microsoft product or service; and in
+                    diagrams, include a label with the product, experience,
+                    or item name near the icon.
+
+  Icon terms        (quoted verbatim from Microsoft):
+                    "Microsoft permits the use of these icons in
+                    architectural diagrams, training materials, or
+                    documentation. You can copy, distribute, and display the
+                    icons only for the permitted use unless granted explicit
+                    permission by Microsoft. Microsoft reserves all other
+                    rights."
+
+
+----------------------------------------------------------------------
 icons/gcp/
 ----------------------------------------------------------------------
   Artwork source:   Google Cloud Icons
