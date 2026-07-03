@@ -10,7 +10,7 @@
 
 [![MIT License](https://img.shields.io/badge/license-MIT-1abc9c)](LICENSE)
 [![Live demo](https://img.shields.io/badge/live%20demo-open%20in%20browser-7B2FBE)](https://abhisheksingh011.github.io/potato/)
-[![Knowledge built-in](https://img.shields.io/badge/SLA%20%C2%B7%20limits%20%C2%B7%20cost%20%C2%B7%20pitfalls-52%20services-1abc9c)](#-service-knowledge-base)
+[![Knowledge built-in](https://img.shields.io/badge/SLA%20%C2%B7%20limits%20%C2%B7%20cost%20%C2%B7%20pitfalls-79%20services-1abc9c)](#-service-knowledge-base)
 [![Real icons](https://img.shields.io/badge/icons-1108%20AWS%20%2F%20Azure%20%2F%20GCP-FF9900)](icons/)
 [![Zero deps](https://img.shields.io/badge/dependencies-zero-2E86C1)](#tech-stack)
 
@@ -212,13 +212,13 @@ If you're choosing Potato, you're not choosing it *over* a drawing tool. You're 
 
 | | |
 |---|---|
-| 📋 **Architecture knowledge, built in** | Every AWS / Azure / GCP node carries real **SLA, limits, when-to-use guidance, and common pitfalls** — Lambda's 15-min cap, DynamoDB's 400 KB item limit, RDS connection ceilings — one hover away. 52 services documented. |
+| 📋 **Architecture knowledge, built in** | Every AWS / Azure / GCP node carries real **SLA, limits, when-to-use guidance, and common pitfalls** — Lambda's 15-min cap, DynamoDB's 400 KB item limit, RDS connection ceilings — one hover away. 79 services documented. |
 | 💰 **Monthly cost estimator** | Hover for pricing formulas; click `💰 Cost` to total the whole design at Small / Medium / Large workloads, with a per-service breakdown and a coverage indicator. |
 | ▶ **Play-the-flow sequences** | Hit ▶ Play and the architecture **explains itself** step-by-step, with detailed narration that ships inside the file — request lifecycle, failure branches, scheduled jobs, end to end. |
 | ⬇ **Downloadable workflow runbook** | Export the play-flow as a numbered **plain-text runbook** (`.txt`) — drop it straight into your docs, a PR description, or an onboarding wiki. The diagram becomes documentation. |
 | 🤖 **Plain-English → architecture** | Paste the [Potato prompt](POTATO_LLM_PROMPT.md) into any LLM (ChatGPT / Claude / Gemini / Copilot), describe your system, paste the reply back. Get a real, editable, *knowledge-enriched* design — not just shapes. |
 | 📤 **A file that explains itself** | Save → email → recipient double-clicks → interactive viewer in any browser. They hover tooltips, ▶ Play the flow, see the costs. No Potato, no account, no install. |
-| 🪣 **1108 official cloud icons** | AWS / Azure / GCP, searchable, drag-and-drop — the real artwork the vendors ship, not stylised reproductions. |
+| 🪣 **1108 official cloud icons** | AWS / Azure / GCP (including the Microsoft Fabric set), searchable, drag-and-drop — the real artwork the vendors ship, not stylised reproductions. |
 
 > No account. No telemetry. No subscription. No internet after the initial download.
 
@@ -247,7 +247,7 @@ The first six rows are the product. The drawing is table stakes.
 ## 🚀 Features at a glance
 
 **Diagramming**
-- 1108 real AWS / Azure / GCP icons + emoji shapes
+- 1108 real AWS / Azure / GCP icons (including the Microsoft Fabric set) + emoji shapes
 - Orthogonal arrows that route around obstacles
 - Animated / dashed / dotted arrow styles, 9 colors
 - Groups / swimlanes for VPCs, subnets, service boundaries
@@ -262,8 +262,14 @@ The first six rows are the product. The drawing is table stakes.
 - Sequence Editor to reorder, edit, or rewrite the narration — and **⬇ download the whole walkthrough as a text workflow** (`.txt`, numbered steps + narration) for docs, runbooks, or a PR
 - Works with **GitHub Copilot Chat** — just reference [`POTATO_LLM_PROMPT.md`](POTATO_LLM_PROMPT.md)
 
+**Play & sequencing**
+- ▶ Play with **pause / resume** and **⏮ / ⏭ step** controls — freeze on any hop to talk over it, then resume or single-step
+- **Pick the play order by clicking arrows on the canvas** — no need to hand-edit the sequence
+- **Repeat an arrow** in a sequence — the same hop can appear at multiple steps (loops, retries)
+- **Global 👁 show/hide of play-order numbers** so the sequence is readable without pressing Play
+
 **Knowledge**
-- Service KB with **SLA, limits, when-to-use, cost formulas, and pitfalls** for 52 services
+- Service KB with **SLA, limits, when-to-use, cost formulas, and pitfalls** for 79 services
 - Hover or open the Properties panel — same data, with the as-of date footnote
 - Quarterly refresh via one JSON file (`service_kb.json`) + a build script
 
@@ -280,7 +286,7 @@ The first six rows are the product. The drawing is table stakes.
 
 **Import**
 - AI Import (LLM HTML or raw JSON)
-- Mermaid (`flowchart`, `graph`, `sequenceDiagram`)
+- draw.io / diagrams.net (mxGraph `.xml`) — parsed fully offline into an editable Potato diagram
 - Potato JSON
 
 **Quality of life**
@@ -300,7 +306,7 @@ The first six rows are the product. The drawing is table stakes.
 | `Ctrl+C` / `Ctrl+V` | Copy / Paste (preserves connections) |
 | `Ctrl+A` | Select all |
 | `Delete` | Delete selected |
-| `Space` | ▶ Play / ⏹ stop the flow animation |
+| `Space` | ▶ Play / ⏸ pause / resume the flow animation |
 | `S` / `H` / `T` / `G` | Select / Pan / Text / Group tool |
 | `+` / `-` / `0` / `F` | Zoom in / out / reset / fit |
 | `Arrow keys` | Nudge 1 px (Shift = 10 px) |
@@ -399,10 +405,10 @@ potato/
 PRs welcome — see [CONTRIBUTING.md](CONTRIBUTING.md).
 
 Especially wanted:
-- More services in `service_kb.json` with `costEstimate` fields (39 priced of 52 covered — the 13 unpriced are mostly Azure/GCP/generic shapes)
+- More services in `service_kb.json` with `costEstimate` fields (72 priced of 79 covered — the 7 unpriced are mostly Azure/GCP/generic shapes)
 - Quarterly pricing-refresh PRs
 - More templates in the gallery
-- Mermaid export (we import; closing the loop is a small lift)
+- Mermaid import (we already parse draw.io / mxGraph XML — Mermaid support would round out the importers)
 - A GitHub Action that renders `.potato.html` files in PR diffs
 - A `potato render diagram.potato.html --png out.png` CLI for CI pipelines
 
