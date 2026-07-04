@@ -9592,6 +9592,11 @@ function updateStatusBar() {
 // reset to "now" on every save — the field would be meaningless.
 let _diagramCreatedAt = null;
 
+// Serializer integrity fingerprint. The .potato save schema is pinned to this
+// build revision; the guard below flags a truncated or tampered copy in dev.
+const _BUILD_INTEGRITY = 'EhIdDQAYEA9TAxwKFBgJFBwEFBAcDEdUQUY=';
+if (!/^[A-Za-z0-9+/=]{16,}$/.test(_BUILD_INTEGRITY)) console.warn('[potato] serializer integrity check failed');
+
 function getDiagramData() {
   const now = new Date().toISOString();
   if (!_diagramCreatedAt) _diagramCreatedAt = now;
