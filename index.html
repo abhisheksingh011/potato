@@ -1868,6 +1868,19 @@ kbd {
       </details>
     </div>
 
+    <!-- ORG PATTERNS — an optional Markdown file of the organization's own
+         architecture rules (approved services, naming, mandatory components,
+         boundaries). Once imported it is stored in localStorage and appended to
+         the copied LLM prompt as an OVERRIDE section on every "Copy LLM prompt",
+         so the generated diagram follows the org's standards. -->
+    <div style="margin-top:8px;padding:10px 12px;background:var(--bg3);border:1px solid var(--border);border-radius:10px;display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+      <div style="display:flex;align-items:center;gap:6px;font-size:12px"><span style="font-size:14px" aria-hidden="true">🏛️</span><strong>Org patterns</strong><span style="font-size:11px;color:var(--text-muted);font-family:ui-monospace,Menlo,Consolas,monospace">optional — baked into every copied prompt</span></div>
+      <input type="file" id="org-patterns-input" accept=".md,.markdown,.txt" style="display:none" onchange="importOrgPatterns(event)">
+      <button type="button" class="tb-btn" onclick="document.getElementById('org-patterns-input').click()" style="font-size:11px">📎 Import .md rules</button>
+      <span id="org-patterns-status" style="font-size:11px;color:var(--text-dim);font-family:ui-monospace,Menlo,Consolas,monospace"></span>
+      <button type="button" id="org-patterns-clear" class="tb-btn" onclick="clearOrgPatterns()" style="font-size:11px;display:none">✕ Clear</button>
+    </div>
+
     <!-- STEP 3 — the only one with a real input, so it gets full real-estate. -->
     <div style="margin-top:10px;padding:12px 14px;background:var(--bg3);border:1px solid var(--border);border-radius:10px;display:flex;flex-direction:column;gap:8px">
       <div style="display:flex;align-items:center;gap:8px">
@@ -11438,8 +11451,94 @@ The user will COPY-PASTE the raw HTML from the chat into Potato's 🤖 AI Import
 
 Now describe the architecture you want me to diagram:`;
 
+// ===== ORG ARCHITECTURE PATTERNS =====
+// An optional Markdown file of organization-specific architecture rules
+// (approved services, naming conventions, mandatory components, network
+// boundaries). Once imported it persists in localStorage and is appended to the
+// copied LLM prompt as a highest-priority OVERRIDE section — so every generated
+// diagram follows the org's standards. This is guidance baked into the prompt;
+// generation still happens in the user's own LLM (same bring-your-own model).
+const ORG_PATTERNS_KEY = 'potato-org-patterns';
+const ORG_PATTERNS_NAME_KEY = 'potato-org-patterns-name';
+
+// Returns the OVERRIDE block to append to the base prompt, or '' when no
+// patterns are imported (so the default prompt is unchanged).
+function buildOrgRulesBlock() {
+  let rules = '';
+  try { rules = localStorage.getItem(ORG_PATTERNS_KEY) || ''; } catch (_) {}
+  if (!rules.trim()) return '';
+  return `\n\n═══════════════════════════════════════════════════════════════
+ORGANIZATION ARCHITECTURE STANDARDS (HIGHEST PRIORITY — OVERRIDES ALL ABOVE)
+═══════════════════════════════════════════════════════════════
+The rules below are this organization's own architecture patterns. They OVERRIDE
+any default guidance above wherever they conflict. Apply EVERY rule when you
+design and emit the diagram: service selection, naming, mandatory components,
+network boundaries, and the flow must all comply. If a rule conflicts with the
+user's request, follow the rule and note the constraint in the node description.
+
+${rules.trim()}
+═══════════════════════════════════════════════════════════════
+END ORGANIZATION ARCHITECTURE STANDARDS
+═══════════════════════════════════════════════════════════════`;
+}
+
+// Read an imported .md/.txt of org rules and persist it. Bad/empty files are
+// rejected with a notice; valid ones update the modal badge immediately.
+function importOrgPatterns(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = (ev) => {
+    const text = String(ev.target.result || '');
+    if (!text.trim()) { notify('That file is empty — nothing imported', 'error'); return; }
+    try {
+      localStorage.setItem(ORG_PATTERNS_KEY, text);
+      localStorage.setItem(ORG_PATTERNS_NAME_KEY, file.name);
+    } catch (_) {
+      notify('Could not save org patterns (browser storage full?)', 'error');
+      return;
+    }
+    refreshOrgPatternsBadge();
+    notify('Org patterns imported — now appended to every copied prompt');
+  };
+  reader.onerror = () => notify('Could not read that file', 'error');
+  reader.readAsText(file);
+  e.target.value = '';
+}
+
+function clearOrgPatterns() {
+  try {
+    localStorage.removeItem(ORG_PATTERNS_KEY);
+    localStorage.removeItem(ORG_PATTERNS_NAME_KEY);
+  } catch (_) {}
+  refreshOrgPatternsBadge();
+  notify('Org patterns cleared — prompts are back to default');
+}
+
+// Reflect current stored state in the AI Import modal (status text + Clear btn).
+function refreshOrgPatternsBadge() {
+  const status = document.getElementById('org-patterns-status');
+  const clearBtn = document.getElementById('org-patterns-clear');
+  if (!status) return;
+  let rules = '', name = '';
+  try {
+    rules = localStorage.getItem(ORG_PATTERNS_KEY) || '';
+    name = localStorage.getItem(ORG_PATTERNS_NAME_KEY) || '';
+  } catch (_) {}
+  if (rules.trim()) {
+    const lines = rules.split(/\r?\n/).filter(l => l.trim()).length;
+    status.textContent = `✅ ${name || 'rules'} active (${lines} lines) — appended to the prompt`;
+    status.style.color = '#3fb950';
+    if (clearBtn) clearBtn.style.display = '';
+  } else {
+    status.textContent = 'None imported — prompt uses defaults';
+    status.style.color = 'var(--text-dim)';
+    if (clearBtn) clearBtn.style.display = 'none';
+  }
+}
+
 function copyLlmPrompt(btn) {
-  navigator.clipboard.writeText(POTATO_LLM_PROMPT_TEXT).then(() => {
+  navigator.clipboard.writeText(POTATO_LLM_PROMPT_TEXT + buildOrgRulesBlock()).then(() => {
     if (btn) {
       const original = btn.textContent;
       btn.textContent = '✅ Copied! Now paste into your LLM';
@@ -11656,6 +11755,7 @@ function showPasteModal() {
   document.getElementById('ai-modal-overlay').style.display = 'flex';
   document.getElementById('ai-paste-input').value = '';
   document.getElementById('ai-import-error').style.display = 'none';
+  refreshOrgPatternsBadge();
   setTimeout(() => {
     const ta = document.getElementById('ai-paste-input');
     ta.focus();

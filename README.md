@@ -97,6 +97,12 @@ Click the green **📋 Copy LLM prompt** button.
 
 This copies Potato's Principal Cloud Architect prompt to your clipboard — a detailed set of instructions that tells any LLM exactly how to produce a valid Potato diagram: schemas, icon paths, layout rules, colour themes, and playFlow narration style. You only copy it once per session.
 
+#### 🏛️ Optional — bake in your organization's architecture patterns
+
+Every organization has its own standards: approved services, naming conventions, mandatory components (central logging, a WAF front door), forbidden choices. In the AI Import panel, click **📎 Import .md rules** and pick a Markdown/text file listing those rules — for example [`examples/org-patterns.example.md`](examples/org-patterns.example.md).
+
+Once imported, the rules are stored in your browser and **appended to the prompt as a highest-priority OVERRIDE section every time you click Copy LLM prompt** — so every diagram the LLM generates follows your organization's standards without you re-typing them. A green badge shows the file is active; **✕ Clear** removes it. Write one rule per line; plain imperative sentences work best.
+
 ---
 
 ### Step 3 — Paste the prompt into any LLM and describe your architecture
