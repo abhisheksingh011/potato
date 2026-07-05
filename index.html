@@ -11482,6 +11482,26 @@ END ORGANIZATION ARCHITECTURE STANDARDS
 ═══════════════════════════════════════════════════════════════`;
 }
 
+// The base prompt ends with this line so the user knows where to type/paste
+// their architecture. When org rules are present they must be inserted BEFORE
+// this line, not after it — otherwise the "type your architecture here" cue
+// gets buried in the middle of the copied text. This helper always keeps the
+// trailer as the final line of the assembled prompt.
+const LLM_PROMPT_TRAILER = 'Now describe the architecture you want me to diagram:';
+
+function composeLlmPrompt() {
+  const org = buildOrgRulesBlock();
+  if (!org) return POTATO_LLM_PROMPT_TEXT;
+  if (POTATO_LLM_PROMPT_TEXT.endsWith(LLM_PROMPT_TRAILER)) {
+    const base = POTATO_LLM_PROMPT_TEXT
+      .slice(0, POTATO_LLM_PROMPT_TEXT.length - LLM_PROMPT_TRAILER.length)
+      .replace(/\s+$/, '');
+    return base + org + '\n\n' + LLM_PROMPT_TRAILER;
+  }
+  // Fallback: trailer not found (prompt edited) — append org block at the end.
+  return POTATO_LLM_PROMPT_TEXT + org;
+}
+
 // Read an imported .md/.txt of org rules and persist it. Bad/empty files are
 // rejected with a notice; valid ones update the modal badge immediately.
 function importOrgPatterns(e) {
@@ -11538,7 +11558,7 @@ function refreshOrgPatternsBadge() {
 }
 
 function copyLlmPrompt(btn) {
-  navigator.clipboard.writeText(POTATO_LLM_PROMPT_TEXT + buildOrgRulesBlock()).then(() => {
+  navigator.clipboard.writeText(composeLlmPrompt()).then(() => {
     if (btn) {
       const original = btn.textContent;
       btn.textContent = '✅ Copied! Now paste into your LLM';
