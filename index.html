@@ -943,6 +943,22 @@ g.arrow-selected .arrow-waypoint-handle { opacity: 1; pointer-events: all; }
 }
 .node-link-badge:hover { background: rgba(123,47,190,1); transform: scale(1.12); }
 
+/* Same hyperlink badge for a container box; sits just left of the ✕ delete. */
+.group-link-badge {
+  position: absolute;
+  top: 6px; right: 32px;
+  width: 18px; height: 18px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 10px; line-height: 1;
+  background: rgba(123,47,190,0.92);
+  border-radius: 50%;
+  cursor: pointer;
+  z-index: 20;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.4);
+  user-select: none;
+}
+.group-link-badge:hover { background: rgba(123,47,190,1); transform: scale(1.12); }
+
 /* ===== RIGHT PROPERTIES PANEL ===== */
 #props-panel {
   width: var(--props-w);
@@ -2023,6 +2039,7 @@ let _showSeqBadges = (() => { try { return localStorage.getItem('potato.seqBadge
 let selectedIds = new Set();
 let selectedArrow = null;
 let selectedGroup = null;
+let selectedGroups = new Set(); // multi-select of container boxes (marquee / Ctrl+A / bulk drag)
 let currentTool = 'select';
 let zoom = 1;
 let panX = 100, panY = 60;
@@ -5853,6 +5870,25 @@ function _nodeLinkBadgeSvg(n, ox, oy) {
   const nw = el ? el.offsetWidth : (+n.w || 160);
   return _svgLinkBadge(n.x + ox + nw - 6, n.y + oy + 6, n.url);
 }
+// (Re)draw the 🔗 badge on a container box's live DOM element.
+function renderGroupLinkBadge(el, grp) {
+  const existing = el.querySelector('.group-link-badge');
+  if (existing) existing.remove();
+  if (!grp.url || !String(grp.url).trim()) return;
+  const b = document.createElement('div');
+  b.className = 'group-link-badge';
+  b.textContent = '🔗';
+  b.title = 'pattern link';
+  b.setAttribute('aria-label', 'pattern link');
+  b.addEventListener('pointerdown', (e) => { e.stopPropagation(); });
+  b.addEventListener('click', (e) => { e.stopPropagation(); e.preventDefault(); openObjectLink(grp.url); });
+  el.appendChild(b);
+}
+// Export badge for a container box, tucked inside its top-right corner.
+function _groupLinkBadgeSvg(g, ox, oy) {
+  if (!g.url || !String(g.url).trim()) return '';
+  return _svgLinkBadge(g.x + ox + g.w - 12, g.y + oy + 12, g.url);
+}
 
 function renderNode(node) {
   let el = document.getElementById('node-' + node.id);
@@ -6144,6 +6180,12 @@ function handleNodeMouseDown(id, e) {
     const n = getNode(sid);
     if (n) dragOffsets[sid] = { ox: n.x, oy: n.y };
   });
+  // Any container boxes in the selection ride along with the nodes.
+  const dragGroupOffsets = {};
+  selectedGroups.forEach(gid => {
+    const g = groups.find(x => x.id === gid);
+    if (g) dragGroupOffsets[gid] = { ox: g.x, oy: g.y };
+  });
 
   const onMove = (e2) => {
     const dx = (e2.clientX - dragStartX) / zoom;
@@ -6157,6 +6199,15 @@ function handleNodeMouseDown(id, e) {
           n.y = snap(Math.round(dragOffsets[sid].oy + dy));
           const el = document.getElementById('node-' + sid);
           if (el) { el.style.left = n.x + 'px'; el.style.top = n.y + 'px'; el.classList.add('dragging'); }
+        }
+      });
+      selectedGroups.forEach(gid => {
+        const g = groups.find(x => x.id === gid);
+        if (g && dragGroupOffsets[gid]) {
+          g.x = snap(Math.round(dragGroupOffsets[gid].ox + dx));
+          g.y = snap(Math.round(dragGroupOffsets[gid].oy + dy));
+          const gel = document.getElementById('grp-' + gid);
+          if (gel) { gel.style.left = g.x + 'px'; gel.style.top = g.y + 'px'; }
         }
       });
       redrawArrows();
@@ -6249,12 +6300,10 @@ function selectNode(id, add = true) {
   const el = document.getElementById('node-' + id);
   if (el) el.classList.add('selected');
   selectedArrow = null;
-  // A node selection supersedes any selected container box.
-  if (selectedGroup) {
-    const gel = document.getElementById('grp-' + selectedGroup);
-    if (gel) gel.classList.remove('selected');
-    selectedGroup = null;
-  }
+  // A node click supersedes a SINGLE selected box for the props panel, but the
+  // multi-select box set (selectedGroups) is left intact so a bulk drag started
+  // from a node still carries the boxes along.
+  selectedGroup = null;
   updatePropsPanel();
 }
 
@@ -6269,7 +6318,12 @@ function clearSelection() {
   arrowsSvg.querySelectorAll('.arrow-path').forEach(a => a.classList.remove('selected'));
   arrowsSvg.querySelectorAll('g.arrow-selected').forEach(g => g.classList.remove('arrow-selected'));
   clearEndpointHandles();
-  // deselect groups
+  // deselect groups — both the single pointer and the multi-select set
+  selectedGroups.forEach(gid => {
+    const gel = document.getElementById('grp-' + gid);
+    if (gel) gel.classList.remove('selected');
+  });
+  selectedGroups.clear();
   if (selectedGroup) {
     const gel = document.getElementById('grp-' + selectedGroup);
     if (gel) gel.classList.remove('selected');
@@ -6283,6 +6337,8 @@ function clearSelection() {
 function selectGroup(id) {
   clearSelection();
   selectedGroup = id;
+  selectedGroups.clear();
+  selectedGroups.add(id);
   const gel = document.getElementById('grp-' + id);
   if (gel) gel.classList.add('selected');
   updatePropsPanel();
@@ -6294,6 +6350,7 @@ function deleteGroup(id) {
   const gel = document.getElementById('grp-' + id);
   if (gel) gel.parentNode.removeChild(gel);
   if (selectedGroup === id) selectedGroup = null;
+  selectedGroups.delete(id);
   markDirty();
   updateStatusBar();
   showPropsEmpty();
@@ -7687,6 +7744,14 @@ function setupEventListeners() {
             el.classList.add('selected');
           }
         });
+        // Container boxes whose rectangle overlaps the marquee are selected too.
+        groups.forEach(g => {
+          if (g.x < rx2 && g.x + g.w > rx1 && g.y < ry2 && g.y + g.h > ry1) {
+            selectedGroups.add(g.id);
+            const gel = document.getElementById('grp-' + g.id);
+            if (gel) gel.classList.add('selected');
+          }
+        });
         updatePropsPanel();
       }
     }
@@ -7804,19 +7869,24 @@ function setupEventListeners() {
 }
 
 function nudgeSelected(dx, dy) {
-  if (!selectedIds.size) return;
+  if (!selectedIds.size && !selectedGroups.size) return;
   pushHistory();
   selectedIds.forEach(id => {
     const n = getNode(id);
     if (n) { n.x += dx; n.y += dy; renderNode(n); }
+  });
+  selectedGroups.forEach(gid => {
+    const g = groups.find(x => x.id === gid);
+    if (g) { g.x += dx; g.y += dy; renderGroup(g); }
   });
   redrawArrows();
   markDirty();
 }
 
 function selectAll() {
-  if (!nodes.length) { notify('Nothing on the canvas yet', 'info'); return; }
+  if (!nodes.length && !groups.length) { notify('Nothing on the canvas yet', 'info'); return; }
   selectedArrow = null;
+  selectedGroup = null;
   clearEndpointHandles();
   arrowsSvg.querySelectorAll('.arrow-path').forEach(a => a.classList.remove('selected'));
   nodes.forEach(n => {
@@ -7825,8 +7895,17 @@ function selectAll() {
     if (!el) { renderNode(n); el = document.getElementById('node-' + n.id); }
     if (el) el.classList.add('selected');
   });
+  groups.forEach(g => {
+    selectedGroups.add(g.id);
+    let gel = document.getElementById('grp-' + g.id);
+    if (!gel) { renderGroup(g); gel = document.getElementById('grp-' + g.id); }
+    if (gel) gel.classList.add('selected');
+  });
   updatePropsPanel();
-  notify(`Selected ${nodes.length} node${nodes.length !== 1 ? 's' : ''}`);
+  const parts = [];
+  if (nodes.length)  parts.push(`${nodes.length} node${nodes.length !== 1 ? 's' : ''}`);
+  if (groups.length) parts.push(`${groups.length} box${groups.length !== 1 ? 'es' : ''}`);
+  notify(`Selected ${parts.join(' + ')}`);
 }
 
 // ===== TOOLS =====
@@ -7977,7 +8056,7 @@ function renderGroup(grp) {
   el.style.setProperty('--group-border', `rgba(${rgb},0.6)`);
   el.style.setProperty('--group-bg', grp.transparent ? 'transparent' : `rgba(${rgb},0.07)`);
 
-  el.classList.toggle('selected', selectedGroup === grp.id);
+  el.classList.toggle('selected', selectedGroup === grp.id || selectedGroups.has(grp.id));
 
   const safeGid = escHtml(grp.id);
   el.innerHTML = `
@@ -8022,15 +8101,34 @@ function renderGroup(grp) {
       if (lblEl && lblEl.contentEditable === 'true') return;
       e.stopPropagation();
       let moved = false;
-      const sx = e.clientX, sy = e.clientY, gox = grp.x, goy = grp.y;
+      const sx = e.clientX, sy = e.clientY;
+      // If this box belongs to a multi-selection, drag the whole selection
+      // (nodes + boxes) together; otherwise just this one box.
+      const multi = selectedGroups.has(grp.id) && (selectedGroups.size + selectedIds.size > 1);
+      const gBase = {}, nBase = {};
+      if (multi) {
+        selectedGroups.forEach(gid => { const g = groups.find(x => x.id === gid); if (g) gBase[gid] = { ox: g.x, oy: g.y }; });
+        selectedIds.forEach(nid => { const n = getNode(nid); if (n) nBase[nid] = { ox: n.x, oy: n.y }; });
+      } else {
+        gBase[grp.id] = { ox: grp.x, oy: grp.y };
+      }
       const onMove = (e2) => {
         const dx = (e2.clientX - sx) / zoom;
         const dy = (e2.clientY - sy) / zoom;
         if (!moved && (Math.abs(dx) > 2 || Math.abs(dy) > 2)) { pushHistory(); moved = true; }
-        grp.x = gox + dx;
-        grp.y = goy + dy;
-        el.style.left = grp.x + 'px';
-        el.style.top = grp.y + 'px';
+        for (const gid in gBase) {
+          const g = groups.find(x => x.id === gid); if (!g) continue;
+          g.x = gBase[gid].ox + dx; g.y = gBase[gid].oy + dy;
+          const gel = document.getElementById('grp-' + gid);
+          if (gel) { gel.style.left = g.x + 'px'; gel.style.top = g.y + 'px'; }
+        }
+        for (const nid in nBase) {
+          const n = getNode(nid); if (!n) continue;
+          n.x = nBase[nid].ox + dx; n.y = nBase[nid].oy + dy;
+          const nel = document.getElementById('node-' + nid);
+          if (nel) { nel.style.left = n.x + 'px'; nel.style.top = n.y + 'px'; }
+        }
+        if (Object.keys(nBase).length) redrawArrows();
       };
       const onUp = () => {
         if (moved) markDirty();
@@ -8070,6 +8168,7 @@ function renderGroup(grp) {
   // clicks on nodes/arrows inside the group reach them. The label above
   // handles group dragging; .group-resize handles resize. Nothing else to
   // wire on the root element.
+  renderGroupLinkBadge(el, grp);
 }
 
 function updateGroupLabel(id, text) {
@@ -8093,7 +8192,7 @@ function updateGroupStyle(id, key, val) {
   if (!g) return;
   g[key] = val;
   renderGroup(g);
-  if (selectedGroup === id) renderGroupProps(g);
+  if (selectedGroup === id || selectedGroups.has(id)) renderGroupProps(g);
   markDirty();
 }
 
@@ -8118,6 +8217,12 @@ function renderGroupProps(grp) {
           Bold label
         </label>
       </div>
+    </div>
+
+    <div class="prop-group">
+      <div class="prop-group-title">🔗 Link URL</div>
+      <div style="font-size:10px;color:var(--text-dim);margin-bottom:6px;font-family:var(--font-mono);">Adds a 🔗 badge (hover: "pattern link"). Opens in a new tab. The URL is never drawn on the box.</div>
+      <input class="prop-input" style="width:100%" value="${escHtml(grp.url||'')}" oninput="updateGroupProp('${grp.id}','url',this.value)" placeholder="https://…">
     </div>
 
     <div class="prop-group">
@@ -8174,20 +8279,26 @@ function updatePropsPanel() {
     return;
   }
 
-  if (selectedGroup) {
-    const grp = groups.find(g => g.id === selectedGroup);
+  const _totalSel = selectedIds.size + selectedGroups.size;
+
+  // A single container box (whether clicked or marquee'd) shows its own editor.
+  if (_totalSel === 1 && selectedGroups.size === 1 && !selectedIds.size) {
+    const grp = groups.find(g => g.id === (selectedGroup || [...selectedGroups][0]));
     if (!grp) { showPropsEmpty(); return; }
     renderGroupProps(grp);
     return;
   }
 
-  if (!selectedIds.size) { showPropsEmpty(); return; }
+  if (!_totalSel) { showPropsEmpty(); return; }
 
-  if (selectedIds.size > 1) {
+  if (_totalSel > 1) {
+    const parts = [];
+    if (selectedIds.size)    parts.push(`${selectedIds.size} node${selectedIds.size !== 1 ? 's' : ''}`);
+    if (selectedGroups.size) parts.push(`${selectedGroups.size} box${selectedGroups.size !== 1 ? 'es' : ''}`);
     content.innerHTML = `
       <div class="prop-group">
         <div class="prop-group-title">Multi-Selection</div>
-        <p style="font-size:12px; color:var(--text-muted)">${selectedIds.size} nodes selected</p>
+        <p style="font-size:12px; color:var(--text-muted)">${parts.join(' + ')} selected</p>
       </div>
       <div class="prop-group">
         <button class="prop-btn danger" onclick="deleteSelected()">🗑️ Delete All Selected</button>
@@ -8652,7 +8763,7 @@ function deleteArrow(id) {
 
 // ===== DELETE =====
 function confirmDeleteSelected() {
-  const count = selectedIds.size + (selectedArrow ? 1 : 0) + (selectedGroup ? 1 : 0);
+  const count = selectedIds.size + (selectedArrow ? 1 : 0) + selectedGroups.size;
   if (count >= 5) {
     if (!confirm('Delete ' + count + ' items? (Ctrl+Z to undo)')) return;
   }
@@ -8660,9 +8771,10 @@ function confirmDeleteSelected() {
 }
 
 function deleteSelected() {
-  if (selectedGroup && !selectedIds.size && !selectedArrow) { deleteGroup(selectedGroup); return; }
-  if (selectedArrow && !selectedIds.size) { deleteArrow(selectedArrow); return; }
-  if (!selectedIds.size) return;
+  // Single-item fast paths keep their existing behavior.
+  if (selectedGroup && selectedGroups.size <= 1 && !selectedIds.size && !selectedArrow) { deleteGroup(selectedGroup); return; }
+  if (selectedArrow && !selectedIds.size && !selectedGroups.size) { deleteArrow(selectedArrow); return; }
+  if (!selectedIds.size && !selectedGroups.size) return;
   pushHistory();
   selectedIds.forEach(id => {
     nodes = nodes.filter(n => n.id !== id);
@@ -8672,11 +8784,19 @@ function deleteSelected() {
     arrows.filter(a => a.from === id || a.to === id).forEach(a => removeArrowDom(a.id));
     arrows = arrows.filter(a => a.from !== id && a.to !== id);
   });
+  // Delete any selected container boxes (nodes inside are independent).
+  selectedGroups.forEach(gid => {
+    groups = groups.filter(g => g.id !== gid);
+    const gel = document.getElementById('grp-' + gid);
+    if (gel && gel.parentNode) gel.parentNode.removeChild(gel);
+  });
   // Drop any playFlow steps that reference removed arrows; keep free-form
   // (connection-less) steps.
   const keepIds = new Set(arrows.map(a => a.id));
   playFlow = playFlow.filter(s => !s.arrow || keepIds.has(s.arrow));
   selectedIds.clear();
+  selectedGroups.clear();
+  selectedGroup = null;
   selectedArrow = null;
   clearEndpointHandles();
   markDirty();
@@ -8691,10 +8811,9 @@ function copySelected() {
   const idSet = new Set(selectedIds);
   const copiedNodes  = [...idSet].map(id => getNode(id)).filter(Boolean).map(n => ({ ...n }));
   const copiedArrows = arrows.filter(a => idSet.has(a.from) && idSet.has(a.to)).map(a => ({ ...a }));
-  // Also copy a selected container box (including AI-imported Region/AZ boxes),
-  // so it can be pasted as a new box.
-  const selGroup = selectedGroup ? groups.find(g => g.id === selectedGroup) : null;
-  const copiedGroups = selGroup ? [{ ...selGroup }] : [];
+  // Also copy any selected container boxes (including AI-imported Region/AZ
+  // boxes), so they can be pasted as new boxes.
+  const copiedGroups = [...selectedGroups].map(gid => groups.find(g => g.id === gid)).filter(Boolean).map(g => ({ ...g }));
   if (!copiedNodes.length && !copiedGroups.length) return;
   clipboard = { nodes: copiedNodes, arrows: copiedArrows, groups: copiedGroups };
 
@@ -8809,6 +8928,7 @@ function restoreState(state) {
   selectedIds.clear();
   selectedArrow = null;
   selectedGroup = null;
+  selectedGroups.clear();
   // Clear DOM
   canvasViewport.querySelectorAll('.node').forEach(el => el.remove());
   canvasViewport.querySelectorAll('.group-node').forEach(el => el.remove());
@@ -10600,6 +10720,7 @@ async function buildDiagramSVG(theme = 'dark') {
     svg += `  <rect class="potato-group-rect" x="${g.x+ox}" y="${g.y+oy}" width="${g.w}" height="${g.h}" rx="12" fill="${gfill}" stroke="${col}" stroke-width="1.5" stroke-dasharray="6,4" opacity="0.7"/>
   <text x="${g.x+ox+12}" y="${g.y+oy+22}" class="grp-label" style="${g.fontSize ? `font-size:${g.fontSize}px;` : ''}${g.bold === false ? 'font-weight:400;' : ''}">${escHtml((g.label||'').toUpperCase())}</text>
 `;
+    svg += _groupLinkBadgeSvg(g, ox, oy);
   });
 
   // Render one node to an SVG string. Extracted so we can paint nodes in two
@@ -11299,6 +11420,7 @@ function loadDiagramData(data) {
   selectedIds.clear();
   selectedArrow = null;
   selectedGroup = null;
+  selectedGroups.clear();
   // Clear
   canvasViewport.querySelectorAll('.node').forEach(el => el.remove());
   canvasViewport.querySelectorAll('.group-node').forEach(el => el.remove());
@@ -11317,7 +11439,7 @@ function newDiagram() {
     if (!confirm('Discard unsaved changes and start a new diagram?')) return;
   }
   nodes = []; arrows = []; groups = []; playFlow = [];
-  selectedIds.clear(); selectedArrow = null; selectedGroup = null;
+  selectedIds.clear(); selectedArrow = null; selectedGroup = null; selectedGroups.clear();
   historyStack = []; redoStack = [];
   _diagramCreatedAt = null;
   arrowLabelScale = 1; updateArrowScaleLabel();
@@ -11541,7 +11663,7 @@ function updatePropsToggleBtn() {
   const btn = document.getElementById('btn-props-toggle');
   if (!btn) return;
   const open = !propsPanel.classList.contains('hidden');
-  const hasSelection = !!selectedArrow || !!selectedGroup || selectedIds.size > 0;
+  const hasSelection = !!selectedArrow || !!selectedGroup || selectedIds.size > 0 || selectedGroups.size > 0;
   btn.classList.toggle('active', open);
   btn.classList.toggle('attention', hasSelection && !open);
   btn.setAttribute('aria-pressed', open ? 'true' : 'false');
