@@ -926,6 +926,23 @@ g.arrow-selected .arrow-waypoint-handle { opacity: 1; pointer-events: all; }
   z-index: 500;
 }
 
+/* Per-object hyperlink badge ("pattern link"). Shown on any node/shape that
+   carries a `url`; opens it in a new tab. The URL text is never drawn. */
+.node-link-badge {
+  position: absolute;
+  top: 3px; right: 3px;
+  width: 18px; height: 18px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 10px; line-height: 1;
+  background: rgba(123,47,190,0.92);
+  border-radius: 50%;
+  cursor: pointer;
+  z-index: 20;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.4);
+  user-select: none;
+}
+.node-link-badge:hover { background: rgba(123,47,190,1); transform: scale(1.12); }
+
 /* ===== RIGHT PROPERTIES PANEL ===== */
 #props-panel {
   width: var(--props-w);
@@ -5788,6 +5805,55 @@ function exportShapeGeom(kind, x, y, w, h, col, fillOverride, strokeW) {
 }
 
 // ===== RENDER NODE =====
+// ===== OBJECT HYPERLINKS ("pattern link") =====
+// Any node or arrow may carry an optional `url`. It's shown only as a small 🔗
+// badge (never the raw URL text), titled "pattern link" on hover, and opens in
+// a new browser tab on click — both in the editor and in the saved standalone
+// HTML (where the badge is emitted as a native SVG <a target="_blank">).
+function normalizeUrl(url) {
+  const u = String(url || '').trim();
+  if (!u) return '';
+  if (/^(https?:|mailto:|tel:|\/|#)/i.test(u)) return u;
+  // A bare host like "wiki.acme.com/page" gets https:// so it opens externally.
+  if (/^[\w.-]+\.[a-z]{2,}(\/|$|:|\?)/i.test(u)) return 'https://' + u;
+  return u;
+}
+function openObjectLink(url) {
+  const u = normalizeUrl(url);
+  if (u) window.open(u, '_blank', 'noopener,noreferrer');
+}
+// (Re)draw the corner 🔗 badge on a node's live DOM element.
+function renderNodeLinkBadge(el, node) {
+  const existing = el.querySelector('.node-link-badge');
+  if (existing) existing.remove();
+  if (!node.url || !String(node.url).trim()) return;
+  const b = document.createElement('div');
+  b.className = 'node-link-badge';
+  b.textContent = '🔗';
+  b.title = 'pattern link';
+  b.setAttribute('aria-label', 'pattern link');
+  // Swallow pointerdown so the badge never starts a node drag / selection.
+  b.addEventListener('pointerdown', (e) => { e.stopPropagation(); });
+  b.addEventListener('click', (e) => { e.stopPropagation(); e.preventDefault(); openObjectLink(node.url); });
+  el.appendChild(b);
+}
+// A native, clickable SVG link badge for exports + the saved viewer. The <a>
+// opens in a new tab; the <title> gives the "pattern link" hover tooltip.
+function _svgLinkBadge(cx, cy, url) {
+  const safe = escHtml(normalizeUrl(url));
+  return `<a href="${safe}" target="_blank" rel="noopener noreferrer" style="cursor:pointer"><title>pattern link</title>` +
+    `<circle cx="${cx.toFixed(1)}" cy="${cy.toFixed(1)}" r="8.5" fill="rgba(123,47,190,0.92)" stroke="#0d0f1a" stroke-width="1.5"/>` +
+    `<text x="${cx.toFixed(1)}" y="${(cy + 0.5).toFixed(1)}" text-anchor="middle" dominant-baseline="central" style="font-size:9px">🔗</text></a>`;
+}
+// The export badge for a node, positioned at its top-right corner (or '' when
+// the node has no link).
+function _nodeLinkBadgeSvg(n, ox, oy) {
+  if (!n.url || !String(n.url).trim()) return '';
+  const el = document.getElementById('node-' + n.id);
+  const nw = el ? el.offsetWidth : (+n.w || 160);
+  return _svgLinkBadge(n.x + ox + nw - 6, n.y + oy + 6, n.url);
+}
+
 function renderNode(node) {
   let el = document.getElementById('node-' + node.id);
   let isNew = false;
@@ -5862,6 +5928,7 @@ function renderNode(node) {
     bindNodeInnerEvents(el, node);
     if (isNew) bindNodeRootEvents(el, node);
     applyNodeCustomStyle(el, node);
+    renderNodeLinkBadge(el, node);
     return;
   }
 
@@ -5886,6 +5953,7 @@ function renderNode(node) {
   // Root listeners only attach once per element.
   if (isNew) bindNodeRootEvents(el, node);
   applyNodeCustomStyle(el, node);
+  renderNodeLinkBadge(el, node);
 }
 
 function isDarkTheme() {
@@ -6767,6 +6835,32 @@ function drawArrow(arrow) {
     num.textContent = txt;
     badge.appendChild(num);
     g.appendChild(badge);
+  }
+
+  // Link badge: a small 🔗 marker (hover: "pattern link") that opens the
+  // arrow's URL in a new tab. Sits just off the route midpoint.
+  g.querySelectorAll('.arrow-link-badge').forEach(el => el.remove());
+  if (arrow.url && String(arrow.url).trim()) {
+    const SVGNS = 'http://www.w3.org/2000/svg';
+    const lx = mid.x + 16, ly = mid.y + 14;
+    const lb = document.createElementNS(SVGNS, 'g');
+    lb.setAttribute('class', 'arrow-link-badge');
+    lb.style.cursor = 'pointer';
+    const title = document.createElementNS(SVGNS, 'title');
+    title.textContent = 'pattern link';
+    lb.appendChild(title);
+    const circ = document.createElementNS(SVGNS, 'circle');
+    circ.setAttribute('cx', lx); circ.setAttribute('cy', ly); circ.setAttribute('r', '9');
+    circ.setAttribute('fill', 'rgba(123,47,190,0.92)'); circ.setAttribute('stroke', 'var(--bg)'); circ.setAttribute('stroke-width', '1.5');
+    lb.appendChild(circ);
+    const t = document.createElementNS(SVGNS, 'text');
+    t.setAttribute('x', lx); t.setAttribute('y', ly + 0.5);
+    t.setAttribute('text-anchor', 'middle'); t.setAttribute('dominant-baseline', 'central');
+    t.setAttribute('font-size', '10'); t.textContent = '🔗';
+    lb.appendChild(t);
+    lb.addEventListener('pointerdown', (e) => { e.stopPropagation(); });
+    lb.addEventListener('click', (e) => { e.stopPropagation(); e.preventDefault(); openObjectLink(arrow.url); });
+    g.appendChild(lb);
   }
 }
 
@@ -8156,6 +8250,12 @@ function updatePropsPanel() {
     </div>
 
     <div class="prop-group">
+      <div class="prop-group-title">🔗 Link URL</div>
+      <div style="font-size:10px;color:var(--text-dim);margin-bottom:6px;font-family:var(--font-mono);">Adds a 🔗 badge (hover: "pattern link"). Opens in a new tab. The URL is never drawn on the diagram.</div>
+      <input class="prop-input" style="width:100%" value="${escHtml(node.url||'')}" oninput="updateNodeProp('${id}','url',this.value)" placeholder="https://…">
+    </div>
+
+    <div class="prop-group">
       <div class="prop-group-title">Position & Size</div>
       <div class="prop-row">
         <span class="prop-label">X</span>
@@ -8351,6 +8451,11 @@ function renderArrowProps(arrow) {
       </div>
     </div>
     <div class="prop-group">
+      <div class="prop-group-title">🔗 Link URL</div>
+      <div style="font-size:10px;color:var(--text-dim);margin-bottom:6px;font-family:var(--font-mono);">Adds a 🔗 badge (hover: "pattern link"). Opens in a new tab.</div>
+      <input class="prop-input" style="width:100%" value="${escHtml(arrow.url||'')}" oninput="updateArrowUrl('${arrow.id}',this.value)" placeholder="https://…">
+    </div>
+    <div class="prop-group">
       <button class="prop-btn danger" onclick="deleteArrow('${arrow.id}')">🗑️ Delete Connection</button>
     </div>`;
 }
@@ -8459,6 +8564,18 @@ function clearNodeIconUrl(id) {
   markDirty();
   updatePropsPanel();
   closeIconPicker();
+}
+
+// Link URL gets its own setter (not updateArrowProp): updateArrowProp calls
+// updatePropsPanel() on every change, which would re-render the panel and steal
+// focus mid-typing. This only redraws the arrow so the URL field stays usable.
+function updateArrowUrl(id, val) {
+  const a = arrows.find(a => a.id === id);
+  if (!a) return;
+  pushHistoryDebounced();
+  a.url = val;
+  drawArrow(a);
+  markDirty();
 }
 
 function updateArrowProp(id, key, val) {
@@ -10593,7 +10710,7 @@ ${n.sublabel ? `    <text x="${nx+12}" y="${subY.toFixed(1)}" class="node-sub">$
   // nodes keep insertion order so a later icon stays above an earlier box.
   const _sortedNodes = [...nodes].sort((a, b) => _zOf(a) - _zOf(b));
   // Below the arrows: nodes sent to back (negative zIndex) paint first.
-  _sortedNodes.filter(n => _zOf(n) < 0).forEach(n => { svg += _renderNodeSvg(n); });
+  _sortedNodes.filter(n => _zOf(n) < 0).forEach(n => { svg += _renderNodeSvg(n) + _nodeLinkBadgeSvg(n, ox, oy); });
 
   const arrowLabels = [];  // deferred so we can de-overlap before drawing
   const seqBadges = [];    // deferred sequence-order chips (drawn on top of lines)
@@ -10652,6 +10769,10 @@ ${n.sublabel ? `    <text x="${nx+12}" y="${subY.toFixed(1)}" class="node-sub">$
     const op = a.darker ? 1 : 0.75;
     svg += `  <path class="potato-arrow" data-arrow-id="${escHtml(a.id)}" data-arrow-color="${arrColor}" d="${dStr}" fill="none" stroke="${stroke}" stroke-width="${sw}" ${dashArr} ${endMarker} ${startMarker} opacity="${op}"/>
 `;
+    if (a.url && String(a.url).trim()) {
+      const amid = midpointOfPolyline(routePts);
+      svg += '  ' + _svgLinkBadge(amid.x + 16, amid.y + 14, a.url) + '\n';
+    }
     const aLabels = getArrowLabels(a);
     if (aLabels.length) {
       const mid = midpointOfPolyline(routePts);
@@ -10727,7 +10848,7 @@ ${n.sublabel ? `    <text x="${nx+12}" y="${subY.toFixed(1)}" class="node-sub">$
 
   // Above the arrows: every node not sent to back, in stacking order. The
   // sent-to-back (negative zIndex) nodes were already painted before the arrows.
-  _sortedNodes.filter(n => _zOf(n) >= 0).forEach(n => { svg += _renderNodeSvg(n); });
+  _sortedNodes.filter(n => _zOf(n) >= 0).forEach(n => { svg += _renderNodeSvg(n) + _nodeLinkBadgeSvg(n, ox, oy); });
 
   svg += '</svg>';
   return svg;
