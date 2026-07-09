@@ -1493,6 +1493,7 @@ kbd {
     <span class="row-label">File</span>
     <button class="tb-btn" onclick="newDiagram()" title="New Diagram" aria-label="New diagram"><span class="tb-icon" aria-hidden="true">📄</span><span class="tb-label">New</span></button>
     <button class="tb-btn" onclick="openDiagram()" title="Open HTML" aria-label="Open diagram"><span class="tb-icon" aria-hidden="true">📂</span><span class="tb-label">Open</span></button>
+    <button class="tb-btn" onclick="insertDiagram()" title="Insert a saved diagram as a clip-on — merges its nodes, arrows and play sequence into THIS diagram (repeatable)" aria-label="Insert diagram as clip-on"><span class="tb-icon" aria-hidden="true">🧩</span><span class="tb-label">Insert</span></button>
     <button class="tb-btn" onclick="showRecentFilesModal()" title="Reopen a recently saved diagram" aria-label="Recent diagrams"><span class="tb-icon" aria-hidden="true">🕘</span><span class="tb-label">Recent</span></button>
     <button class="tb-btn" onclick="duplicateDiagram()" title="Save a copy with a new name" aria-label="Duplicate diagram"><span class="tb-icon" aria-hidden="true">🗂️</span><span class="tb-label">Duplicate</span></button>
     <button class="tb-btn" onclick="exportPNG()" title="Export the whole diagram as a PNG image (follows the current dark/light theme)" aria-label="Export PNG"><span class="tb-icon" aria-hidden="true">🖼️</span><span class="tb-label">Export PNG</span></button>
@@ -1550,6 +1551,7 @@ kbd {
       <div class="sidebar-tab" role="tab" tabindex="0" onclick="switchSidebarTab('aws')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();switchSidebarTab('aws');}">AWS</div>
       <div class="sidebar-tab" role="tab" tabindex="0" onclick="switchSidebarTab('azure')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();switchSidebarTab('azure');}">Azure</div>
       <div class="sidebar-tab" role="tab" tabindex="0" onclick="switchSidebarTab('gcp')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();switchSidebarTab('gcp');}">GCP</div>
+      <div class="sidebar-tab" role="tab" tabindex="0" onclick="switchSidebarTab('clipons')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();switchSidebarTab('clipons');}" title="Reusable saved diagrams — click one to merge it into the current diagram">🧩 Clip-ons</div>
     </div>
     <div id="component-list"></div>
   </div>
@@ -1713,6 +1715,7 @@ kbd {
 
 <!-- Hidden file input -->
 <input type="file" id="file-input" accept=".html,.potato.html,.xml" style="display:none" onchange="loadDiagramFile(event)">
+<input type="file" id="insert-input" accept=".html,.potato.html,.xml" multiple style="display:none" onchange="insertDiagramFiles(event)">
 
 
 <!-- RECENT FILES MODAL -->
@@ -4651,7 +4654,7 @@ function switchSidebarTab(tab) {
   const sb = document.getElementById('sidebar');
   if (sb && sb.classList.contains('collapsed')) toggleSidebar();
   document.querySelectorAll('.sidebar-tab').forEach((t, i) => {
-    const tabs = ['shapes','aws','azure','gcp'];
+    const tabs = ['shapes','aws','azure','gcp','clipons'];
     t.classList.toggle('active', tabs[i] === tab);
   });
   renderSidebar(tab);
@@ -4662,6 +4665,10 @@ function renderSidebar(tab, filter = '') {
   currentSidebarTab = tab;
   const list = document.getElementById('component-list');
   list.innerHTML = '';
+
+  // Clip-ons tab isn't a component palette — it's a folder of saved diagrams
+  // you merge in. Hand off to its own renderer (search filters clip-on names).
+  if (tab === 'clipons') { renderClipOnsPanel(list, filter); return; }
 
   // When a search query is active, ignore tab boundaries and walk every tab
   // — users searching for "Lambda" shouldn't have to know it's an AWS thing.
@@ -10822,6 +10829,321 @@ function loadDiagramFile(e) {
   };
   reader.readAsText(file);
   e.target.value = '';
+}
+
+// ===== CLIP-ONS: INSERT A SAVED DIAGRAM AS A REUSABLE MODULE =====
+// Unlike Open (loadDiagramData, which REPLACES everything), inserting MERGES a
+// saved .potato.html into the current diagram: every node/arrow/group gets a
+// fresh id, the sub-diagram is offset to sit beside existing content, its play
+// sequence is appended (badges renumber automatically), and it's optionally
+// wrapped in a labeled module box. Repeatable — drop in as many as you like and
+// wire them together. This is the Step-1 engine behind the "🧩 Insert" button;
+// a folder-panel front door builds on this same call later.
+
+// Bounding box of a source diagram's nodes+groups, in the file's own coords.
+// Node heights are auto (h:null), so estimate a generous 120px for placement.
+function _clipBBox(srcNodes, srcGroups) {
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+  (srcNodes || []).forEach(n => {
+    const w = +n.w || 160, h = +n.h || 120;
+    minX = Math.min(minX, n.x); minY = Math.min(minY, n.y);
+    maxX = Math.max(maxX, n.x + w); maxY = Math.max(maxY, n.y + h);
+  });
+  (srcGroups || []).forEach(g => {
+    minX = Math.min(minX, g.x); minY = Math.min(minY, g.y);
+    maxX = Math.max(maxX, g.x + g.w); maxY = Math.max(maxY, g.y + g.h);
+  });
+  if (!isFinite(minX)) return { minX: 0, minY: 0, maxX: 0, maxY: 0 };
+  return { minX, minY, maxX, maxY };
+}
+
+// Where to drop the incoming diagram: to the right of current content (tops
+// aligned), or near the origin when the canvas is empty. GAP > wrapper padding
+// so a wrapped module never overlaps existing nodes.
+function _insertOffsetFor(srcBox) {
+  let curMaxX = -Infinity, curMinY = Infinity;
+  nodes.forEach(n => {
+    const el = document.getElementById('node-' + n.id);
+    const w = el ? el.offsetWidth : (+n.w || 160);
+    curMaxX = Math.max(curMaxX, n.x + w); curMinY = Math.min(curMinY, n.y);
+  });
+  groups.forEach(g => { curMaxX = Math.max(curMaxX, g.x + g.w); curMinY = Math.min(curMinY, g.y); });
+  if (!isFinite(curMaxX)) return { dx: Math.round(60 - srcBox.minX), dy: Math.round(60 - srcBox.minY) };
+  const GAP = 100;
+  return { dx: Math.round(curMaxX + GAP - srcBox.minX), dy: Math.round(curMinY - srcBox.minY) };
+}
+
+// Pull the diagram JSON out of a .potato.html string (or accept raw JSON).
+function extractPotatoData(raw) {
+  if (!raw) return null;
+  const m = String(raw).match(/<script[^>]+id=["']potato-data["'][^>]*>([\s\S]*?)<\/script>/i);
+  const jsonStr = m ? m[1] : raw;
+  try {
+    const d = JSON.parse(String(jsonStr).trim());
+    if (d && (Array.isArray(d.nodes) || Array.isArray(d.groups))) return d;
+  } catch (_) {}
+  return null;
+}
+
+// The merge engine. Returns the number of nodes inserted (0 if nothing usable).
+function mergeDiagramData(data, opts = {}) {
+  const srcNodes  = (data && data.nodes)  || [];
+  const srcArrows = (data && data.arrows) || [];
+  const srcGroups = (data && data.groups) || [];
+  const srcFlow   = Array.isArray(data && data.playFlow) ? data.playFlow : [];
+  if (!srcNodes.length && !srcGroups.length) { notify('That file has no diagram to insert', 'warning'); return 0; }
+
+  const srcBox = _clipBBox(srcNodes, srcGroups);
+  const { dx, dy } = _insertOffsetFor(srcBox);
+  pushHistory();
+  clearSelection();
+
+  // Wrapper module box FIRST so it paints behind the inserted content.
+  if (opts.wrapGroupLabel) {
+    const pad = 24;
+    const wrap = {
+      id: uid('g'),
+      x: Math.round(srcBox.minX + dx - pad),
+      y: Math.round(srcBox.minY + dy - pad),
+      w: Math.round((srcBox.maxX - srcBox.minX) + pad * 2),
+      h: Math.round((srcBox.maxY - srcBox.minY) + pad * 2),
+      label: String(opts.wrapGroupLabel), color: 'teal'
+    };
+    groups.push(wrap); renderGroup(wrap);
+  }
+
+  // The clip-on's own boundary groups (trust boundaries etc.), shifted.
+  srcGroups.forEach(g => {
+    const copy = { ...g, id: uid('g'), x: g.x + dx, y: g.y + dy };
+    groups.push(copy); renderGroup(copy);
+  });
+
+  // Nodes: fresh ids (remembered in idMap so arrows can be rewired), shifted,
+  // rendered, and selected so the whole module is ready to drag.
+  const idMap = {};
+  const insertedNodeIds = [];
+  srcNodes.forEach(n => {
+    const newId = uid('n');
+    idMap[n.id] = newId;
+    const copy = { ...n, id: newId, x: n.x + dx, y: n.y + dy, zIndex: 10 + nodes.length };
+    nodes.push(copy); renderNode(copy);
+    selectedIds.add(newId);
+    const el = document.getElementById('node-' + newId);
+    if (el) el.classList.add('selected');
+    insertedNodeIds.push(newId);
+  });
+
+  // Arrows: rewire from/to through idMap; skip any whose endpoints didn't come
+  // across. Build first, draw AFTER playFlow is appended so the numbered badges
+  // reflect the final sequence.
+  const arrowIdMap = {};
+  const newArrows = [];
+  srcArrows.forEach(a => {
+    const from = idMap[a.from], to = idMap[a.to];
+    if (!from || !to) return;
+    const newId = uid('a');
+    arrowIdMap[a.id] = newId;
+    const copy = { ...a, id: newId, from, to };
+    arrows.push(copy); newArrows.push(copy);
+  });
+
+  // Append the play sequence, remapping each step's arrow ref. Because
+  // arrowSeqNumbers() reads a step's position in playFlow, the inserted steps
+  // simply continue the running count (existing 1..N stay, clip-on gets N+1..).
+  srcFlow.forEach(s => {
+    const arrow = arrowIdMap[s && s.arrow];
+    if (!arrow) return;
+    playFlow.push({ arrow, title: String((s && s.title) || ''), text: String((s && s.text) || '') });
+  });
+
+  newArrows.forEach(drawArrow);
+
+  markDirty(); updateStatusBar(); updatePropsPanel();
+  return insertedNodeIds.length;
+}
+
+// "🧩 Insert" button → pick one or more saved diagrams to merge in.
+function insertDiagram() {
+  const el = document.getElementById('insert-input');
+  if (el) el.click();
+}
+
+async function insertDiagramFiles(e) {
+  const files = Array.from((e.target && e.target.files) || []);
+  if (e.target) e.target.value = '';
+  if (!files.length) return;
+  let totalNodes = 0, totalFiles = 0, skipped = 0;
+  for (const file of files) {
+    let text = '';
+    try { text = await file.text(); } catch (_) { skipped++; continue; }
+    const data = extractPotatoData(text);
+    if (!data) { skipped++; continue; }
+    const label = String(file.name).replace(/\.(potato\.)?(html|xml|svg|png)$/i, '').trim();
+    const added = mergeDiagramData(data, { wrapGroupLabel: label || 'Clip-on' });
+    if (added > 0) { totalNodes += added; totalFiles++; }
+  }
+  if (totalFiles) {
+    setTimeout(fitToContent, 60);
+    let msg = `Inserted ${totalFiles} clip-on${totalFiles !== 1 ? 's' : ''} (${totalNodes} node${totalNodes !== 1 ? 's' : ''})`;
+    if (skipped) msg += ` — skipped ${skipped} file${skipped !== 1 ? 's' : ''} with no Potato data`;
+    notify(msg, 'success');
+  } else {
+    notify('Nothing inserted — no Potato data found in the selected file' + (files.length !== 1 ? 's' : ''), 'warning');
+  }
+}
+
+// ===== CLIP-ONS SIDEBAR TAB (Phase 2: browse a folder of saved diagrams) =====
+// A folder of .potato.html files becomes a palette of reusable modules. Click a
+// card to merge that diagram in via mergeDiagramData(). The folder handle is
+// remembered across sessions in the same IndexedDB store the file handle uses.
+let _clipOnDirHandle = null;   // FileSystemDirectoryHandle for the chosen folder
+let _clipOnItems = [];         // [{ name, data }] parsed from the folder
+let _clipOnRestoreTried = false;
+
+async function _persistClipOnDir(handle) {
+  try {
+    const db = await _openHandleDb();
+    const tx = db.transaction(_HANDLE_STORE, 'readwrite');
+    tx.objectStore(_HANDLE_STORE).put(handle, 'clipons-dir');
+    await new Promise((r, e) => { tx.oncomplete = r; tx.onerror = () => e(tx.error); });
+  } catch (_) { /* private mode / no IDB — best-effort */ }
+}
+async function _restoreClipOnDir() {
+  if (!SUPPORTS_FS_ACCESS) return;
+  try {
+    const db = await _openHandleDb();
+    const tx = db.transaction(_HANDLE_STORE, 'readonly');
+    const req = tx.objectStore(_HANDLE_STORE).get('clipons-dir');
+    const handle = await new Promise((r, e) => { req.onsuccess = () => r(req.result); req.onerror = () => e(req.error); });
+    if (handle) _clipOnDirHandle = handle;
+  } catch (_) { /* ignore */ }
+}
+
+// A lightweight, self-contained preview: scaled boxes + connector lines drawn
+// straight from the clip-on's data. (buildDiagramSVG can't be reused — it reads
+// the live global nodes and DOM, not an arbitrary diagram.)
+function _clipOnThumbSvg(data) {
+  const ns = (data && data.nodes) || [], as = (data && data.arrows) || [], gs = (data && data.groups) || [];
+  const box = _clipBBox(ns, gs);
+  const bw = Math.max(1, box.maxX - box.minX), bh = Math.max(1, box.maxY - box.minY);
+  const W = 200, H = 96, pad = 8;
+  const s = Math.min((W - pad * 2) / bw, (H - pad * 2) / bh);
+  const ox = pad + ((W - pad * 2) - bw * s) / 2 - box.minX * s;
+  const oy = pad + ((H - pad * 2) - bh * s) / 2 - box.minY * s;
+  const TC = { green:'#4caf50', orange:'#FF9900', blue:'#2E86C1', purple:'#7B2FBE', red:'#DD344C', teal:'#1ABC9C', pink:'#E91E63', yellow:'#F1C40F', cyan:'#00BCD4', gray:'#9E9E9E', gradient:'#7B2FBE' };
+  const byId = {}; ns.forEach(n => byId[n.id] = n);
+  const rectOf = (n) => { const w = +n.w || 160, h = +n.h || 80; return { x: n.x * s + ox, y: n.y * s + oy, w: Math.max(3, w * s), h: Math.max(3, h * s), cx: (n.x + w / 2) * s + ox, cy: (n.y + h / 2) * s + oy }; };
+  let body = '';
+  gs.forEach(g => { body += `<rect x="${(g.x*s+ox).toFixed(1)}" y="${(g.y*s+oy).toFixed(1)}" width="${(g.w*s).toFixed(1)}" height="${(g.h*s).toFixed(1)}" rx="3" fill="none" stroke="rgba(255,255,255,0.13)" stroke-dasharray="2 2"/>`; });
+  as.forEach(a => { const f = byId[a.from], t = byId[a.to]; if (!f || !t) return; const fp = rectOf(f), tp = rectOf(t); body += `<line x1="${fp.cx.toFixed(1)}" y1="${fp.cy.toFixed(1)}" x2="${tp.cx.toFixed(1)}" y2="${tp.cy.toFixed(1)}" stroke="#7986cb" stroke-width="1" opacity="0.7"/>`; });
+  ns.forEach(n => { const p = rectOf(n); const col = TC[n.theme] || '#7986cb'; body += `<rect x="${p.x.toFixed(1)}" y="${p.y.toFixed(1)}" width="${p.w.toFixed(1)}" height="${p.h.toFixed(1)}" rx="2" fill="${col}33" stroke="${col}" stroke-width="1"/>`; });
+  return `<svg viewBox="0 0 ${W} ${H}" width="100%" height="100%" preserveAspectRatio="xMidYMid meet" xmlns="http://www.w3.org/2000/svg" style="display:block">${body}</svg>`;
+}
+
+function renderClipOnsPanel(list, filter = '') {
+  // Lazily restore a previously-chosen folder the first time this tab opens.
+  if (!_clipOnDirHandle && !_clipOnRestoreTried) {
+    _clipOnRestoreTried = true;
+    _restoreClipOnDir().then(() => { if (_clipOnDirHandle && currentSidebarTab === 'clipons') renderSidebar('clipons', (document.getElementById('component-search') || {}).value || ''); });
+  }
+  const q = (filter || '').trim().toLowerCase();
+  const supported = (typeof window.showDirectoryPicker === 'function');
+  const wrap = document.createElement('div');
+  wrap.style.cssText = 'padding:10px';
+
+  const head =
+    `<div style="display:flex;gap:6px;margin-bottom:8px;flex-wrap:wrap">` +
+      `<button class="tb-btn" style="font-size:11px" onclick="chooseClipOnFolder()">📁 ${_clipOnDirHandle ? 'Change folder' : 'Choose folder'}</button>` +
+      (_clipOnDirHandle ? `<button class="tb-btn" style="font-size:11px" onclick="refreshClipOns()" title="Re-scan the folder">↻ Refresh</button>` : '') +
+      `<button class="tb-btn" style="font-size:11px" onclick="insertDiagram()" title="Insert one or more .potato.html files without choosing a folder">🧩 Insert file…</button>` +
+    `</div>`;
+  const status = _clipOnDirHandle
+    ? `<div style="font-size:11px;color:var(--text-dim);margin-bottom:8px">📂 ${escHtml(_clipOnDirHandle.name)} — ${_clipOnItems.length} clip-on${_clipOnItems.length !== 1 ? 's' : ''}</div>`
+    : `<div style="font-size:11px;color:var(--text-dim);line-height:1.6;margin-bottom:8px">Pick a folder of saved <code>.potato.html</code> diagrams. Click any card to merge it into the current diagram as a labeled module. Add as many as you like, then wire them together.</div>`;
+  wrap.innerHTML = head + status;
+
+  if (!supported && !_clipOnDirHandle) {
+    wrap.innerHTML += `<div style="font-size:11px;color:var(--text-dim);line-height:1.6">This browser can't browse a folder (needs Chromium). Use <strong>🧩 Insert file…</strong> to pick diagrams one at a time.</div>`;
+    list.appendChild(wrap); return;
+  }
+  if (_clipOnDirHandle && !_clipOnItems.length) {
+    wrap.innerHTML += `<div style="font-size:11px;color:var(--text-dim);line-height:1.6">Folder remembered. Click <strong>↻ Refresh</strong> to load its diagrams (browsers require a click before reading files).</div>`;
+    list.appendChild(wrap); return;
+  }
+
+  const items = _clipOnItems.filter(it => !q || it.name.toLowerCase().includes(q));
+  if (!items.length) {
+    wrap.innerHTML += `<div style="font-size:11px;color:var(--text-dim)">${q ? 'No clip-ons match your search.' : 'No .potato.html diagrams found in this folder.'}</div>`;
+    list.appendChild(wrap); return;
+  }
+
+  const grid = document.createElement('div');
+  grid.style.cssText = 'display:grid;grid-template-columns:1fr;gap:8px';
+  items.forEach(it => {
+    const card = document.createElement('div');
+    card.style.cssText = 'border:1px solid var(--border);border-radius:8px;overflow:hidden;cursor:pointer;background:var(--bg);transition:border-color .12s';
+    card.title = `Insert "${it.name}" as a clip-on`;
+    card.onmouseenter = () => card.style.borderColor = 'var(--hover-border, rgba(255,255,255,0.2))';
+    card.onmouseleave = () => card.style.borderColor = 'var(--border)';
+    const counts = `${(it.data.nodes || []).length} nodes · ${(it.data.arrows || []).length} arrows`;
+    card.innerHTML =
+      `<div style="height:96px;background:var(--bg2);border-bottom:1px solid var(--border)">${_clipOnThumbSvg(it.data)}</div>` +
+      `<div style="padding:6px 8px">` +
+        `<div style="font-size:12px;font-weight:700;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${escHtml(it.name)}</div>` +
+        `<div style="font-size:10px;color:var(--text-dim)">${counts}</div>` +
+      `</div>`;
+    card.addEventListener('click', () => insertClipOnItem(it));
+    grid.appendChild(card);
+  });
+  wrap.appendChild(grid);
+  list.appendChild(wrap);
+}
+
+function insertClipOnItem(it) {
+  if (!it || !it.data) return;
+  const added = mergeDiagramData(it.data, { wrapGroupLabel: it.name || 'Clip-on' });
+  if (added > 0) { setTimeout(fitToContent, 60); notify(`Inserted "${it.name}" (${added} node${added !== 1 ? 's' : ''})`, 'success'); }
+}
+
+async function chooseClipOnFolder() {
+  if (typeof window.showDirectoryPicker !== 'function') {
+    notify('Folder browsing needs a Chromium browser — use 🧩 Insert file… instead', 'warning');
+    insertDiagram();
+    return;
+  }
+  let handle;
+  try { handle = await window.showDirectoryPicker(); }
+  catch (e) { if (e && e.name === 'AbortError') return; notify('Could not open folder: ' + ((e && e.message) || e), 'error'); return; }
+  _clipOnDirHandle = handle;
+  await _persistClipOnDir(handle);
+  await refreshClipOns();
+}
+
+async function refreshClipOns() {
+  if (!_clipOnDirHandle) return;
+  try {
+    if (typeof _clipOnDirHandle.queryPermission === 'function') {
+      let p = await _clipOnDirHandle.queryPermission({ mode: 'read' });
+      if (p !== 'granted' && typeof _clipOnDirHandle.requestPermission === 'function') p = await _clipOnDirHandle.requestPermission({ mode: 'read' });
+      if (p !== 'granted') { notify('Folder permission denied', 'warning'); return; }
+    }
+    const items = [];
+    for await (const entry of _clipOnDirHandle.values()) {
+      if (entry.kind !== 'file') continue;
+      if (!/\.(potato\.)?html$/i.test(entry.name)) continue;
+      let text = '';
+      try { const f = await entry.getFile(); text = await f.text(); } catch (_) { continue; }
+      const data = extractPotatoData(text);
+      if (!data) continue;
+      items.push({ name: String(entry.name).replace(/\.(potato\.)?html$/i, ''), data });
+    }
+    items.sort((a, b) => a.name.localeCompare(b.name));
+    _clipOnItems = items;
+    if (currentSidebarTab === 'clipons') renderSidebar('clipons', (document.getElementById('component-search') || {}).value || '');
+    notify(`Found ${items.length} clip-on${items.length !== 1 ? 's' : ''} in "${_clipOnDirHandle.name}"`, items.length ? 'success' : 'warning');
+  } catch (e) {
+    notify('Could not read folder: ' + ((e && e.message) || e), 'error');
+  }
 }
 
 function loadDiagramData(data) {
