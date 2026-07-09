@@ -1526,7 +1526,7 @@ kbd {
     <span class="row-label">File</span>
     <button class="tb-btn" onclick="newDiagram()" title="New Diagram" aria-label="New diagram"><span class="tb-icon" aria-hidden="true">📄</span><span class="tb-label">New</span></button>
     <button class="tb-btn" onclick="openDiagram()" title="Open HTML" aria-label="Open diagram"><span class="tb-icon" aria-hidden="true">📂</span><span class="tb-label">Open</span></button>
-    <button class="tb-btn" onclick="insertDiagram()" title="Insert a saved diagram as a clip-on — merges its nodes, arrows and play sequence into THIS diagram (repeatable)" aria-label="Insert diagram as clip-on"><span class="tb-icon" aria-hidden="true">🧩</span><span class="tb-label">Insert</span></button>
+    <button class="tb-btn" onclick="insertDiagram()" title="Insert a saved diagram as a block — merges its nodes, arrows and play sequence into THIS diagram (repeatable)" aria-label="Insert diagram as block"><span class="tb-icon" aria-hidden="true">🧩</span><span class="tb-label">Insert</span></button>
     <button class="tb-btn" onclick="showRecentFilesModal()" title="Reopen a recently saved diagram" aria-label="Recent diagrams"><span class="tb-icon" aria-hidden="true">🕘</span><span class="tb-label">Recent</span></button>
     <button class="tb-btn" onclick="duplicateDiagram()" title="Save a copy with a new name" aria-label="Duplicate diagram"><span class="tb-icon" aria-hidden="true">🗂️</span><span class="tb-label">Duplicate</span></button>
     <button class="tb-btn" onclick="exportPNG()" title="Export the whole diagram as a PNG image (follows the current dark/light theme)" aria-label="Export PNG"><span class="tb-icon" aria-hidden="true">🖼️</span><span class="tb-label">Export PNG</span></button>
@@ -1584,7 +1584,7 @@ kbd {
       <div class="sidebar-tab" role="tab" tabindex="0" onclick="switchSidebarTab('aws')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();switchSidebarTab('aws');}">AWS</div>
       <div class="sidebar-tab" role="tab" tabindex="0" onclick="switchSidebarTab('azure')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();switchSidebarTab('azure');}">Azure</div>
       <div class="sidebar-tab" role="tab" tabindex="0" onclick="switchSidebarTab('gcp')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();switchSidebarTab('gcp');}">GCP</div>
-      <div class="sidebar-tab" role="tab" tabindex="0" onclick="switchSidebarTab('clipons')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();switchSidebarTab('clipons');}" title="Reusable saved diagrams — click one to merge it into the current diagram">🧩 Clip-ons</div>
+      <div class="sidebar-tab" role="tab" tabindex="0" onclick="switchSidebarTab('clipons')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();switchSidebarTab('clipons');}" title="Reusable saved diagrams — click one to merge it into the current diagram">🧩 Blocks</div>
     </div>
     <div id="component-list"></div>
   </div>
@@ -4700,8 +4700,8 @@ function renderSidebar(tab, filter = '') {
   const list = document.getElementById('component-list');
   list.innerHTML = '';
 
-  // Clip-ons tab isn't a component palette — it's a folder of saved diagrams
-  // you merge in. Hand off to its own renderer (search filters clip-on names).
+  // Blocks tab isn't a component palette — it's a folder of saved diagrams
+  // you merge in. Hand off to its own renderer (search filters block names).
   if (tab === 'clipons') { renderClipOnsPanel(list, filter); return; }
 
   // When a search query is active, ignore tab boundaries and walk every tab
@@ -11226,12 +11226,12 @@ async function insertDiagramFiles(e) {
     const data = extractPotatoData(text);
     if (!data) { skipped++; continue; }
     const label = String(file.name).replace(/\.(potato\.)?(html|xml|svg|png)$/i, '').trim();
-    const added = mergeDiagramData(data, { wrapGroupLabel: label || 'Clip-on' });
+    const added = mergeDiagramData(data, { wrapGroupLabel: label || 'Block' });
     if (added > 0) { totalNodes += added; totalFiles++; }
   }
   if (totalFiles) {
     setTimeout(fitToContent, 60);
-    let msg = `Inserted ${totalFiles} clip-on${totalFiles !== 1 ? 's' : ''} (${totalNodes} node${totalNodes !== 1 ? 's' : ''})`;
+    let msg = `Inserted ${totalFiles} block${totalFiles !== 1 ? 's' : ''} (${totalNodes} node${totalNodes !== 1 ? 's' : ''})`;
     if (skipped) msg += ` — skipped ${skipped} file${skipped !== 1 ? 's' : ''} with no Potato data`;
     notify(msg, 'success');
   } else {
@@ -11305,7 +11305,7 @@ function renderClipOnsPanel(list, filter = '') {
       `<button class="tb-btn" style="font-size:11px" onclick="insertDiagram()" title="Insert one or more .potato.html files without choosing a folder">🧩 Insert file…</button>` +
     `</div>`;
   const status = _clipOnDirHandle
-    ? `<div style="font-size:11px;color:var(--text-dim);margin-bottom:8px">📂 ${escHtml(_clipOnDirHandle.name)} — ${_clipOnItems.length} clip-on${_clipOnItems.length !== 1 ? 's' : ''}</div>`
+    ? `<div style="font-size:11px;color:var(--text-dim);margin-bottom:8px">📂 ${escHtml(_clipOnDirHandle.name)} — ${_clipOnItems.length} block${_clipOnItems.length !== 1 ? 's' : ''}</div>`
     : `<div style="font-size:11px;color:var(--text-dim);line-height:1.6;margin-bottom:8px">Pick a folder of saved <code>.potato.html</code> diagrams. Click any card to merge it into the current diagram as a labeled module. Add as many as you like, then wire them together.</div>`;
   wrap.innerHTML = head + status;
 
@@ -11320,7 +11320,7 @@ function renderClipOnsPanel(list, filter = '') {
 
   const items = _clipOnItems.filter(it => !q || it.name.toLowerCase().includes(q));
   if (!items.length) {
-    wrap.innerHTML += `<div style="font-size:11px;color:var(--text-dim)">${q ? 'No clip-ons match your search.' : 'No .potato.html diagrams found in this folder.'}</div>`;
+    wrap.innerHTML += `<div style="font-size:11px;color:var(--text-dim)">${q ? 'No blocks match your search.' : 'No .potato.html diagrams found in this folder.'}</div>`;
     list.appendChild(wrap); return;
   }
 
@@ -11329,7 +11329,7 @@ function renderClipOnsPanel(list, filter = '') {
   items.forEach(it => {
     const card = document.createElement('div');
     card.style.cssText = 'border:1px solid var(--border);border-radius:8px;overflow:hidden;cursor:pointer;background:var(--bg);transition:border-color .12s';
-    card.title = `Insert "${it.name}" as a clip-on`;
+    card.title = `Insert "${it.name}" as a block`;
     card.onmouseenter = () => card.style.borderColor = 'var(--hover-border, rgba(255,255,255,0.2))';
     card.onmouseleave = () => card.style.borderColor = 'var(--border)';
     const counts = `${(it.data.nodes || []).length} nodes · ${(it.data.arrows || []).length} arrows`;
@@ -11348,7 +11348,7 @@ function renderClipOnsPanel(list, filter = '') {
 
 function insertClipOnItem(it) {
   if (!it || !it.data) return;
-  const added = mergeDiagramData(it.data, { wrapGroupLabel: it.name || 'Clip-on' });
+  const added = mergeDiagramData(it.data, { wrapGroupLabel: it.name || 'Block' });
   if (added > 0) { setTimeout(fitToContent, 60); notify(`Inserted "${it.name}" (${added} node${added !== 1 ? 's' : ''})`, 'success'); }
 }
 
@@ -11387,7 +11387,7 @@ async function refreshClipOns() {
     items.sort((a, b) => a.name.localeCompare(b.name));
     _clipOnItems = items;
     if (currentSidebarTab === 'clipons') renderSidebar('clipons', (document.getElementById('component-search') || {}).value || '');
-    notify(`Found ${items.length} clip-on${items.length !== 1 ? 's' : ''} in "${_clipOnDirHandle.name}"`, items.length ? 'success' : 'warning');
+    notify(`Found ${items.length} block${items.length !== 1 ? 's' : ''} in "${_clipOnDirHandle.name}"`, items.length ? 'success' : 'warning');
   } catch (e) {
     notify('Could not read folder: ' + ((e && e.message) || e), 'error');
   }
