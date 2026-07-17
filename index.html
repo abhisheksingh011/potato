@@ -6135,19 +6135,34 @@ function startInlineEdit(el, node) {
   const original = el.textContent;
   let cancelled = false;
 
+  // Text/Note boxes and shape labels render with white-space:pre-wrap and wrap
+  // on export, so line breaks are meaningful in them. contenteditable stores a
+  // break as <br>/block markup, which textContent silently drops — read
+  // innerText instead so typed line breaks actually survive the commit.
+  const keepsLineBreaks = node.type === 'text' || !!node.shape;
+  // A Text/Note box holds prose, so Enter should start a new line there; commit
+  // with Ctrl/Cmd+Enter or by clicking away. Every other field keeps Enter=commit.
+  const enterMakesNewline = node.type === 'text' && field === 'label';
+
   el.contentEditable = 'true';
   el.focus();
   selectAllText(el);
 
+  function readValue() {
+    if (!keepsLineBreaks) return el.textContent;
+    return String(el.innerText || '').replace(/\r\n/g, '\n').replace(/\n+$/, '');
+  }
+
   function onKeydown(e) {
-    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); el.blur(); }
-    else if (e.key === 'Escape')          { e.preventDefault(); cancelled = true; el.blur(); }
+    if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); el.blur(); return; }
+    if (e.key === 'Enter' && !e.shiftKey && !enterMakesNewline) { e.preventDefault(); el.blur(); return; }
+    if (e.key === 'Escape') { e.preventDefault(); cancelled = true; el.blur(); }
   }
 
   function finish() {
     el.removeEventListener('keydown', onKeydown);
     el.contentEditable = 'false';
-    const txt = cancelled ? original : el.textContent;
+    const txt = cancelled ? original : readValue();
     if (cancelled) el.textContent = original;
     // Only spend a history slot if the value actually changed.
     if (txt !== original) {
@@ -6156,6 +6171,9 @@ function startInlineEdit(el, node) {
       if (field === 'sublabel') node.sublabel = txt;
       if (field === 'category') node.category = txt;
       markDirty();
+      // Re-render so the stored \n renders via pre-wrap (instead of leaving the
+      // browser's <br> markup behind), and reroute arrows if the box grew.
+      if (keepsLineBreaks) { renderNode(node); redrawArrows(); }
     }
     updatePropsPanel();
   }
@@ -8331,10 +8349,16 @@ function updatePropsPanel() {
   content.innerHTML = `
     <div class="prop-group">
       <div class="prop-group-title">Identity</div>
+      ${node.type === 'text' ? `
+      <div class="prop-group-title" style="font-size:10px;margin-bottom:4px">Text</div>
+      <textarea class="prop-input" rows="5" style="width:100%;resize:vertical;line-height:1.5;font-family:var(--font-mono);font-size:11px"
+        oninput="updateNodeProp('${id}','label',this.value)"
+        placeholder="Type as many lines as you like…">${escHtml(node.label || '')}</textarea>
+      <div style="font-size:10px;color:var(--text-dim);margin-top:4px;font-family:var(--font-mono)">On canvas: double-click to edit, Enter for a new line, Ctrl+Enter to finish.</div>` : `
       <div class="prop-row">
         <span class="prop-label">Label</span>
         <input class="prop-input" value="${escHtml(node.label)}" oninput="updateNodeProp('${id}','label',this.value)">
-      </div>
+      </div>`}
       ${node.shape ? '' : `
       <div class="prop-row">
         <span class="prop-label">Sub-label</span>
@@ -8422,7 +8446,7 @@ function updatePropsPanel() {
       <div class="prop-group-title" style="margin-top:8px">Text</div>
       <div class="prop-row">
         <span class="prop-label">Size</span>
-        <input type="range" min="8" max="32" step="1" value="${node.fontSize || (node.shape ? 13 : 12)}" oninput="updateNodeProp('${id}','fontSize',+this.value)" style="flex:1" title="Label text size (px)">
+        <input type="range" min="8" max="96" step="1" value="${node.fontSize || (node.shape ? 13 : 12)}" oninput="updateNodeProp('${id}','fontSize',+this.value)" style="flex:1" title="Label text size (px)">
         <span style="font-size:10px;color:var(--text-muted);width:26px;text-align:right">${node.fontSize || (node.shape ? 13 : 12)}px</span>
       </div>
       <div class="prop-row">
@@ -10758,7 +10782,13 @@ async function buildDiagramSVG(theme = 'dark') {
       // the canvas's wrapping flex label, then centre the block vertically.
       const fs = +n.fontSize || 12;
       const lh = fs * 1.25;
-      const lines = wrapSvgText(n.label || '', nw - 20, fs);
+      // Honour the user's explicit line breaks first, then wrap each paragraph.
+      const lines = [];
+      String(n.label || '').split(/\r?\n/).forEach(par => {
+        if (!par.trim()) { lines.push(''); return; }
+        wrapSvgText(par, nw - 20, fs).forEach(l => lines.push(l));
+      });
+      if (!lines.length) lines.push('');
       const top = (ny + nh/2) - (lines.length - 1) * lh / 2;
       const tspans = lines.map((ln, i) =>
         `<tspan ${anchor} y="${(top + i*lh).toFixed(1)}">${escHtml(ln)}</tspan>`).join('');
@@ -10774,12 +10804,24 @@ ${geom}
     if (n.type === 'text') {
       const tFill = n.fill || P.nodeFill;
       const tRx = n.rounded === false ? 0 : 10;
-      const tAnchor = n.align==='left' ? `x="${nx+12}" text-anchor="start"`
-                    : n.align==='right' ? `x="${nx+nw-12}" text-anchor="end"`
-                    : `x="${nx+nw/2}" text-anchor="middle"`;
+      const fs = +n.fontSize || 12;
+      const lh = fs * 1.35;
+      const tx = n.align==='left' ? nx + 12 : n.align==='right' ? nx + nw - 12 : nx + nw/2;
+      const tAnchor = n.align==='left' ? 'start' : n.align==='right' ? 'end' : 'middle';
+      // The canvas renders these with white-space:pre-wrap, so honour the user's
+      // explicit line breaks, then wrap each paragraph to the box width. Text is
+      // never truncated — a long note exports in full, matching what's on screen.
+      const tLines = [];
+      String(n.label || '').split(/\r?\n/).forEach(par => {
+        if (!par.trim()) { tLines.push(''); return; }
+        wrapSvgText(par, nw - 24, fs).forEach(l => tLines.push(l));
+      });
+      const tTop = (ny + nh/2) - (tLines.length - 1) * lh / 2;
+      const tSpans = tLines.map((ln, i) =>
+        `<tspan x="${tx}" text-anchor="${tAnchor}" y="${(tTop + i*lh).toFixed(1)}">${escHtml(ln)}</tspan>`).join('');
       return `  <g class="potato-node" data-node-id="${escHtml(n.id)}" style="cursor:pointer"${gOpacity}>
     <rect class="potato-node-rect" x="${nx}" y="${ny}" width="${nw}" height="${nh}" rx="${tRx}" fill="${tFill}" stroke="${strokeCol}" stroke-width="${strokeW}" opacity="0.95"/>
-    <text ${tAnchor} y="${ny+nh/2}" class="node-name"${labelStyle} dominant-baseline="central">${escHtml((n.label||'').slice(0,40))}</text>
+    <text class="node-name"${labelStyle} dominant-baseline="central">${tSpans}</text>
   </g>
 `;
     }
