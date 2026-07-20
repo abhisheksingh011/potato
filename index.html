@@ -1525,6 +1525,7 @@ kbd {
 
     <span class="row-label">File</span>
     <button class="tb-btn" onclick="newDiagram()" title="New Diagram" aria-label="New diagram"><span class="tb-icon" aria-hidden="true">📄</span><span class="tb-label">New</span></button>
+    <button class="tb-btn" onclick="clearCanvas()" title="Clear the canvas — removes everything on screen (asks first; Ctrl+Z to undo)" aria-label="Clear canvas"><span class="tb-icon" aria-hidden="true">🧹</span><span class="tb-label">Clear</span></button>
     <button class="tb-btn" onclick="openDiagram()" title="Open HTML" aria-label="Open diagram"><span class="tb-icon" aria-hidden="true">📂</span><span class="tb-label">Open</span></button>
     <button class="tb-btn" onclick="insertDiagram()" title="Insert a saved diagram as a block — merges its nodes, arrows and play sequence into THIS diagram (repeatable)" aria-label="Insert diagram as block"><span class="tb-icon" aria-hidden="true">🧩</span><span class="tb-label">Insert</span></button>
     <button class="tb-btn" onclick="showRecentFilesModal()" title="Reopen a recently saved diagram" aria-label="Recent diagrams"><span class="tb-icon" aria-hidden="true">🕘</span><span class="tb-label">Recent</span></button>
@@ -11290,6 +11291,7 @@ async function insertDiagramFiles(e) {
 let _clipOnDirHandle = null;   // FileSystemDirectoryHandle for the chosen folder
 let _clipOnItems = [];         // [{ name, data }] parsed from the folder
 let _clipOnRestoreTried = false;
+let _blockPreview = null;      // the block currently shown in the view-only preview pane
 
 async function _persistClipOnDir(handle) {
   try {
@@ -11350,7 +11352,7 @@ function renderClipOnsPanel(list, filter = '') {
     `</div>`;
   const status = _clipOnDirHandle
     ? `<div style="font-size:11px;color:var(--text-dim);margin-bottom:8px">📂 ${escHtml(_clipOnDirHandle.name)} — ${_clipOnItems.length} block${_clipOnItems.length !== 1 ? 's' : ''}</div>`
-    : `<div style="font-size:11px;color:var(--text-dim);line-height:1.6;margin-bottom:8px">Pick a folder of saved <code>.potato.html</code> diagrams. Click any card to merge it into the current diagram as a labeled module. Add as many as you like, then wire them together.</div>`;
+    : `<div style="font-size:11px;color:var(--text-dim);line-height:1.6;margin-bottom:8px">Pick a folder of saved <code>.potato.html</code> diagrams. Click a card to <strong>preview</strong> it (view only); use <strong>➕ Add</strong> to drop it into your diagram as a labeled module. Add as many as you like.</div>`;
   wrap.innerHTML = head + status;
 
   if (!supported && !_clipOnDirHandle) {
@@ -11368,32 +11370,70 @@ function renderClipOnsPanel(list, filter = '') {
     list.appendChild(wrap); return;
   }
 
+  // View-only preview pane: shows the selected block large with an explicit
+  // "➕ Add to diagram". Clicking a different card just swaps what's shown here —
+  // nothing is added until you press Add.
+  if (_blockPreview && _clipOnItems.includes(_blockPreview)) {
+    const p = _blockPreview;
+    const pv = document.createElement('div');
+    pv.style.cssText = 'border:1px solid var(--purple);border-radius:8px;overflow:hidden;background:var(--bg);margin-bottom:10px';
+    pv.innerHTML =
+      `<div style="display:flex;justify-content:space-between;align-items:center;gap:6px;padding:6px 8px;background:var(--bg3)">` +
+        `<div style="font-size:12px;font-weight:700;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">👁 ${escHtml(p.name)}</div>` +
+        `<button class="tb-btn" style="flex:none;font-size:11px;padding:2px 6px" onclick="closeBlockPreview()" title="Close preview">✕</button>` +
+      `</div>` +
+      `<div style="height:220px;background:var(--bg2)">${_clipOnThumbSvg(p.data)}</div>` +
+      `<div style="padding:6px 8px 0;font-size:10px;color:var(--text-dim)">${(p.data.nodes || []).length} nodes · ${(p.data.arrows || []).length} arrows · view only</div>` +
+      `<div style="padding:8px"><button class="tb-btn" style="width:100%;font-size:12px" onclick="addPreviewedBlock()">➕ Add to diagram</button></div>`;
+    wrap.appendChild(pv);
+  }
+
   const grid = document.createElement('div');
   grid.style.cssText = 'display:grid;grid-template-columns:1fr;gap:8px';
   items.forEach(it => {
+    const isPrev = _blockPreview === it;
     const card = document.createElement('div');
-    card.style.cssText = 'border:1px solid var(--border);border-radius:8px;overflow:hidden;cursor:pointer;background:var(--bg);transition:border-color .12s';
-    card.title = `Insert "${it.name}" as a block`;
-    card.onmouseenter = () => card.style.borderColor = 'var(--hover-border, rgba(255,255,255,0.2))';
-    card.onmouseleave = () => card.style.borderColor = 'var(--border)';
+    card.style.cssText = `border:1px solid ${isPrev ? 'var(--purple)' : 'var(--border)'};border-radius:8px;overflow:hidden;cursor:pointer;background:var(--bg);transition:border-color .12s`;
+    card.title = `Click to preview "${it.name}"`;
+    card.onmouseenter = () => { if (_blockPreview !== it) card.style.borderColor = 'var(--hover-border, rgba(255,255,255,0.2))'; };
+    card.onmouseleave = () => { if (_blockPreview !== it) card.style.borderColor = 'var(--border)'; };
     const counts = `${(it.data.nodes || []).length} nodes · ${(it.data.arrows || []).length} arrows`;
     card.innerHTML =
       `<div style="height:96px;background:var(--bg2);border-bottom:1px solid var(--border)">${_clipOnThumbSvg(it.data)}</div>` +
-      `<div style="padding:6px 8px">` +
-        `<div style="font-size:12px;font-weight:700;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${escHtml(it.name)}</div>` +
-        `<div style="font-size:10px;color:var(--text-dim)">${counts}</div>` +
+      `<div style="padding:6px 8px;display:flex;justify-content:space-between;align-items:center;gap:6px">` +
+        `<div style="min-width:0">` +
+          `<div style="font-size:12px;font-weight:700;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${escHtml(it.name)}</div>` +
+          `<div style="font-size:10px;color:var(--text-dim)">${counts}</div>` +
+        `</div>` +
+        `<button class="block-add-btn tb-btn" style="flex:none;font-size:11px;padding:3px 7px" title="Add this block to the diagram">➕ Add</button>` +
       `</div>`;
-    card.addEventListener('click', () => insertClipOnItem(it));
+    // Clicking the card previews (view only); the ➕ Add button inserts it.
+    card.addEventListener('click', () => previewBlock(it));
+    const addBtn = card.querySelector('.block-add-btn');
+    if (addBtn) addBtn.addEventListener('click', (e) => { e.stopPropagation(); insertClipOnItem(it); });
     grid.appendChild(card);
   });
   wrap.appendChild(grid);
   list.appendChild(wrap);
 }
 
+// Show a block in the view-only preview pane (swaps if another was showing).
+function previewBlock(it) {
+  _blockPreview = it;
+  renderSidebar('clipons', (document.getElementById('component-search') || {}).value || '');
+}
+function closeBlockPreview() {
+  _blockPreview = null;
+  renderSidebar('clipons', (document.getElementById('component-search') || {}).value || '');
+}
+function addPreviewedBlock() {
+  if (_blockPreview) insertClipOnItem(_blockPreview);
+}
+
 function insertClipOnItem(it) {
   if (!it || !it.data) return;
   const added = mergeDiagramData(it.data, { wrapGroupLabel: it.name || 'Block' });
-  if (added > 0) { setTimeout(fitToContent, 60); notify(`Inserted "${it.name}" (${added} node${added !== 1 ? 's' : ''})`, 'success'); }
+  if (added > 0) { setTimeout(fitToContent, 60); notify(`Added "${it.name}" (${added} node${added !== 1 ? 's' : ''})`, 'success'); }
 }
 
 async function chooseClipOnFolder() {
@@ -11430,6 +11470,8 @@ async function refreshClipOns() {
     }
     items.sort((a, b) => a.name.localeCompare(b.name));
     _clipOnItems = items;
+    _blockPreview = null; // items are fresh objects — drop any stale preview
+
     if (currentSidebarTab === 'clipons') renderSidebar('clipons', (document.getElementById('component-search') || {}).value || '');
     notify(`Found ${items.length} block${items.length !== 1 ? 's' : ''} in "${_clipOnDirHandle.name}"`, items.length ? 'success' : 'warning');
   } catch (e) {
@@ -11499,6 +11541,24 @@ function newDiagram() {
   try { localStorage.removeItem(autosaveKey()); } catch(e) {}
   showPropsEmpty();
   notify('New diagram created');
+}
+
+// One-click "remove the diagram" — clears everything on the canvas after a
+// confirm. Unlike New, it's undoable (Ctrl+Z) and keeps the current file/name.
+function clearCanvas() {
+  if (!nodes.length && !groups.length && !arrows.length) { notify('The canvas is already empty', 'info'); return; }
+  if (!confirm('Do you want to remove this diagram? This clears everything on the canvas. (Ctrl+Z to undo)')) return;
+  pushHistory();
+  nodes = []; arrows = []; groups = []; playFlow = [];
+  selectedIds.clear(); selectedArrow = null; selectedGroup = null; selectedGroups.clear();
+  canvasViewport.querySelectorAll('.node').forEach(el => el.remove());
+  canvasViewport.querySelectorAll('.group-node').forEach(el => el.remove());
+  arrowsSvg.querySelectorAll('g').forEach(el => el.remove());
+  clearEndpointHandles();
+  markDirty();
+  updateStatusBar();
+  showPropsEmpty();
+  notify('Diagram cleared');
 }
 
 // ===== ICON EMBEDDING FOR SAVED FILES =====
