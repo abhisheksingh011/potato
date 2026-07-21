@@ -10,8 +10,8 @@
 
 [![MIT License](https://img.shields.io/badge/license-MIT-1abc9c)](LICENSE)
 [![Live demo](https://img.shields.io/badge/live%20demo-open%20in%20browser-7B2FBE)](https://abhisheksingh011.github.io/potato/)
-[![Knowledge built-in](https://img.shields.io/badge/SLA%20%C2%B7%20limits%20%C2%B7%20cost%20%C2%B7%20pitfalls-79%20services-1abc9c)](#-service-knowledge-base)
-[![Real icons](https://img.shields.io/badge/icons-1108%20AWS%20%2F%20Azure%20%2F%20GCP-FF9900)](icons/)
+[![Knowledge built-in](https://img.shields.io/badge/SLA%20%C2%B7%20limits%20%C2%B7%20cost%20%C2%B7%20pitfalls-82%20services-1abc9c)](#-service-knowledge-base)
+[![Real icons](https://img.shields.io/badge/icons-1111%20AWS%20%2F%20Azure%20%2F%20GCP-FF9900)](icons/)
 [![Zero deps](https://img.shields.io/badge/dependencies-zero-2E86C1)](#tech-stack)
 
 <br>
@@ -204,6 +204,46 @@ Each step is shown as an editable card — connection name, narration text, reor
 
 ---
 
+## 🚀 Deploy Guide — turn the diagram into a build plan
+
+Click **🚀 Deploy Guide** and Potato assembles a tuned prompt *plus your diagram JSON*, ready to paste into any LLM. It reads the architecture on the canvas — nodes, arrows, container boxes, and the Play narration — so the plan is grounded in what you actually drew.
+
+Pick your **Output**:
+
+| Output | You get |
+|---|---|
+| **Runbook only (table)** | A dependency-ordered deployment runbook: `# · Depends on · Service · Task · Instruction · Why needed` |
+| **Runbook + IaC code** | The table plus production-grade **Terraform / AWS CDK / CloudFormation / Bicep / Pulumi** |
+| **Runbook + console steps** | The table plus click-by-click console instructions |
+| **All** | Table + IaC + console |
+| **Infra task dependency table (AWS)** | A full infrastructure task breakdown: `# · Dependency · Description · AWS Service · Account · Region · VPC · Subnet · Task · Status · Owner · Remarks` — decomposed to every IAM role, security group, DLQ, VPC endpoint and log group, with owners assigned per team |
+
+The cloud provider is **auto-detected** from the icons on your canvas, and toggles let you demand least-privilege IAM, observability, rollback notes, and cost notes on every step. **👁 Preview prompt** shows the exact text before you copy it.
+
+---
+
+## 🧩 Blocks — compose new diagrams from saved ones
+
+Stop redrawing the same auth chain. **Blocks** turns a folder of saved `.potato.html` diagrams into a palette of reusable architecture modules.
+
+- **🧩 Blocks sidebar tab** → **📁 Choose folder** → every diagram in it appears as a thumbnail card.
+- **Click a card to preview it** (view only). Click another to switch. Nothing is added until you say so.
+- **➕ Add** merges it into the current diagram — fresh IDs, placed clear of existing content, wrapped in a labelled module box, and its **play sequence appended and renumbered** so the combined walkthrough still reads in order.
+- Add as many blocks as you like, then wire them together — that's the point.
+- **🧩 Insert** in the File row does the same from one or more files without picking a folder.
+
+The chosen folder is remembered between sessions. Non-Chromium browsers fall back to file-picking.
+
+---
+
+## 🔗 Pattern links — attach a URL to anything
+
+Give any **node, shape, arrow, or container box** a URL in the Properties panel. It renders as a small **🔗 badge** — never the raw URL — that reads **"pattern link"** on hover and opens in a new tab.
+
+Links survive into the **saved HTML**: they're emitted as native SVG links, so a teammate who opens your `.potato.html` can click straight through to the runbook, ADR, ticket, or standards page behind each component.
+
+---
+
 ## 🧠 Why this isn't a diagram tool
 
 A diagram tool stops at the picture. **Potato keeps going** — it's where you *design, understand, price, and document* a cloud system, not just draw one.
@@ -218,13 +258,16 @@ If you're choosing Potato, you're not choosing it *over* a drawing tool. You're 
 
 | | |
 |---|---|
-| 📋 **Architecture knowledge, built in** | Every AWS / Azure / GCP node carries real **SLA, limits, when-to-use guidance, and common pitfalls** — Lambda's 15-min cap, DynamoDB's 400 KB item limit, RDS connection ceilings — one hover away. 79 services documented. |
+| 📋 **Architecture knowledge, built in** | Every AWS / Azure / GCP node carries real **SLA, limits, when-to-use guidance, and common pitfalls** — Lambda's 15-min cap, DynamoDB's 400 KB item limit, RDS connection ceilings — one hover away. 82 services documented. |
 | 💰 **Monthly cost estimator** | Hover for pricing formulas; click `💰 Cost` to total the whole design at Small / Medium / Large workloads, with a per-service breakdown and a coverage indicator. |
 | ▶ **Play-the-flow sequences** | Hit ▶ Play and the architecture **explains itself** step-by-step, with detailed narration that ships inside the file — request lifecycle, failure branches, scheduled jobs, end to end. |
 | ⬇ **Downloadable workflow runbook** | Export the play-flow as a numbered **plain-text runbook** (`.txt`) — drop it straight into your docs, a PR description, or an onboarding wiki. The diagram becomes documentation. |
 | 🤖 **Plain-English → architecture** | Paste the [Potato prompt](POTATO_LLM_PROMPT.md) into any LLM (ChatGPT / Claude / Gemini / Copilot), describe your system, paste the reply back. Get a real, editable, *knowledge-enriched* design — not just shapes. |
 | 📤 **A file that explains itself** | Save → email → recipient double-clicks → interactive viewer in any browser. They hover tooltips, ▶ Play the flow, see the costs. No Potato, no account, no install. |
-| 🪣 **1108 official cloud icons** | AWS / Azure / GCP (including the Microsoft Fabric set), searchable, drag-and-drop — the real artwork the vendors ship, not stylised reproductions. |
+| 🚀 **Deployment build plan** | `🚀 Deploy Guide` turns the canvas into a dependency-ordered runbook, production-grade IaC, console steps, or a full **AWS infra task table** with an owner per team — grounded in the diagram, not a blank prompt. |
+| 🧩 **Reusable Blocks** | Point at a folder of saved diagrams and compose new architectures from proven ones. Preview first, then merge — IDs, placement, and the play sequence are reconciled automatically. |
+| 🔗 **Pattern links on anything** | Attach a URL to any node, arrow, or box. It shows as a 🔗 badge (never the raw link), and stays clickable inside the saved HTML your team opens. |
+| 🪣 **1111 official cloud icons** | AWS / Azure / GCP (including the Microsoft Fabric set), searchable, drag-and-drop — the real artwork the vendors ship, not stylised reproductions. |
 
 > No account. No telemetry. No subscription. No internet after the initial download.
 
@@ -240,7 +283,7 @@ If you're choosing Potato, you're not choosing it *over* a drawing tool. You're 
 | **Downloadable text runbook** from the flow | ✅ | ❌ | ❌ | ❌ | ❌ |
 | **LLM-native** — describe it in English, any model | ✅ | ❌ | ❌ | ⚠️ syntax | ❌ |
 | **Self-explaining shareable file** (recipient interacts) | ✅ | ❌ | ❌ | ❌ | ❌ |
-| 1108 official AWS/Azure/GCP icons built-in | ✅ | ⚠️ download | ❌ | ❌ | ✅ paid |
+| 1111 official AWS/Azure/GCP icons built-in | ✅ | ⚠️ download | ❌ | ❌ | ✅ paid |
 | Single offline HTML file | ✅ | ❌ | ❌ | ❌ | ❌ |
 | Lives in `git diff` next to your code | ✅ HTML | ⚠️ XML | ⚠️ JSON | ✅ MD | ❌ |
 | Account / login required | ❌ | ❌ | ❌ | ❌ | ✅ |
@@ -253,11 +296,16 @@ The first six rows are the product. The drawing is table stakes.
 ## 🚀 Features at a glance
 
 **Diagramming**
-- 1108 real AWS / Azure / GCP icons (including the Microsoft Fabric set) + emoji shapes
-- Orthogonal arrows that route around obstacles
-- Animated / dashed / dotted arrow styles, 9 colors
-- Groups / swimlanes for VPCs, subnets, service boundaries
-- Auto-layout (LR / TB), grid snap, fit-to-content
+- 1111 real AWS / Azure / GCP icons (including the Microsoft Fabric set) + emoji shapes
+- Geometric shapes (rectangle, rounded, diamond, cylinder, …) with editable centred text
+- Multi-line **text / note boxes** — press Enter for a new line, font size up to 96 px, wraps and never truncates on export
+- Orthogonal arrows that route around obstacles, with **line jumps** where they cross (toggleable)
+- Animated / dashed / dotted arrow styles, 9 colors, per-arrow thickness and multiple draggable labels
+- Global arrow-label text scaling (`A- / A+`)
+- Container boxes for VPCs, subnets, service boundaries — transparent-fill option
+- Per-node styling: fill, border colour/width, opacity, rounded corners, text size/colour/alignment, 8-handle resize
+- **🔗 Pattern links** — attach a URL to any node, arrow, or container box
+- Auto-layout (LR / TB), grid snap, fit-to-content, minimap
 - Touch + pen support on iPad / tablets
 - Dark + light themes with visible group borders in both
 
@@ -275,7 +323,7 @@ The first six rows are the product. The drawing is table stakes.
 - **Global 👁 show/hide of play-order numbers** so the sequence is readable without pressing Play
 
 **Knowledge**
-- Service KB with **SLA, limits, when-to-use, cost formulas, and pitfalls** for 79 services
+- Service KB with **SLA, limits, when-to-use, cost formulas, and pitfalls** for 82 services
 - Hover or open the Properties panel — same data, with the as-of date footnote
 - Quarterly refresh via one JSON file (`service_kb.json`) + a build script
 
@@ -285,21 +333,36 @@ The first six rows are the product. The drawing is table stakes.
 - Auto-sum total with coverage indicator ("14 of 17 services priced")
 - Honest about what's not modelled (egress, NAT gateway, support plans)
 
+**Deploy Guide** (`🚀 Deploy Guide` toolbar button)
+- Builds an LLM prompt from the live canvas — provider auto-detected from your icons
+- Outputs: dependency-ordered **runbook**, **IaC** (Terraform / CDK / CloudFormation / Bicep / Pulumi), **console steps**, or an **AWS infra task dependency table** with owners per team
+- Toggles for least-privilege IAM, observability, rollback notes, and cost notes
+- **👁 Preview prompt** before copying
+
+**Blocks — reuse & composition** (`🧩 Blocks` sidebar tab)
+- Point at a folder of saved `.potato.html` diagrams → thumbnail palette (folder remembered between sessions)
+- **Click to preview (view only)**; **➕ Add** merges it in with fresh IDs, clear placement, and a labelled module box
+- Play sequences are appended and **auto-renumbered** so the combined flow still reads in order
+- `🧩 Insert` merges one or more files directly, without choosing a folder
+
 **Export & share**
-- `💾 Save` → self-contained `.potato.html` (~10–60 KB). Reopens in Potato to edit, double-clicks to view standalone.
-- The saved-HTML viewer is **interactive** — hover for tooltips, ▶ Play the flow, switch dark/light theme, no editor required.
+- `💾 Save` → self-contained `.potato.html` (~10–60 KB), with a confirm prompt so you never save by accident. Reopens in Potato to edit, double-clicks to view standalone.
+- The saved-HTML viewer is **interactive** — hover for tooltips, ▶ Play the flow, click 🔗 pattern links, switch dark/light theme, no editor required.
+- `🖼 Export PNG` → high-resolution raster (auto-scaled, falls back to `.svg` if the browser blocks the canvas). Play-order numbers appear only if the 👁 toggle is on.
 - `⬇ Download workflow` (in the Sequence Editor) → exports the ordered steps + narration as a plain-text (`.txt`) file, ready to paste into docs or a PR.
 
 **Import**
 - AI Import (LLM HTML or raw JSON)
 - draw.io / diagrams.net (mxGraph `.xml`) — parsed fully offline into an editable Potato diagram
-- Potato JSON
+- Potato JSON, and `.potato.html` merged in as Blocks
 
 **Quality of life**
 - 60-level undo / redo, copy / paste (preserves arrow connections)
-- Multi-select, drag-rect, arrow-key nudge, shift-nudge x10
+- Multi-select via marquee or `Ctrl+A` — **includes container boxes**, which move and delete with the selection
+- Arrow-key nudge, shift-nudge ×10
+- `🧹 Clear` — wipe the canvas in one click (asks first, undoable)
 - Auto-save to localStorage + per-tab crash recovery
-- Recent diagrams (last 8) in the Templates modal
+- `🕘 Recent` diagrams and `🗂️ Duplicate` (save a copy under a new name)
 
 ---
 
@@ -307,10 +370,11 @@ The first six rows are the product. The drawing is table stakes.
 
 | Shortcut | Action |
 |---|---|
-| `Ctrl+S` | Save |
+| `Ctrl+S` / `Ctrl+Shift+S` | Save / Save As |
 | `Ctrl+Z` / `Ctrl+Y` | Undo / Redo |
 | `Ctrl+C` / `Ctrl+V` | Copy / Paste (preserves connections) |
-| `Ctrl+A` | Select all |
+| `Ctrl+A` | Select all — nodes **and** container boxes |
+| `F11` | Toggle full screen |
 | `Delete` | Delete selected |
 | `Space` | ▶ Play / ⏸ pause / resume the flow animation |
 | `S` / `H` / `T` / `G` | Select / Pan / Text / Group tool |
@@ -381,8 +445,10 @@ potato/
 ├── _generate_kb.js            ← Splices service_kb.json into index.html
 ├── _generate_components.js    ← Splices the icons/ tree into the COMPONENTS manifest
 ├── _test_saved_viewer.js      ← Smoke test for the saved-viewer inline script
-├── icons/                     ← 1108 SVGs across aws/azure/gcp by category
+├── icons/                     ← 1140 SVGs across aws/azure/gcp/generic by category
 ├── assets/                    ← Screenshots and brand assets
+├── examples/                  ← Org-pattern rule files you can import (see AI Import)
+├── confluence-extension/      ← Atlassian Forge app to embed Potato diagrams in Confluence
 ├── POTATO_LLM_PROMPT.md       ← Long-form prompt you can copy into any LLM
 ├── .github/
 │   ├── copilot-instructions.md  ← Auto-loaded by Copilot Chat in this repo
@@ -411,7 +477,7 @@ potato/
 PRs welcome — see [CONTRIBUTING.md](CONTRIBUTING.md).
 
 Especially wanted:
-- More services in `service_kb.json` with `costEstimate` fields (72 priced of 79 covered — the 7 unpriced are mostly Azure/GCP/generic shapes)
+- More services in `service_kb.json` with `costEstimate` fields (72 priced of 82 covered — the 10 unpriced are mostly Azure/GCP/generic shapes)
 - Quarterly pricing-refresh PRs
 - More templates in the gallery
 - Mermaid import (we already parse draw.io / mxGraph XML — Mermaid support would round out the importers)
