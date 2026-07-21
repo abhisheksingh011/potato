@@ -1977,6 +1977,7 @@ kbd {
           <option value="iac">Runbook + IaC code</option>
           <option value="console">Runbook + console steps</option>
           <option value="all">All (table + IaC + console)</option>
+          <option value="taskplan">Infra task dependency table (AWS)</option>
         </select>
       </label>
       <label id="deploy-iac-wrap" style="display:none;flex-direction:column;gap:4px;font-size:11px;color:var(--text-muted);font-family:ui-monospace,Menlo,Consolas,monospace">
@@ -1992,7 +1993,7 @@ kbd {
     </div>
 
     <!-- INCLUDE TOGGLES -->
-    <div style="margin-top:10px;padding:10px 14px;background:var(--bg3);border:1px solid var(--border);border-radius:10px;display:flex;flex-wrap:wrap;gap:14px;font-size:12px;color:var(--text)">
+    <div id="deploy-include-row" style="margin-top:10px;padding:10px 14px;background:var(--bg3);border:1px solid var(--border);border-radius:10px;display:flex;flex-wrap:wrap;gap:14px;font-size:12px;color:var(--text)">
       <span style="font-size:11px;color:var(--text-muted);font-family:ui-monospace,Menlo,Consolas,monospace">Include:</span>
       <label style="display:flex;align-items:center;gap:5px;cursor:pointer"><input type="checkbox" id="deploy-inc-iam" checked onchange="updateDeployPreview()"> IAM least-privilege</label>
       <label style="display:flex;align-items:center;gap:5px;cursor:pointer"><input type="checkbox" id="deploy-inc-obs" checked onchange="updateDeployPreview()"> Observability</label>
@@ -12334,7 +12335,62 @@ function onDeployOutputChange() {
   const out = document.getElementById('deploy-output').value;
   const wantIac = out === 'iac' || out === 'all';
   document.getElementById('deploy-iac-wrap').style.display = wantIac ? 'flex' : 'none';
+  // The task-dependency table has its own fixed format — the Include toggles
+  // and IaC flavor don't apply to it.
+  const incRow = document.getElementById('deploy-include-row');
+  if (incRow) incRow.style.display = (out === 'taskplan') ? 'none' : 'flex';
   updateDeployPreview();
+}
+
+// Turn the live canvas into a readable prose description of the integration
+// flow — components (with their boundary/zone), connections, and the narrated
+// step order. Used to fill the "MY FLOW" section of the task-planner prompt so
+// the model plans against THIS diagram rather than a placeholder.
+function describeCanvasFlow() {
+  const nameOf = (id) => { const n = getNode(id); return n ? (n.label || n.type || id) : id; };
+  const out = [];
+  const dName = ((document.getElementById('filename-input') || {}).value || '').trim();
+  out.push('Integration flow' + (dName ? ': ' + dName : ''));
+
+  if (groups.length) {
+    out.push('', 'Boundaries / zones:');
+    groups.forEach(g => out.push('- ' + (g.label || 'unnamed boundary')));
+  }
+
+  out.push('', 'Components:');
+  nodes.forEach(n => {
+    const bits = [];
+    if (n.type && n.type !== n.label) bits.push(n.type);
+    if (n.category) bits.push(n.category);
+    if (n.sublabel)  bits.push(n.sublabel);
+    // Which drawn boundary contains this node (groups are geometric).
+    const box = groups.find(g => n.x >= g.x && n.y >= g.y && n.x <= g.x + g.w && n.y <= g.y + g.h);
+    if (box && box.label) bits.push('inside ' + box.label);
+    let line = '- ' + (n.label || n.type || n.id) + (bits.length ? ' (' + bits.join(' · ') + ')' : '');
+    if (n.description) line += ' — ' + String(n.description).replace(/\s+/g, ' ').trim();
+    out.push(line);
+  });
+
+  if (arrows.length) {
+    out.push('', 'Connections (direction = data flow):');
+    arrows.forEach(a => {
+      const labs = (typeof getArrowLabels === 'function' ? getArrowLabels(a) : [])
+        .map(l => l && l.text).filter(Boolean).join(', ');
+      out.push('- ' + nameOf(a.from) + ' -> ' + nameOf(a.to) +
+        (labs ? ' [' + labs + ']' : '') +
+        (a.style === 'dashed' ? ' (async / event-driven)' : ''));
+    });
+  }
+
+  if (playFlow && playFlow.length) {
+    out.push('', 'Step-by-step narration:');
+    playFlow.forEach((s, i) => {
+      const a = arrows.find(x => x.id === s.arrow);
+      const hop = a ? nameOf(a.from) + ' -> ' + nameOf(a.to) : '';
+      out.push((i + 1) + '. ' + (s.title ? s.title + ': ' : '') + (String(s.text || '').trim() || hop));
+    });
+  }
+  return out.join('\n');
 }
 
 // Assemble the exact text the Copy button puts on the clipboard:
@@ -12362,6 +12418,67 @@ function buildDeployPrompt() {
     { meta: { name: d.meta.name }, nodes: d.nodes, arrows: d.arrows, groups: d.groups, playFlow: d.playFlow },
     null, 2
   );
+
+  // Infra task dependency table — a fixed-format AWS build plan. "MY FLOW" is
+  // filled from the live canvas, and the diagram JSON is appended as the
+  // authoritative source so nothing in the drawing is missed.
+  if (out === 'taskplan') {
+    return `You are an infrastructure task planner. I will describe an integration flow, and you will produce a complete infrastructure task dependency table covering ALL components in the flow.
+
+## MY FLOW:
+${describeCanvasFlow()}
+
+## OUTPUT FORMAT:
+
+Create a task dependency table with these columns:
+
+| # | Dependency | Description | AWS Service | AWS Account | Region | VPC | Subnet | Task | Status | Owner | Remarks |
+
+## RULES:
+
+### Resource Decomposition:
+1. Every distinct infrastructure component gets its own row — including but not limited to:
+   - Compute: Lambda, ECS/Fargate, EC2, Step Functions
+   - Networking: NLB, ALB, API Gateway, VPC, Subnets, NAT Gateway, VPC Endpoints, DNS, Proxy (e.g., Netskope)
+   - Storage/Database: DynamoDB, Aurora RDS, S3, ElastiCache
+   - Messaging: SQS, SNS, EventBridge, Kinesis
+   - Security: Cognito, Secrets Manager, ACM Certificates, WAF
+   - IAM: Separate row for each IAM Role and IAM Policy per service
+   - Monitoring: CloudWatch Log Groups, Alarms, Dashboards
+   - Resilience: DLQs for every SQS queue and every Lambda
+   - Security Groups: Separate row for each service requiring network rules
+   - External/On-Prem systems: Azure AD, APIC, DNS, third-party APIs (mark as "External" in AWS Service column)
+   - Containers: ECR repositories, ECS Task Definitions, ECS Services, ECS Clusters
+   - Database supporting resources: Subnet Groups, Parameter Groups, credentials in Secrets Manager
+
+2. If a service connects to another service, ensure the networking path is represented (Security Groups, VPC Endpoints, NAT Gateways, proxy configs).
+
+### Dependencies:
+3. Set the "Dependency" column to the row number(s) that must be completed before this task can start. Leave blank if no dependency.
+4. Order rows logically following the flow direction (upstream → downstream).
+
+### Placeholders:
+5. Use "AWS Account**", "Region**", "VPC**", "Subnet**" as placeholders (to be filled during implementation).
+6. Set VPC/Subnet to "N/A" for fully managed services not requiring VPC placement (SQS, SNS, DynamoDB, Secrets Manager, IAM, Cognito, CloudWatch, EventBridge, S3, ACM).
+7. For external/on-prem systems, set AWS Account, Region, VPC, Subnet all to "N/A".
+
+### Status & Ownership:
+8. Set all Status to "Not started".
+9. Assign Owner based on responsibility:
+   - "Application Team" → application code, business logic, Lambda handler code, container app code
+   - "Cloud Engineer" → infrastructure provisioning, IAM, networking, ECS setup, DB setup
+   - "Security Team" → keys, secrets, certificates, identity providers, encryption
+   - "Network Team" → proxy configuration, DNS, cross-network connectivity, firewall rules
+   - "DBA" → database schema, parameter groups, performance tuning
+   - "Identity Team" → Azure AD, SSO, federation
+   - Use combined owners where applicable (e.g., "Security Team / Cloud Engineer")
+
+### Output discipline:
+10. Reply in plain GitHub-flavored Markdown TEXT only, written directly in the chat. The table MUST be a literal Markdown table (rows of "| ... | ... |"). Do NOT build an app, artifact, canvas, document or downloadable file, and do NOT use tools, web search or code execution. Start the reply with the table — no preamble, no closing summary.
+
+--- ARCHITECTURE (Potato diagram JSON — authoritative source for the flow above) ---
+${json}`;
+  }
 
   return 'You are a Principal Cloud Engineer. Produce a PRODUCTION-GRADE deployment runbook for the architecture described in the JSON at the end of this message. A competent cloud engineer should be able to follow it end to end and reach a working, production-ready deployment.\n\n' +
     'OUTPUT FORMAT — READ FIRST (so every model replies the same way)\n' +
@@ -12392,6 +12509,7 @@ function buildDeployPrompt() {
 }
 
 function deployDeliverablesLabel(out, iacFlavor) {
+  if (out === 'taskplan') return 'an infrastructure task dependency table';
   if (out === 'runbook') return 'a tabular runbook only';
   if (out === 'iac')     return 'a tabular runbook + ' + iacFlavor + ' code';
   if (out === 'console') return 'a tabular runbook + console click-by-click steps';
