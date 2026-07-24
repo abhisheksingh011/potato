@@ -12170,18 +12170,26 @@ Now describe the architecture you want me to diagram:`;
 // ===== ORG ARCHITECTURE PATTERNS =====
 // An optional Markdown file of organization-specific architecture rules
 // (approved services, naming conventions, mandatory components, network
-// boundaries). Once imported it persists in localStorage and is appended to the
-// copied LLM prompt as a highest-priority OVERRIDE section — so every generated
-// diagram follows the org's standards. This is guidance baked into the prompt;
-// generation still happens in the user's own LLM (same bring-your-own model).
+// boundaries). Once imported it is appended to the copied LLM prompt as a
+// highest-priority OVERRIDE section — so every generated diagram follows the
+// org's standards. This is guidance baked into the prompt; generation still
+// happens in the user's own LLM (same bring-your-own model).
+//
+// The rules live in MEMORY ONLY — not localStorage — so they are dropped on a
+// page refresh or in a new window/tab. You re-import them per session, on
+// purpose: org rules shouldn't silently stick around and alter later prompts.
 const ORG_PATTERNS_KEY = 'potato-org-patterns';
 const ORG_PATTERNS_NAME_KEY = 'potato-org-patterns-name';
+// Clean up rules a previous (persisting) build may have saved, so they don't
+// linger across this refresh.
+try { localStorage.removeItem(ORG_PATTERNS_KEY); localStorage.removeItem(ORG_PATTERNS_NAME_KEY); } catch (_) {}
+let _orgPatternsRules = '';
+let _orgPatternsName  = '';
 
 // Returns the OVERRIDE block to append to the base prompt, or '' when no
 // patterns are imported (so the default prompt is unchanged).
 function buildOrgRulesBlock() {
-  let rules = '';
-  try { rules = localStorage.getItem(ORG_PATTERNS_KEY) || ''; } catch (_) {}
+  const rules = _orgPatternsRules;
   if (!rules.trim()) return '';
   return `\n\n═══════════════════════════════════════════════════════════════
 ORGANIZATION ARCHITECTURE STANDARDS (HIGHEST PRIORITY — OVERRIDES ALL ABOVE)
@@ -12218,8 +12226,8 @@ function composeLlmPrompt() {
   return POTATO_LLM_PROMPT_TEXT + org;
 }
 
-// Read an imported .md/.txt of org rules and persist it. Bad/empty files are
-// rejected with a notice; valid ones update the modal badge immediately.
+// Read an imported .md/.txt of org rules into memory (this session only). Bad/
+// empty files are rejected with a notice; valid ones update the modal badge.
 function importOrgPatterns(e) {
   const file = e.target.files[0];
   if (!file) return;
@@ -12227,15 +12235,10 @@ function importOrgPatterns(e) {
   reader.onload = (ev) => {
     const text = String(ev.target.result || '');
     if (!text.trim()) { notify('That file is empty — nothing imported', 'error'); return; }
-    try {
-      localStorage.setItem(ORG_PATTERNS_KEY, text);
-      localStorage.setItem(ORG_PATTERNS_NAME_KEY, file.name);
-    } catch (_) {
-      notify('Could not save org patterns (browser storage full?)', 'error');
-      return;
-    }
+    _orgPatternsRules = text;
+    _orgPatternsName  = file.name;
     refreshOrgPatternsBadge();
-    notify('Org patterns imported — now appended to every copied prompt');
+    notify('Org patterns imported — active until you refresh or close this tab');
   };
   reader.onerror = () => notify('Could not read that file', 'error');
   reader.readAsText(file);
@@ -12243,24 +12246,19 @@ function importOrgPatterns(e) {
 }
 
 function clearOrgPatterns() {
-  try {
-    localStorage.removeItem(ORG_PATTERNS_KEY);
-    localStorage.removeItem(ORG_PATTERNS_NAME_KEY);
-  } catch (_) {}
+  _orgPatternsRules = '';
+  _orgPatternsName  = '';
   refreshOrgPatternsBadge();
   notify('Org patterns cleared — prompts are back to default');
 }
 
-// Reflect current stored state in the AI Import modal (status text + Clear btn).
+// Reflect current in-memory state in the AI Import modal (status text + Clear btn).
 function refreshOrgPatternsBadge() {
   const status = document.getElementById('org-patterns-status');
   const clearBtn = document.getElementById('org-patterns-clear');
   if (!status) return;
-  let rules = '', name = '';
-  try {
-    rules = localStorage.getItem(ORG_PATTERNS_KEY) || '';
-    name = localStorage.getItem(ORG_PATTERNS_NAME_KEY) || '';
-  } catch (_) {}
+  const rules = _orgPatternsRules;
+  const name  = _orgPatternsName;
   if (rules.trim()) {
     const lines = rules.split(/\r?\n/).filter(l => l.trim()).length;
     status.textContent = `✅ ${name || 'rules'} active (${lines} lines) — appended to the prompt`;
